@@ -1,0 +1,86 @@
+use serde::Serialize;
+
+#[derive(Serialize, Clone, Debug)]
+pub struct FileStatus {
+    pub path: String,
+    pub state: String,
+    pub staged: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct RefLabel {
+    pub name: String,
+    pub kind: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct CommitInfo {
+    pub oid: String,
+    pub short_oid: String,
+    pub message: String,
+    pub author: String,
+    pub author_email: String,
+    pub date: String,
+    pub parents: Vec<String>,
+    pub refs: Vec<RefLabel>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct BranchInfo {
+    pub name: String,
+    pub is_remote: bool,
+    pub upstream: Option<String>,
+    pub ahead: u32,
+    pub behind: u32,
+    pub is_current: bool,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct TagInfo {
+    pub name: String,
+    pub oid: String,
+    pub message: Option<String>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct StashEntry {
+    pub index: usize,
+    pub message: String,
+    pub date: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct DiffLine {
+    pub kind: String,
+    pub old_lineno: Option<u32>,
+    pub new_lineno: Option<u32>,
+    pub content: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct DiffHunk {
+    pub header: String,
+    pub lines: Vec<DiffLine>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct FileDiff {
+    pub path: String,
+    pub hunks: Vec<DiffHunk>,
+    pub insertions: u32,
+    pub deletions: u32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct RepoInfo {
+    pub path: String,
+    pub current_branch: String,
+    pub head_oid: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct RepoPathCheck {
+    pub exists: bool,
+    pub is_git_repo: bool,
+    pub display_name: String,
+}

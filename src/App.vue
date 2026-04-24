@@ -1,0 +1,460 @@
+<script setup lang="ts">
+import { ref, watch, onMounted, onUnmounted } from "vue";
+import AppToolbar from "./components/AppToolbar.vue";
+import RepositoriesPanel from "./components/RepositoriesPanel.vue";
+import BranchPanel from "./components/BranchPanel.vue";
+import CommitGraph from "./components/CommitGraph.vue";
+import CommitDetails from "./components/CommitDetails.vue";
+import FileList from "./components/FileList.vue";
+import DiffView from "./components/DiffView.vue";
+import StatusBar from "./components/StatusBar.vue";
+import CommitDialog from "./components/dialogs/CommitDialog.vue";
+import CloneDialog from "./components/dialogs/CloneDialog.vue";
+import PushDialog from "./components/dialogs/PushDialog.vue";
+import PullDialog from "./components/dialogs/PullDialog.vue";
+import CheckoutDialog from "./components/dialogs/CheckoutDialog.vue";
+import CheckoutRemoteDialog from "./components/dialogs/CheckoutRemoteDialog.vue";
+import ConfirmDialog from "./components/dialogs/ConfirmDialog.vue";
+import DiscardDialog from "./components/dialogs/DiscardDialog.vue";
+import SettingsDialog from "./components/dialogs/SettingsDialog.vue";
+import FileCompareDialog from "./components/dialogs/FileCompareDialog.vue";
+import { useFileCompare } from "@/composables/useFileCompare";
+import { useRepo } from "@/composables/useRepo";
+import { useFiles } from "@/composables/useFiles";
+import { useBranches } from "@/composables/useBranches";
+import { useLog } from "@/composables/useLog";
+import { useRemote } from "@/composables/useRemote";
+
+const { repoPath, onRepoOpened, restoreLastRepo } = useRepo();
+const { refresh: refreshFiles } = useFiles();
+const { refresh: refreshBranches } = useBranches();
+const { refresh: refreshLog } = useLog();
+const { pull, push } = useRemote();
+const { target: compareTarget } = useFileCompare();
+
+async function refreshAll() {
+  await Promise.all([refreshFiles(), refreshBranches(), refreshLog()]);
+}
+
+onRepoOpened(refreshAll);
+
+watch(repoPath, (val) => {
+  if (!val) refreshAll();
+});
+
+const showCommitDialog = ref(false);
+const showCloneDialog = ref(false);
+const showPushDialog = ref(false);
+const showPullDialog = ref(false);
+const showCheckoutDialog = ref(false);
+const checkoutRemoteTarget = ref<string | null>(null);
+const showConfirmDialog = ref(false);
+const showDiscardDialog = ref(false);
+const showErrorDialog = ref(false);
+const showSettingsDialog = ref(false);
+const errorMessage = ref("");
+
+function showError(msg: string) {
+  errorMessage.value = msg;
+  showErrorDialog.value = true;
+}
+
+function handlePullRequest(remote: string, rebase: boolean) {
+  showPullDialog.value = false;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(async () => {
+      document.body.style.cursor = "wait";
+      try {
+        await pull(remote, rebase);
+        await refreshAll();
+      } catch (e) {
+        showError(String(e));
+      } finally {
+        document.body.style.cursor = "";
+      }
+    });
+  });
+}
+function handlePushRequest(remote: string, force: boolean) {
+  showPushDialog.value = false;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(async () => {
+      document.body.style.cursor = "wait";
+      try {
+        await push(remote, force);
+        await refreshAll();
+      } catch (e) {
+        showError(String(e));
+      } finally {
+        document.body.style.cursor = "";
+      }
+    });
+  });
+}
+
+const confirmMessage = ref("");
+
+// --- Template ref for RepositoriesPanel ---
+const repositoriesPanelRef = ref<InstanceType<typeof RepositoriesPanel> | null>(null);
+
+function handleAddRepository() {
+  repositoriesPanelRef.value?.triggerAddRepository();
+}
+
+function handleAddGroup() {
+  repositoriesPanelRef.value?.triggerAddGroup();
+}
+
+// --- Close any open dialog on Esc ---
+const dialogs = [showCommitDialog, showCloneDialog, showPushDialog, showPullDialog, showCheckoutDialog, showConfirmDialog, showDiscardDialog, showErrorDialog, showSettingsDialog];
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === "Escape") {
+    if (checkoutRemoteTarget.value) { checkoutRemoteTarget.value = null; return; }
+    for (const d of dialogs) {
+      if (d.value) { d.value = false; return; }
+    }
+  }
+  if (e.altKey && e.key === "PageDown") {
+    e.preventDefault();
+    if (repoPath.value) showPullDialog.value = true;
+  }
+  if (e.altKey && e.key === "PageUp") {
+    e.preventDefault();
+    if (repoPath.value) handlePushRequest("origin", false);
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P" || e.code === "KeyP")) {
+    e.preventDefault();
+    showSettingsDialog.value = true;
+  }
+}
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+onMounted(() => {
+  window.addEventListener("keydown", onKeydown);
+  restoreLastRepo();
+  pollTimer = setInterval(() => {
+    if (repoPath.value) {
+      refreshFiles();
+      refreshLog();
+      refreshBranches();
+    }
+  }, 2000);
+});
+onUnmounted(() => {
+  window.removeEventListener("keydown", onKeydown);
+  if (pollTimer) clearInterval(pollTimer);
+});
+
+// --- Resizable panel sizes (persisted to localStorage) ---
+const LAYOUT_KEY = "gitstream-layout";
+
+function loadLayout() {
+  try {
+    const raw = localStorage.getItem(LAYOUT_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return {};
+}
+
+const saved = loadLayout();
+const sidebarWidth = ref<number>(saved.sidebarWidth ?? 220);
+const rightPaneWidth = ref<number>(saved.rightPaneWidth ?? 340);
+const topRowHeight = ref<number | null>(saved.topRowHeight ?? null);
+const detailsHeight = ref<number | null>(saved.detailsHeight ?? null);
+const reposHeight = ref<number | null>(saved.reposHeight ?? null);
+
+function saveLayout() {
+  localStorage.setItem(LAYOUT_KEY, JSON.stringify({
+    sidebarWidth: sidebarWidth.value,
+    rightPaneWidth: rightPaneWidth.value,
+    topRowHeight: topRowHeight.value,
+    detailsHeight: detailsHeight.value,
+    reposHeight: reposHeight.value,
+  }));
+}
+
+const horizontalHandles = new Set(["sidebar", "right-pane"]);
+let dragging: string | null = null;
+let startPos = 0;
+let startSize = 0;
+
+function onMouseDown(e: MouseEvent, handle: string) {
+  dragging = handle;
+  startPos = horizontalHandles.has(handle) ? e.clientX : e.clientY;
+
+  if (handle === "sidebar") startSize = sidebarWidth.value;
+  else if (handle === "right-pane") startSize = rightPaneWidth.value;
+  else if (handle === "top-row") {
+    const el = document.querySelector(".top-row") as HTMLElement | null;
+    startSize = topRowHeight.value ?? (el ? el.offsetHeight : 400);
+  } else if (handle === "right-row") {
+    const el = document.querySelector(".details-pane") as HTMLElement | null;
+    startSize = detailsHeight.value ?? (el ? el.offsetHeight : 200);
+  } else if (handle === "repos") {
+    const el = document.querySelector(".repos-section") as HTMLElement | null;
+    startSize = reposHeight.value ?? (el ? el.offsetHeight : 180);
+  }
+
+  document.addEventListener("mousemove", onMouseMove);
+  document.addEventListener("mouseup", onMouseUp);
+  document.body.style.cursor = horizontalHandles.has(handle) ? "col-resize" : "row-resize";
+  document.body.style.userSelect = "none";
+}
+
+function onMouseMove(e: MouseEvent) {
+  if (!dragging) return;
+  if (dragging === "sidebar") {
+    sidebarWidth.value = Math.max(120, startSize + (e.clientX - startPos));
+  } else if (dragging === "right-pane") {
+    rightPaneWidth.value = Math.max(180, startSize - (e.clientX - startPos));
+  } else if (dragging === "top-row") {
+    topRowHeight.value = Math.max(100, startSize + (e.clientY - startPos));
+  } else if (dragging === "right-row") {
+    detailsHeight.value = Math.max(60, startSize + (e.clientY - startPos));
+  } else if (dragging === "repos") {
+    reposHeight.value = Math.max(60, startSize + (e.clientY - startPos));
+  }
+}
+
+function onMouseUp() {
+  dragging = null;
+  document.removeEventListener("mousemove", onMouseMove);
+  document.removeEventListener("mouseup", onMouseUp);
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+  saveLayout();
+}
+</script>
+
+<template>
+  <div class="app-layout">
+    <!-- Toolbar -->
+    <AppToolbar
+      @commit="showCommitDialog = true"
+      @clone="showCloneDialog = true"
+      @push="handlePushRequest('origin', false)"
+      @pull="showPullDialog = true"
+      @checkout="showCheckoutDialog = true"
+      @settings="showSettingsDialog = true"
+      @add-repository="handleAddRepository"
+      @add-group="handleAddGroup"
+    />
+
+    <!-- Main body -->
+    <div class="app-body">
+      <!-- LEFT SIDEBAR -->
+      <aside class="left-sidebar" :style="{ width: sidebarWidth + 'px' }">
+        <div
+          class="repos-section"
+          :style="reposHeight ? { flex: 'none', height: reposHeight + 'px' } : {}"
+        >
+          <RepositoriesPanel ref="repositoriesPanelRef" />
+        </div>
+        <div class="resize-handle-h" @mousedown="onMouseDown($event, 'repos')" />
+        <div class="branches-section">
+          <BranchPanel
+            @checkout-remote="checkoutRemoteTarget = $event"
+            @checked-out="refreshAll()"
+            @branches-changed="refreshAll()"
+          />
+        </div>
+      </aside>
+
+      <div class="resize-handle-v" @mousedown="onMouseDown($event, 'sidebar')" />
+
+      <!-- CENTER + RIGHT -->
+      <div class="main-area">
+        <!-- TOP ROW: Graph | (Commit Details + Files) -->
+        <div
+          class="top-row"
+          :style="topRowHeight ? { flex: 'none', height: topRowHeight + 'px' } : {}"
+        >
+          <div class="graph-pane">
+            <CommitGraph
+              @commit="showCommitDialog = true"
+              @discard="showDiscardDialog = true"
+            />
+          </div>
+
+          <div class="resize-handle-v" @mousedown="onMouseDown($event, 'right-pane')" />
+
+          <div class="right-pane" :style="{ width: rightPaneWidth + 'px' }">
+            <div
+              class="details-pane"
+              :style="detailsHeight ? { flex: 'none', height: detailsHeight + 'px' } : {}"
+            >
+              <CommitDetails />
+            </div>
+            <div class="resize-handle-h" @mousedown="onMouseDown($event, 'right-row')" />
+            <div class="files-pane">
+              <FileList />
+            </div>
+          </div>
+        </div>
+
+        <div class="resize-handle-h" @mousedown="onMouseDown($event, 'top-row')" />
+
+        <!-- BOTTOM ROW: Diff -->
+        <div class="bottom-row">
+          <div class="diff-pane">
+            <DiffView />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <StatusBar />
+
+    <!-- Dialogs -->
+    <CommitDialog v-if="showCommitDialog" @close="showCommitDialog = false; refreshAll()" />
+    <CloneDialog v-if="showCloneDialog" @close="showCloneDialog = false; refreshAll()" />
+    <PushDialog v-if="showPushDialog" @close="showPushDialog = false" @push="handlePushRequest" />
+    <PullDialog v-if="showPullDialog" @close="showPullDialog = false" @pull="handlePullRequest" />
+    <CheckoutDialog v-if="showCheckoutDialog" @close="showCheckoutDialog = false; refreshAll()" />
+    <CheckoutRemoteDialog
+      v-if="checkoutRemoteTarget"
+      :remote-branch="checkoutRemoteTarget"
+      @close="checkoutRemoteTarget = null; refreshAll()"
+    />
+    <ConfirmDialog
+      v-if="showConfirmDialog"
+      :message="confirmMessage"
+      @close="showConfirmDialog = false"
+    />
+    <DiscardDialog v-if="showDiscardDialog" @close="showDiscardDialog = false; refreshAll()" />
+    <SettingsDialog v-if="showSettingsDialog" @close="showSettingsDialog = false" />
+    <FileCompareDialog v-if="compareTarget" />
+    <ConfirmDialog
+      v-if="showErrorDialog"
+      :message="errorMessage"
+      confirm-label="OK"
+      @close="showErrorDialog = false"
+      @confirm="showErrorDialog = false"
+    />
+  </div>
+</template>
+
+<style scoped>
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-primary);
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Left sidebar */
+.left-sidebar {
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-subtle);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.repos-section {
+  flex: 1;
+  overflow: hidden;
+}
+
+.branches-section {
+  flex: 2;
+  overflow: hidden;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Main area */
+.main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Top row */
+.top-row {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.graph-pane {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Right pane: details + files stacked */
+.right-pane {
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-subtle);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.details-pane {
+  flex: 2;
+  overflow: hidden;
+}
+
+.files-pane {
+  flex: 3;
+  overflow: hidden;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Bottom row */
+.bottom-row {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.diff-pane {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ---- Resize handles ---- */
+.resize-handle-v {
+  width: 4px;
+  cursor: col-resize;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+.resize-handle-v::after {
+  content: "";
+  position: absolute;
+  inset: 0 -2px;
+}
+.resize-handle-v:hover {
+  background: var(--accent);
+}
+
+.resize-handle-h {
+  height: 4px;
+  cursor: row-resize;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+.resize-handle-h::after {
+  content: "";
+  position: absolute;
+  inset: -2px 0;
+}
+.resize-handle-h:hover {
+  background: var(--accent);
+}
+</style>

@@ -1,0 +1,175 @@
+:root {
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-size: 15px;
+  --font-size-sm: 13px;
+  --font-size-xs: 12px;
+
+  --radius: 4px;
+  --radius-lg: 6px;
+
+  --toolbar-height: 40px;
+  --statusbar-height: 24px;
+  --panel-min-width: 200px;
+}
+
+/* LIGHT theme */
+:root,
+:root[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f2f2f2;
+  --bg-tertiary: #ffffff;
+  --bg-surface: #ebebeb;
+  --bg-hover: #e5f1fb;
+  --bg-active: #cce8ff;
+
+  --text-primary: #1e1e1e;
+  --text-secondary: #4a4a4a;
+  --text-muted: #8a8a8a;
+
+  --border: #c8c8c8;
+  --border-subtle: #e0e0e0;
+
+  --accent: #1e6fba;
+  --accent-hover: #2a7fce;
+
+  --green: #2e8b2e;
+  --red: #c83232;
+  --yellow: #c8a000;
+  --blue: #1e6fba;
+  --purple: #8a3a9a;
+  --teal: #2a8a8a;
+  --orange: #d97706;
+
+  --diff-added-bg: #d4f8d4;
+  --diff-added-line: #eaffea;
+  --diff-removed-bg: #fcd9d9;
+  --diff-removed-line: #ffeeee;
+}
+
+/* Material Design (dark) theme */
+:root[data-theme="material"] {
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --bg-tertiary: #1e1e1e;
+  --bg-surface: #242424;       /* elevation 02 */
+  --bg-hover: #2c2c2c;         /* elevation 03 */
+  --bg-active: #383838;        /* elevation 06 */
+
+  --text-primary: rgba(255, 255, 255, 0.70);
+  --text-secondary: rgba(255, 255, 255, 0.50);
+  --text-muted: rgba(255, 255, 255, 0.32);
+
+  --border: #2c2c2c;
+  --border-subtle: #242424;
+
+  --accent: #bb86fc;            /* primary */
+  --accent-hover: #cfa3fd;
+
+  --green: #03dac6;             /* secondary teal */
+  --red: #cf6679;               /* error */
+  --yellow: #ffd54f;
+  --blue: #82b1ff;
+  --purple: #bb86fc;
+  --teal: #03dac6;
+  --orange: #ffab40;
+
+  --diff-added-bg: rgba(3, 218, 198, 0.18);
+  --diff-added-line: rgba(3, 218, 198, 0.08);
+  --diff-removed-bg: rgba(207, 102, 121, 0.22);
+  --diff-removed-line: rgba(207, 102, 121, 0.10);
+}
+
+/* VSCode Dark+ DARK theme */
+:root[data-theme="dark"] {
+  --bg-primary: #1e1e1e;       /* editor.background */
+  --bg-secondary: #252526;     /* sideBar.background */
+  --bg-tertiary: #3c3c3c;      /* input.background */
+  --bg-surface: #333333;       /* activityBar / titleBar */
+  --bg-hover: #2a2d2e;         /* list.hoverBackground */
+  --bg-active: #094771;        /* list.activeSelectionBackground */
+
+  --text-primary: #cccccc;     /* foreground */
+  --text-secondary: #9d9d9d;
+  --text-muted: #6e7681;
+
+  --border: #3c3c3c;           /* panel.border */
+  --border-subtle: #252526;
+
+  --accent: #007acc;           /* focusBorder / statusBar */
+  --accent-hover: #1f8ad2;
+
+  --green: #6a9955;            /* comment green */
+  --red: #f48771;              /* errorForeground */
+  --yellow: #dcdcaa;           /* function yellow */
+  --blue: #569cd6;             /* keyword blue */
+  --purple: #c586c0;           /* control purple */
+  --teal: #4ec9b0;             /* type green-teal */
+  --orange: #ce9178;           /* string orange */
+
+  --diff-added-bg: rgba(155, 185, 85, 0.20);
+  --diff-added-line: rgba(155, 185, 85, 0.10);
+  --diff-removed-bg: rgba(255, 0, 0, 0.20);
+  --diff-removed-line: rgba(255, 0, 0, 0.10);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-hover);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-active);
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  border: none;
+  cursor: pointer;
+  background: none;
+  color: inherit;
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  outline: none;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent);
+}
+
+/* Search highlight */
+mark.hl {
+  background: #fff37a;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}

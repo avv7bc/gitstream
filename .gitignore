@@ -1,0 +1,20 @@
+# Rust
+/src-tauri/target
+
+# Nested repo leftover
+/src-tauri/gitstream
+
+# Node
+node_modules
+dist
+
+# IDE
+*.swp
+*.swo
+*~
+.DS_Store
+.vscode
+.idea
+
+# Git worktrees
+.worktrees
