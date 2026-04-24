@@ -45,6 +45,8 @@ pub fn classify_git_error(stderr: &str) -> GitError {
         GitError::NothingToCommit
     } else if s.contains("conflict") && s.contains("merge") {
         GitError::MergeConflict
+    } else if s.contains("not a git repository") {
+        GitError::RepoNotFound("Directory is not a git repository".into())
     } else {
         GitError::CommandFailed {
             message: stderr.trim().to_string(),
