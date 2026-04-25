@@ -45,6 +45,8 @@
   --diff-added-line: #eaffea;
   --diff-removed-bg: #fcd9d9;
   --diff-removed-line: #ffeeee;
+  --diff-word-added-bg: rgba(34, 197, 94, 0.35);
+  --diff-word-removed-bg: rgba(239, 68, 68, 0.35);
 }
 
 /* Material Design (dark) theme */
@@ -78,6 +80,8 @@
   --diff-added-line: rgba(3, 218, 198, 0.08);
   --diff-removed-bg: rgba(207, 102, 121, 0.22);
   --diff-removed-line: rgba(207, 102, 121, 0.10);
+  --diff-word-added-bg: rgba(34, 197, 94, 0.35);
+  --diff-word-removed-bg: rgba(239, 68, 68, 0.35);
 }
 
 /* VSCode Dark+ DARK theme */
@@ -111,6 +115,8 @@
   --diff-added-line: rgba(155, 185, 85, 0.10);
   --diff-removed-bg: rgba(255, 0, 0, 0.20);
   --diff-removed-line: rgba(255, 0, 0, 0.10);
+  --diff-word-added-bg: rgba(34, 197, 94, 0.35);
+  --diff-word-removed-bg: rgba(239, 68, 68, 0.35);
 }
 
 /* SmartGit dark theme */
@@ -144,6 +150,8 @@
   --diff-added-line: rgba(46, 202, 75, 0.08);
   --diff-removed-bg: rgba(231, 76, 60, 0.22);
   --diff-removed-line: rgba(231, 76, 60, 0.10);
+  --diff-word-added-bg: rgba(34, 197, 94, 0.35);
+  --diff-word-removed-bg: rgba(239, 68, 68, 0.35);
 }
 
 /* Catppuccin Mocha theme */
@@ -177,6 +185,8 @@
   --diff-added-line: rgba(166, 227, 161, 0.28);
   --diff-removed-bg: rgba(243, 139, 168, 0.12);
   --diff-removed-line: rgba(243, 139, 168, 0.28);
+  --diff-word-added-bg: rgba(34, 197, 94, 0.35);
+  --diff-word-removed-bg: rgba(239, 68, 68, 0.35);
 }
 
 /* Dracula theme */
@@ -210,6 +220,8 @@
   --diff-added-line: rgba(80, 250, 123, 0.28);
   --diff-removed-bg: rgba(255, 85, 85, 0.12);
   --diff-removed-line: rgba(255, 85, 85, 0.28);
+  --diff-word-added-bg: rgba(34, 197, 94, 0.35);
+  --diff-word-removed-bg: rgba(239, 68, 68, 0.35);
 }
 
 * {
