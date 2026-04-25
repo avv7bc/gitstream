@@ -1,18 +1,18 @@
 import { ref, watch } from "vue";
 
-export type ThemeMode = "system" | "light" | "dark" | "material";
+export type ThemeMode = "system" | "light" | "dark" | "material" | "smartgit";
 
 const STORAGE_KEY = "gitstream-theme";
 const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
 function loadMode(): ThemeMode {
   const v = localStorage.getItem(STORAGE_KEY);
-  return v === "light" || v === "dark" || v === "material" || v === "system" ? v : "system";
+  return v === "light" || v === "dark" || v === "material" || v === "smartgit" || v === "system" ? (v as ThemeMode) : "system";
 }
 
 const mode = ref<ThemeMode>(loadMode());
 
-function resolve(m: ThemeMode): "light" | "dark" | "material" {
+function resolve(m: ThemeMode): "light" | "dark" | "material" | "smartgit" {
   if (m === "system") return mediaQuery.matches ? "dark" : "light";
   return m;
 }

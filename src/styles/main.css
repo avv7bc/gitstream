@@ -113,6 +113,39 @@
   --diff-removed-line: rgba(255, 0, 0, 0.10);
 }
 
+/* SmartGit dark theme */
+:root[data-theme="smartgit"] {
+  --bg-primary: #2b2b2b;       /* main background */
+  --bg-secondary: #323232;     /* secondary panels */
+  --bg-tertiary: #3c3c3c;      /* input background */
+  --bg-surface: #2d2d2d;       /* toolbar/statusbar */
+  --bg-hover: #3a3a3a;         /* hover state */
+  --bg-active: #0f5a8f;        /* selection background */
+
+  --text-primary: #e0e0e0;     /* primary text */
+  --text-secondary: #a8a8a8;
+  --text-muted: #6a6a6a;
+
+  --border: #3f3f3f;           /* borders */
+  --border-subtle: #353535;
+
+  --accent: #3b8eea;           /* accent blue */
+  --accent-hover: #5ba3ff;
+
+  --green: #2eca4b;            /* bright green */
+  --red: #e74c3c;              /* bright red */
+  --yellow: #f39c12;           /* orange-yellow */
+  --blue: #3b8eea;             /* smartgit blue */
+  --purple: #9b5de5;           /* purple */
+  --teal: #00d9ff;             /* cyan */
+  --orange: #e67e22;           /* orange */
+
+  --diff-added-bg: rgba(46, 202, 75, 0.20);
+  --diff-added-line: rgba(46, 202, 75, 0.08);
+  --diff-removed-bg: rgba(231, 76, 60, 0.22);
+  --diff-removed-line: rgba(231, 76, 60, 0.10);
+}
+
 * {
   margin: 0;
   padding: 0;

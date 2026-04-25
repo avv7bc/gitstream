@@ -123,6 +123,7 @@ const themes: { value: ThemeMode; label: string }[] = [
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark+ (VSCode)" },
   { value: "material", label: "Material" },
+  { value: "smartgit", label: "SmartGit" },
 ];
 
 const tab = ref<"user" | "workspace">("user");
