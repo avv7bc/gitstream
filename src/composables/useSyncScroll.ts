@@ -37,6 +37,10 @@ export function useSyncScroll() {
   let cleanup: (() => void) | null = null;
 
   onMounted(() => {
+    if (!leftPanelRef.value || !rightPanelRef.value) {
+      console.warn('[useSyncScroll] Refs not attached to DOM elements');
+      return;
+    }
     cleanup = setupSync() || null;
   });
 
