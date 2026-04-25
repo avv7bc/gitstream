@@ -6,7 +6,7 @@ import BranchPanel from "./components/BranchPanel.vue";
 import CommitGraph from "./components/CommitGraph.vue";
 import CommitDetails from "./components/CommitDetails.vue";
 import FileList from "./components/FileList.vue";
-import DiffView from "./components/DiffView.vue";
+import SideBySideDiffView from "./components/SideBySideDiffView.vue";
 import StatusBar from "./components/StatusBar.vue";
 import CommitDialog from "./components/dialogs/CommitDialog.vue";
 import CloneDialog from "./components/dialogs/CloneDialog.vue";
@@ -298,7 +298,7 @@ function onMouseUp() {
         <!-- BOTTOM ROW: Diff -->
         <div class="bottom-row">
           <div class="diff-pane">
-            <DiffView />
+            <SideBySideDiffView />
           </div>
         </div>
       </div>
