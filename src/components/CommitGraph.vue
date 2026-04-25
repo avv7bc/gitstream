@@ -63,6 +63,46 @@ function getCurrentIndex(): number {
   return idx >= 0 ? idx : 0; // fallback to 0 if not found
 }
 
+function navigateCommits(direction: 'up' | 'down'): void {
+  const currentIdx = getCurrentIndex();
+  const hasWorkingTree = changedCount.value > 0;
+  const maxIdx = filteredCommits.value.length - 1;
+
+  let newIdx: number;
+
+  if (direction === 'up') {
+    newIdx = currentIdx - 1;
+    // Boundary: don't go above -1 (Working Tree) or 0 (first commit)
+    if (newIdx < (hasWorkingTree ? -1 : 0)) {
+      return; // no-op, stay at boundary
+    }
+  } else {
+    // direction === 'down'
+    newIdx = currentIdx + 1;
+    // Boundary: don't go beyond last commit
+    if (newIdx > maxIdx) {
+      return; // no-op, stay at boundary
+    }
+  }
+
+  // Apply new selection
+  if (newIdx === -1) {
+    selectWorkingTree();
+  } else {
+    selectedCommit.value = filteredCommits.value[newIdx].oid;
+  }
+}
+
+function handleKeyDown(e: KeyboardEvent): void {
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    navigateCommits('up');
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    navigateCommits('down');
+  }
+}
+
 const firstRemoteIdx = computed(() => {
   return filteredCommits.value.findIndex((c) =>
     c.refs.some((r) => r.kind === "remote-branch")
@@ -125,7 +165,7 @@ function formatDate(iso: string): string {
     </div>
 
 
-    <div class="graph-body">
+    <div class="graph-body" tabindex="0" role="listbox" @keydown="handleKeyDown">
       <!-- Working Tree / Index row -->
       <div
         v-if="changedCount > 0"
