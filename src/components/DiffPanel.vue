@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import DiffLinesPair from "./DiffLinesPair.vue";
 import type { DiffHunkWithWordDiff } from "@/composables/useSideBySideDiff";
 
 interface Props {
@@ -8,18 +7,18 @@ interface Props {
   isOldVersion: boolean;
 }
 
-withDefaults(defineProps<Props>());
+withDefaults(defineProps<Props>(), {});
 
 const panelRef = ref<HTMLDivElement | null>(null);
 </script>
 
 <template>
   <div ref="panelRef" class="diff-panel">
-    <div v-for="(hunk, hi) in hunks" :key="hi" class="diff-hunk">
+    <div v-for="hunk in hunks" :key="`${hunk.header}`" class="diff-hunk">
       <div class="hunk-header">{{ hunk.header }}</div>
       <div
-        v-for="(line, li) in hunk.lines"
-        :key="li"
+        v-for="line in hunk.lines"
+        :key="`${line.content}-${line.kind}`"
         class="line-wrapper"
         :class="{
           'show-old': isOldVersion && (line.kind === 'removed' || line.kind === 'context'),
@@ -33,7 +32,7 @@ const panelRef = ref<HTMLDivElement | null>(null);
           </span>
           <span class="line-content">
             <template v-if="line.wordDiffs">
-              <template v-for="(span, idx) in line.wordDiffs" :key="idx">
+              <template v-for="span in line.wordDiffs" :key="`${span.text}-${span.kind}`">
                 <span :class="['word-diff', span.kind]">{{ span.text }}</span>
               </template>
             </template>

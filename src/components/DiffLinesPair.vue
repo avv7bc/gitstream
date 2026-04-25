@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DiffLineWithWordDiff, WordDiffSpan } from "@/composables/useSideBySideDiff";
+import type { DiffLineWithWordDiff } from "@/composables/useSideBySideDiff";
 
 interface Props {
   oldLine?: DiffLineWithWordDiff;
@@ -11,10 +11,6 @@ withDefaults(defineProps<Props>(), {
   showPlaceholder: false,
 });
 
-function renderWordDiffs(spans: WordDiffSpan[] | undefined): string {
-  if (!spans) return "";
-  return spans.map(s => s.text).join("");
-}
 
 function getLineClass(line?: DiffLineWithWordDiff): string {
   if (!line) return "placeholder";
@@ -29,7 +25,7 @@ function getLineClass(line?: DiffLineWithWordDiff): string {
       <span class="line-prefix">{{ oldLine ? (oldLine.kind === "removed" ? "-" : " ") : "" }}</span>
       <span class="line-content">
         <template v-if="oldLine?.wordDiffs">
-          <template v-for="(span, idx) in oldLine.wordDiffs" :key="idx">
+          <template v-for="span in oldLine.wordDiffs" :key="`${span.text}-${span.kind}`">
             <span :class="['word-diff', span.kind]">{{ span.text }}</span>
           </template>
         </template>
@@ -44,7 +40,7 @@ function getLineClass(line?: DiffLineWithWordDiff): string {
       <span class="line-prefix">{{ newLine ? (newLine.kind === "added" ? "+" : " ") : "" }}</span>
       <span class="line-content">
         <template v-if="newLine?.wordDiffs">
-          <template v-for="(span, idx) in newLine.wordDiffs" :key="idx">
+          <template v-for="span in newLine.wordDiffs" :key="`${span.text}-${span.kind}`">
             <span :class="['word-diff', span.kind]">{{ span.text }}</span>
           </template>
         </template>

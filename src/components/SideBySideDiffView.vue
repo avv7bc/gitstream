@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import { useDiff } from "@/composables/useDiff";
 import { useFiles } from "@/composables/useFiles";
 import { useSyncScroll } from "@/composables/useSyncScroll";
 import { useSideBySideDiff } from "@/composables/useSideBySideDiff";
-import DiffPanel from "./DiffPanel.vue";
-import type { DiffHunk } from "@/types";
 
 const { currentDiff } = useDiff();
 const { selectedFile } = useFiles();
@@ -87,11 +85,11 @@ function scrollToHunk() {
     <div class="diff-container">
       <div ref="leftPanelRef" class="diff-side old">
         <div class="side-label">Old Version</div>
-        <div v-for="(hunk, hi) in enrichedHunks" :key="hi" :data-hunk-idx="hi" class="hunk-section">
+        <div v-for="(hunk, hi) in enrichedHunks" :key="`${hunk.header}`" :data-hunk-idx="hi" class="hunk-section">
           <div class="hunk-header">{{ hunk.header }}</div>
           <div
-            v-for="(line, li) in hunk.lines"
-            :key="li"
+            v-for="line in hunk.lines"
+            :key="`${line.content}-${line.kind}-old`"
             class="diff-line"
             :class="[line.kind, { hidden: line.kind === 'added' }]"
           >
@@ -99,7 +97,7 @@ function scrollToHunk() {
             <span class="line-prefix">{{ line.kind === "removed" ? "-" : " " }}</span>
             <span class="line-content">
               <template v-if="line.wordDiffs">
-                <template v-for="(span, idx) in line.wordDiffs" :key="idx">
+                <template v-for="span in line.wordDiffs" :key="`${span.text}-${span.kind}`">
                   <span :class="['word-diff', span.kind]">{{ span.text }}</span>
                 </template>
               </template>
@@ -115,11 +113,11 @@ function scrollToHunk() {
 
       <div ref="rightPanelRef" class="diff-side new">
         <div class="side-label">New Version</div>
-        <div v-for="(hunk, hi) in enrichedHunks" :key="hi" :data-hunk-idx="hi" class="hunk-section">
+        <div v-for="(hunk, hi) in enrichedHunks" :key="`${hunk.header}`" :data-hunk-idx="hi" class="hunk-section">
           <div class="hunk-header">{{ hunk.header }}</div>
           <div
-            v-for="(line, li) in hunk.lines"
-            :key="li"
+            v-for="line in hunk.lines"
+            :key="`${line.content}-${line.kind}-new`"
             class="diff-line"
             :class="[line.kind, { hidden: line.kind === 'removed' }]"
           >
@@ -127,7 +125,7 @@ function scrollToHunk() {
             <span class="line-prefix">{{ line.kind === "added" ? "+" : " " }}</span>
             <span class="line-content">
               <template v-if="line.wordDiffs">
-                <template v-for="(span, idx) in line.wordDiffs" :key="idx">
+                <template v-for="span in line.wordDiffs" :key="`${span.text}-${span.kind}`">
                   <span :class="['word-diff', span.kind]">{{ span.text }}</span>
                 </template>
               </template>
