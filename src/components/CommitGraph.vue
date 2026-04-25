@@ -52,6 +52,17 @@ function selectWorkingTree() {
   selectedCommit.value = "__worktree__";
 }
 
+function getCurrentIndex(): number {
+  // Working Tree is at position -1
+  if (selectedCommit.value === "__worktree__") {
+    return changedCount.value > 0 ? -1 : 0; // fallback to 0 if WT not visible
+  }
+
+  // Find commit in filtered list
+  const idx = filteredCommits.value.findIndex((c) => c.oid === selectedCommit.value);
+  return idx >= 0 ? idx : 0; // fallback to 0 if not found
+}
+
 const firstRemoteIdx = computed(() => {
   return filteredCommits.value.findIndex((c) =>
     c.refs.some((r) => r.kind === "remote-branch")
