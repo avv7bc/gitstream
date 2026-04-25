@@ -94,7 +94,7 @@ const formattedDate = computed(() => {
 }
 .panel-title-date {
   margin-left: auto;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
 }
@@ -102,7 +102,7 @@ const formattedDate = computed(() => {
 .details-body {
   padding: 10px 12px;
   overflow-y: auto;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -138,7 +138,7 @@ const formattedDate = computed(() => {
   color: var(--text-primary);
 }
 .detail-value.hash {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--accent);
   font-size: var(--font-size-xs);
 }

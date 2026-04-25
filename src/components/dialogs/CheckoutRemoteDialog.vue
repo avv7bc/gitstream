@@ -144,7 +144,7 @@ async function handleCheckout() {
 }
 .remote-info .remote-name {
   color: var(--text-primary);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-sans);
 }
 
 .option-row {

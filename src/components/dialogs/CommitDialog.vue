@@ -167,7 +167,7 @@ async function handleCommit(alsoPush: boolean) {
 }
 
 .dialog-hint {
-  font-size: 15px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 4px;
@@ -236,6 +236,7 @@ async function handleCommit(alsoPush: boolean) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: var(--font-size-xs);
 }
 
 .empty {
@@ -251,8 +252,8 @@ async function handleCommit(alsoPush: boolean) {
 
 .commit-message-input {
   width: 100%;
-  font-family: var(--font-mono);
-  font-size: var(--font-size);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
   resize: vertical;
   min-height: 100px;
   padding: 8px;

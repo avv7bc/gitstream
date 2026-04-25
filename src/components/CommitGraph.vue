@@ -305,6 +305,7 @@ function formatDate(iso: string): string {
   text-overflow: ellipsis;
   white-space: nowrap;
   padding-right: 8px;
+  font-size: var(--font-size-xs);
 }
 
 .date-col {
@@ -315,6 +316,7 @@ function formatDate(iso: string): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: var(--font-size-xs);
 }
 
 @container (max-width: 500px) {
@@ -328,7 +330,6 @@ function formatDate(iso: string): string {
 .hash-col {
   width: 70px;
   flex-shrink: 0;
-  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   color: var(--text-muted);
   text-align: right;

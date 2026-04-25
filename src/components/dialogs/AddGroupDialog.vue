@@ -64,7 +64,7 @@ onMounted(() => {
 }
 
 .dialog-hint {
-  font-size: 15px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 4px;

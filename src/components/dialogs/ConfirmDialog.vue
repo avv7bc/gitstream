@@ -49,7 +49,7 @@ const { dragStyle, onDragStart } = useDraggable();
 }
 
 .confirm-message {
-  font-size: var(--font-size);
+  font-size: var(--font-size-sm);
   color: var(--text-secondary);
   line-height: 1.5;
 }

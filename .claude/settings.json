@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(./start.sh build *)"
+      "Bash(./start.sh build *)",
+      "WebSearch",
+      "WebFetch(domain:help.gitkraken.com)"
     ]
   }
 }

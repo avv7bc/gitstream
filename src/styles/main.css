@@ -124,7 +124,7 @@
 
   --text-primary: #e0e0e0;     /* primary text */
   --text-secondary: #a8a8a8;
-  --text-muted: #6a6a6a;
+  --text-muted: #898989;       /* improved contrast */
 
   --border: #3f3f3f;           /* borders */
   --border-subtle: #353535;
@@ -144,6 +144,72 @@
   --diff-added-line: rgba(46, 202, 75, 0.08);
   --diff-removed-bg: rgba(231, 76, 60, 0.22);
   --diff-removed-line: rgba(231, 76, 60, 0.10);
+}
+
+/* Catppuccin Mocha theme */
+:root[data-theme="catppuccin"] {
+  --bg-primary: #1e1e2e;       /* base */
+  --bg-secondary: #181825;     /* mantle */
+  --bg-tertiary: #11111b;      /* crust */
+  --bg-surface: #313244;       /* surface0 */
+  --bg-hover: #45475a;         /* surface1 */
+  --bg-active: #585b70;        /* surface2 */
+
+  --text-primary: #cdd6f4;     /* text */
+  --text-secondary: #a6adc8;   /* subtext0 */
+  --text-muted: #6c7086;       /* overlay0 */
+
+  --border: #45475a;
+  --border-subtle: #313244;
+
+  --accent: #89b4fa;           /* blue */
+  --accent-hover: #b4befe;     /* lavender */
+
+  --green: #a6e3a1;
+  --red: #f38ba8;
+  --yellow: #f9e2af;
+  --blue: #89b4fa;
+  --purple: #cba6f7;
+  --teal: #94e2d5;
+  --orange: #fab387;
+
+  --diff-added-bg: rgba(166, 227, 161, 0.12);
+  --diff-added-line: rgba(166, 227, 161, 0.28);
+  --diff-removed-bg: rgba(243, 139, 168, 0.12);
+  --diff-removed-line: rgba(243, 139, 168, 0.28);
+}
+
+/* Dracula theme */
+:root[data-theme="dracula"] {
+  --bg-primary: #282a36;
+  --bg-secondary: #21222c;
+  --bg-tertiary: #191a21;
+  --bg-surface: #44475a;       /* current line */
+  --bg-hover: #4d5068;
+  --bg-active: #6272a4;        /* comment */
+
+  --text-primary: #f8f8f2;
+  --text-secondary: #c8c8d0;
+  --text-muted: #6272a4;
+
+  --border: #44475a;
+  --border-subtle: #3a3c4e;
+
+  --accent: #bd93f9;           /* purple — signature Dracula */
+  --accent-hover: #caa4fb;
+
+  --green: #50fa7b;
+  --red: #ff5555;
+  --yellow: #f1fa8c;
+  --blue: #8be9fd;
+  --purple: #bd93f9;
+  --teal: #8be9fd;
+  --orange: #ffb86c;
+
+  --diff-added-bg: rgba(80, 250, 123, 0.12);
+  --diff-added-line: rgba(80, 250, 123, 0.28);
+  --diff-removed-bg: rgba(255, 85, 85, 0.12);
+  --diff-removed-line: rgba(255, 85, 85, 0.28);
 }
 
 * {
@@ -205,4 +271,13 @@ mark.hl {
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
+}
+
+:root[data-theme="dark"] mark.hl,
+:root[data-theme="material"] mark.hl,
+:root[data-theme="smartgit"] mark.hl,
+:root[data-theme="catppuccin"] mark.hl,
+:root[data-theme="dracula"] mark.hl {
+  background: rgba(243, 156, 18, 0.35);
+  color: var(--text-primary);
 }

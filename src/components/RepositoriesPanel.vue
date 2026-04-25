@@ -616,7 +616,7 @@ defineExpose({
   gap: 4px;
   padding: 3px 8px;
   cursor: grab;
-  font-size: var(--font-size);
+  font-size: var(--font-size-sm);
   user-select: none;
   position: relative;
 }

@@ -214,7 +214,7 @@ const diffFileName = computed(() => currentDiff.value?.path ?? selectedFile.valu
 .diff-body {
   flex: 1;
   overflow: auto;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--font-size-sm);
   line-height: 1.5;
 }

@@ -124,6 +124,8 @@ const themes: { value: ThemeMode; label: string }[] = [
   { value: "dark", label: "Dark+ (VSCode)" },
   { value: "material", label: "Material" },
   { value: "smartgit", label: "SmartGit" },
+  { value: "catppuccin", label: "Catppuccin Mocha" },
+  { value: "dracula", label: "Dracula" },
 ];
 
 const tab = ref<"user" | "workspace">("user");
@@ -535,10 +537,13 @@ const activeCategoryLabel = computed(
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='%23cccccc'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='%23a8a8a8'/></svg>");
   background-repeat: no-repeat;
   background-position: right 10px center;
   cursor: pointer;
+}
+:root[data-theme="smartgit"] .vs-select {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='%23e0e0e0'/></svg>");
 }
 .vs-select:focus { border-color: var(--accent); }
 .vs-select option {
