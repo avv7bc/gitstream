@@ -16,10 +16,12 @@ export interface DiffHunkWithWordDiff extends DiffHunk {
 
 export function useSideBySideDiff() {
   const dmp = new diff_match_patch();
+  const SIMILARITY_THRESHOLD = 0.3;
 
   function matchRelatedLines(hunk: DiffHunk): Map<number, number> {
     // Map of removed line index -> added line index
     const mapping = new Map<number, number>();
+    const usedAddedIndices = new Set<number>();
     const removedLines: Array<{ idx: number; content: string }> = [];
     const addedLines: Array<{ idx: number; content: string }> = [];
 
@@ -41,13 +43,14 @@ export function useSideBySideDiff() {
         const added = addedLines[j];
         const diffs = dmp.diff_main(removed.content, added.content);
         const similarity = computeSimilarity(diffs);
-        if (similarity > bestScore && !Array.from(mapping.values()).includes(addedLines[j].idx)) {
+        if (similarity > bestScore && !usedAddedIndices.has(j) && similarity >= SIMILARITY_THRESHOLD) {
           bestScore = similarity;
           bestMatch = j;
         }
       }
 
-      if (bestMatch >= 0) {
+      if (bestMatch >= 0 && bestScore >= SIMILARITY_THRESHOLD) {
+        usedAddedIndices.add(addedLines[bestMatch].idx);
         mapping.set(removed.idx, addedLines[bestMatch].idx);
       }
     }
@@ -87,6 +90,7 @@ export function useSideBySideDiff() {
   ): DiffHunkWithWordDiff {
     const mapping = matchRelatedLines(hunk);
     const enrichedLines: DiffLineWithWordDiff[] = [];
+    const usedAddedIndices = new Set(mapping.values());
 
     for (let i = 0; i < hunk.lines.length; i++) {
       const line = hunk.lines[i];
@@ -99,7 +103,7 @@ export function useSideBySideDiff() {
           line.content,
           relatedLine.content
         );
-      } else if (line.kind === "added" && !Array.from(mapping.values()).includes(i)) {
+      } else if (line.kind === "added" && !usedAddedIndices.has(i)) {
         // Orphaned added line - highlight entire content as added
         enrichedLine.wordDiffs = [{ text: line.content, kind: "added" }];
       } else if (line.kind === "removed" && !mapping.has(i)) {
