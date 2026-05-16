@@ -135,6 +135,42 @@ pub fn do_delete_branch(repo_path: String, branch: String, force: bool) -> Resul
 }
 
 #[tauri::command]
+pub fn do_create_tag(
+    repo_path: String,
+    name: String,
+    message: Option<String>,
+    target: Option<String>,
+    force: bool,
+) -> Result<(), String> {
+    mutation::create_tag(
+        Path::new(&repo_path),
+        &name,
+        message.as_deref(),
+        target.as_deref(),
+        force,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_delete_tag(repo_path: String, name: String) -> Result<(), String> {
+    mutation::delete_tag(Path::new(&repo_path), &name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn do_push_tag(
+    repo_path: String,
+    remote: String,
+    name: String,
+    delete: bool,
+) -> Result<String, String> {
+    run_with_timeout(move || {
+        mutation::push_tag(Path::new(&repo_path), &remote, &name, delete)
+            .map_err(|e| e.to_string())
+    }, "push").await
+}
+
+#[tauri::command]
 pub async fn do_clone(url: String, dest: String) -> Result<String, String> {
     run_with_timeout(move || {
         mutation::clone_repo(&url, &dest).map_err(|e| e.to_string())
