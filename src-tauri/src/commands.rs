@@ -29,7 +29,7 @@ async fn run_network_git(
     if let Some(p) = repo_path {
         cmd.arg("-C").arg(p);
     }
-    cmd.args(args.iter().map(|s| s.as_str()));
+    cmd.args(args);
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
     cmd.kill_on_drop(true);
@@ -40,6 +40,10 @@ async fn run_network_git(
 
     match tokio::time::timeout(Duration::from_secs(secs), child.wait()).await {
         Ok(Ok(status)) => {
+            // stdout/stderr are read after exit. Safe here: git suppresses
+            // progress output to non-TTY pipes, so network ops produce <1 KB.
+            // A pipe-buffer deadlock would need >64 KB before process exit,
+            // which does not occur for fetch/pull/push/clone with Stdio::piped().
             let mut stdout = String::new();
             let mut stderr = String::new();
             if let Some(mut o) = child.stdout.take() {
