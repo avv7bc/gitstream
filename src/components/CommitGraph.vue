@@ -482,4 +482,9 @@ function formatDate(iso: string): string {
 .ctx-danger:hover {
   background: rgba(243, 139, 168, 0.1);
 }
+.ctx-separator {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 4px 0;
+}
 </style>
