@@ -18,6 +18,7 @@ import ConfirmDialog from "./components/dialogs/ConfirmDialog.vue";
 import DiscardDialog from "./components/dialogs/DiscardDialog.vue";
 import SettingsDialog from "./components/dialogs/SettingsDialog.vue";
 import FileCompareDialog from "./components/dialogs/FileCompareDialog.vue";
+import AddTagDialog from "./components/dialogs/AddTagDialog.vue";
 import { useFileCompare } from "@/composables/useFileCompare";
 import { useRepo } from "@/composables/useRepo";
 import { useFiles } from "@/composables/useFiles";
@@ -27,7 +28,7 @@ import { useRemote } from "@/composables/useRemote";
 
 const { repoPath, onRepoOpened, restoreLastRepo } = useRepo();
 const { refresh: refreshFiles } = useFiles();
-const { refresh: refreshBranches } = useBranches();
+const { refresh: refreshBranches, createTag } = useBranches();
 const { refresh: refreshLog } = useLog();
 const { pull, push } = useRemote();
 const { target: compareTarget } = useFileCompare();
@@ -52,6 +53,30 @@ const showConfirmDialog = ref(false);
 const showDiscardDialog = ref(false);
 const showErrorDialog = ref(false);
 const showSettingsDialog = ref(false);
+const showAddTagDialog = ref(false);
+const addTagTarget = ref<{ oid: string; subject: string } | null>(null);
+
+function openAddTag(target: { oid: string; subject: string } | null) {
+  addTagTarget.value = target;
+  showAddTagDialog.value = true;
+}
+
+async function handleCreateTag(payload: {
+  name: string;
+  message: string | null;
+  force: boolean;
+}) {
+  const target = addTagTarget.value?.oid ?? null;
+  showAddTagDialog.value = false;
+  try {
+    await createTag(payload.name, payload.message, target, payload.force);
+    await refreshAll();
+  } catch (e) {
+    showError(String(e));
+  }
+  addTagTarget.value = null;
+}
+
 const errorMessage = ref("");
 
 function showError(msg: string) {
@@ -257,6 +282,8 @@ function onMouseUp() {
             @checkout-remote="checkoutRemoteTarget = $event"
             @checked-out="refreshAll()"
             @branches-changed="refreshAll()"
+            @tags-changed="refreshAll()"
+            @create-tag="openAddTag(null)"
           />
         </div>
       </aside>
@@ -274,6 +301,7 @@ function onMouseUp() {
             <CommitGraph
               @commit="showCommitDialog = true"
               @discard="showDiscardDialog = true"
+              @create-tag="openAddTag($event)"
             />
           </div>
 
@@ -325,6 +353,12 @@ function onMouseUp() {
     />
     <DiscardDialog v-if="showDiscardDialog" @close="showDiscardDialog = false; refreshAll()" />
     <SettingsDialog v-if="showSettingsDialog" @close="showSettingsDialog = false" />
+    <AddTagDialog
+      v-if="showAddTagDialog"
+      :target="addTagTarget"
+      @close="showAddTagDialog = false; addTagTarget = null"
+      @confirm="handleCreateTag"
+    />
     <FileCompareDialog v-if="compareTarget" />
     <ConfirmDialog
       v-if="showErrorDialog"
