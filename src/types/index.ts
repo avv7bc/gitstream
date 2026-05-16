@@ -23,17 +23,13 @@ export interface CommitInfo {
   date: string;
   parents: string[];
   refs: RefLabel[];
+  column: number;
+  lines: GraphLine[];
 }
 
 export interface RefLabel {
   name: string;
   kind: "local-branch" | "remote-branch" | "tag" | "head" | "stash";
-}
-
-export interface GraphRow {
-  commit: CommitInfo;
-  column: number;
-  lines: GraphLine[];
 }
 
 export interface GraphLine {

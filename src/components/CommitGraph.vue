@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { useLog } from "@/composables/useLog";
 import { useFiles } from "@/composables/useFiles";
 import { useRepo } from "@/composables/useRepo";
-import type { RefLabel } from "@/types";
+import type { RefLabel, GraphLine } from "@/types";
 import { highlight } from "@/utils/highlight";
 
 const emit = defineEmits<{
@@ -13,6 +13,44 @@ const emit = defineEmits<{
 }>();
 
 const { commits, selectedCommit } = useLog();
+const GRAPH_PALETTE = ["--blue", "--green", "--purple", "--teal", "--orange", "--yellow"];
+const GRAPH_COL_W = 14;
+const GRAPH_PAD = 8;
+const GRAPH_ROW_H = 24;
+
+function laneX(c: number): number {
+  return GRAPH_PAD + c * GRAPH_COL_W;
+}
+function laneColor(colorIdx: number): string {
+  return `var(${GRAPH_PALETTE[colorIdx % GRAPH_PALETTE.length]})`;
+}
+function linePath(l: GraphLine): string {
+  const x1 = laneX(l.from_column);
+  const x2 = laneX(l.to_column);
+  const mid = GRAPH_ROW_H / 2;
+  if (l.style === "straight") {
+    return `M ${x1} 0 L ${x1} ${GRAPH_ROW_H}`;
+  }
+  if (l.style === "fork") {
+    const cy = (mid + GRAPH_ROW_H) / 2;
+    return `M ${x1} ${mid} C ${x1} ${cy} ${x2} ${cy} ${x2} ${GRAPH_ROW_H}`;
+  }
+  const cy = mid / 2;
+  return `M ${x1} 0 C ${x1} ${cy} ${x2} ${cy} ${x2} ${mid}`;
+}
+const graphMaxCol = computed(() => {
+  let m = 0;
+  for (const c of commits.value) {
+    if (c.column > m) m = c.column;
+    for (const l of c.lines) {
+      if (l.from_column > m) m = l.from_column;
+      if (l.to_column > m) m = l.to_column;
+    }
+  }
+  return m;
+});
+const graphColW = computed(() => Math.max(80, laneX(graphMaxCol.value) + 16));
+const wtCol = computed(() => commits.value[0]?.column ?? 0);
 const { files } = useFiles();
 const { repoPath } = useRepo();
 
@@ -165,7 +203,7 @@ function formatDate(iso: string): string {
 </script>
 
 <template>
-  <div class="commit-graph" :style="{ '--author-col-w': (maxAuthorLen + 2) + 'ch' }" @contextmenu.prevent>
+  <div class="commit-graph" :style="{ '--author-col-w': (maxAuthorLen + 2) + 'ch', '--graph-col-w': graphColW + 'px' }" @contextmenu.prevent>
     <div class="panel-title-bar">
       <span class="panel-title">Graph<template v-if="repoName"> | {{ repoName }}</template></span>
       <div class="graph-toolbar">
@@ -186,9 +224,9 @@ function formatDate(iso: string): string {
         @contextmenu="onContextMenu($event, '__worktree__')"
       >
         <div class="graph-col">
-          <svg width="80" height="24" class="graph-svg">
-            <line x1="8" y1="12" x2="8" y2="24" stroke="var(--blue)" stroke-width="2" />
-            <circle cx="8" cy="12" r="4" fill="var(--red)" stroke="var(--bg-primary)" stroke-width="1.5" />
+          <svg :width="graphColW" height="24" class="graph-svg">
+            <line :x1="laneX(wtCol)" y1="12" :x2="laneX(wtCol)" y2="24" stroke="var(--red)" stroke-width="2" />
+            <circle :cx="laneX(wtCol)" cy="12" r="4" fill="var(--red)" stroke="var(--bg-primary)" stroke-width="1.5" />
           </svg>
         </div>
         <div class="message-col">
@@ -207,11 +245,25 @@ function formatDate(iso: string): string {
         @click="selectedCommit = commit.oid"
         @contextmenu="onContextMenu($event, commit.oid)"
       >
-        <!-- Graph column with SVG lines -->
+        <!-- Graph column with SVG lane lines -->
         <div class="graph-col">
-          <svg width="80" height="24" class="graph-svg">
-            <line v-if="idx > 0 || changedCount > 0" x1="8" y1="0" x2="8" y2="24" stroke="var(--blue)" stroke-width="2" />
-            <circle cx="8" cy="12" r="4" :fill="isUnpushed(idx) ? 'var(--yellow)' : 'var(--blue)'" stroke="var(--bg-primary)" stroke-width="1.5" />
+          <svg :width="graphColW" height="24" class="graph-svg">
+            <path
+              v-for="(ln, li) in commit.lines"
+              :key="li"
+              :d="linePath(ln)"
+              :stroke="laneColor(ln.color)"
+              stroke-width="2"
+              fill="none"
+            />
+            <circle
+              :cx="laneX(commit.column)"
+              cy="12"
+              r="4"
+              :fill="isUnpushed(idx) ? 'var(--yellow)' : laneColor(commit.column)"
+              stroke="var(--bg-primary)"
+              stroke-width="1.5"
+            />
           </svg>
         </div>
 
@@ -334,7 +386,7 @@ function formatDate(iso: string): string {
 }
 
 .graph-col {
-  width: 80px;
+  width: var(--graph-col-w, 80px);
   flex-shrink: 0;
   overflow: hidden;
 }
