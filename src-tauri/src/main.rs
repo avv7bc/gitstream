@@ -2,6 +2,7 @@
 
 mod commands;
 mod git;
+mod settings;
 
 fn main() {
     tauri::Builder::default()
