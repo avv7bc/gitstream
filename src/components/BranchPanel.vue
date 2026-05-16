@@ -4,12 +4,14 @@ import { useBranches } from "@/composables/useBranches";
 import { highlight } from "@/utils/highlight";
 import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 import RenameBranchDialog from "@/components/dialogs/RenameBranchDialog.vue";
-import type { BranchInfo } from "@/types";
+import type { BranchInfo, TagInfo } from "@/types";
 
 const emit = defineEmits<{
   checkoutRemote: [remoteBranch: string];
   checkedOut: [];
   branchesChanged: [];
+  tagsChanged: [];
+  createTag: [];
 }>();
 
 async function handleLocalDblClick(branch: { name: string; is_current: boolean }) {
@@ -21,6 +23,7 @@ async function handleLocalDblClick(branch: { name: string; is_current: boolean }
 const {
   branches, tags, stashes, remotes,
   checkout, mergeBranch, renameBranch, deleteBranch, pushBranch,
+  deleteTag, pushTag,
 } = useBranches();
 
 // --- Context menu for local branches ---
@@ -152,6 +155,63 @@ async function confirmForceDelete() {
     window.alert(`Delete failed: ${e}`);
   }
   targetBranch.value = null;
+}
+
+// --- Tag context menu ---
+const tagCtxMenu = ref<{ x: number; y: number } | null>(null);
+const ctxTag = ref<TagInfo | null>(null);
+const showDeleteTagConfirm = ref(false);
+const targetTag = ref<TagInfo | null>(null);
+
+function onTagContextMenu(e: MouseEvent, tag: TagInfo) {
+  e.preventDefault();
+  e.stopPropagation();
+  tagCtxMenu.value = { x: e.clientX, y: e.clientY };
+  ctxTag.value = tag;
+}
+
+function closeTagCtxMenu() {
+  tagCtxMenu.value = null;
+  ctxTag.value = null;
+}
+
+const hasRemote = computed(() => remotes.value.length > 0);
+
+async function handlePushTagCtx() {
+  const t = ctxTag.value;
+  closeTagCtxMenu();
+  if (!t) return;
+  try {
+    await pushTag(remotes.value[0] ?? "origin", t.name, false);
+    emit("tagsChanged");
+  } catch (e) {
+    window.alert(`Push tag failed: ${e}`);
+  }
+}
+
+function handleDeleteTagCtx() {
+  targetTag.value = ctxTag.value;
+  closeTagCtxMenu();
+  showDeleteTagConfirm.value = true;
+}
+
+async function confirmDeleteTag(alsoRemote: boolean) {
+  const t = targetTag.value;
+  showDeleteTagConfirm.value = false;
+  if (!t) {
+    targetTag.value = null;
+    return;
+  }
+  try {
+    await deleteTag(t.name);
+    if (alsoRemote && remotes.value.length > 0) {
+      await pushTag(remotes.value[0], t.name, true);
+    }
+    emit("tagsChanged");
+  } catch (e) {
+    window.alert(`Delete tag failed: ${e}`);
+  }
+  targetTag.value = null;
 }
 
 const filter = ref("");
@@ -301,6 +361,11 @@ function selectItem(key: string) {
           </svg>
           <span class="section-title">Tags</span>
           <span class="section-count">{{ filteredTags.length }}</span>
+          <button
+            class="section-add-btn"
+            title="Add tag (on HEAD)"
+            @click.stop="emit('createTag')"
+          >+</button>
         </div>
         <div v-if="expandedSections.tags && filteredTags.length" class="section-items">
           <div
@@ -309,6 +374,7 @@ function selectItem(key: string) {
             class="branch-item"
             :class="{ selected: selectedKey === `tag:${tag.name}` }"
             @mousedown="selectItem(`tag:${tag.name}`)"
+            @contextmenu="onTagContextMenu($event, tag)"
           >
             <svg width="14" height="14" viewBox="0 0 16 16" class="tag-icon">
               <path d="M2 9V2h7l5 5-7 7-5-5z" fill="none" stroke="currentColor" stroke-width="1.2"/>
@@ -419,6 +485,40 @@ function selectItem(key: string) {
         :old-name="targetBranch.name"
         @close="showRenameDialog = false; targetBranch = null"
         @confirm="confirmRename"
+      />
+
+      <div
+        v-if="tagCtxMenu"
+        class="ctx-menu"
+        :style="{ left: tagCtxMenu.x + 'px', top: tagCtxMenu.y + 'px' }"
+        @click.stop
+      >
+        <button
+          class="ctx-item"
+          :disabled="!hasRemote"
+          @click="handlePushTagCtx"
+        >Push Tag</button>
+        <div class="ctx-separator" />
+        <button
+          class="ctx-item ctx-danger"
+          @click="handleDeleteTagCtx"
+        >Delete Tag</button>
+      </div>
+      <div
+        v-if="tagCtxMenu"
+        class="ctx-backdrop"
+        @click="closeTagCtxMenu"
+        @contextmenu.prevent="closeTagCtxMenu"
+      />
+
+      <ConfirmDialog
+        v-if="showDeleteTagConfirm && targetTag"
+        :message="`Delete tag '${targetTag.name}'?`"
+        confirm-label="Delete"
+        danger
+        :checkbox-label="hasRemote ? `Also delete on remote '${remotes[0]}'` : undefined"
+        @close="showDeleteTagConfirm = false; targetTag = null"
+        @confirm="confirmDeleteTag"
       />
     </Teleport>
   </div>
@@ -629,5 +729,23 @@ function selectItem(key: string) {
   height: 1px;
   background: var(--border-subtle);
   margin: 4px 0;
+}
+
+.section-add-btn {
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  text-align: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 13px;
+}
+.section-add-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 </style>
