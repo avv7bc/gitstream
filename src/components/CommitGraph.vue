@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, onMounted, onUnmounted } from "vue";
 import { useLog } from "@/composables/useLog";
 import { useBranches } from "@/composables/useBranches";
 import RefIcon from "@/components/RefIcon.vue";
@@ -120,9 +120,7 @@ async function ctxReset(mode: "soft" | "mixed" | "hard") {
   }
 }
 
-async function ctxRevert() {
-  const oid = ctxCommitOid.value;
-  closeCtxMenu();
+async function runRevert(oid: string | null) {
   if (!oid || oid === "__worktree__") return;
   try {
     await revertCommit(oid, false);
@@ -133,9 +131,13 @@ async function ctxRevert() {
   }
 }
 
-async function ctxCherryPick() {
+async function ctxRevert() {
   const oid = ctxCommitOid.value;
   closeCtxMenu();
+  await runRevert(oid);
+}
+
+async function runCherryPick(oid: string | null) {
   if (!oid || oid === "__worktree__") return;
   try {
     await cherryPick(oid);
@@ -144,6 +146,12 @@ async function ctxCherryPick() {
   } finally {
     emit("changed");
   }
+}
+
+async function ctxCherryPick() {
+  const oid = ctxCommitOid.value;
+  closeCtxMenu();
+  await runCherryPick(oid);
 }
 
 const ctxIsWorkingTree = computed(() => ctxCommitOid.value === "__worktree__");
@@ -210,6 +218,29 @@ function handleKeyDown(e: KeyboardEvent): void {
     navigateCommits('down');
   }
 }
+
+// Глобальный обработчик горячих клавиш — работает независимо от фокуса,
+// но не перехватывает ввод в полях.
+function isEditableTarget(el: EventTarget | null): boolean {
+  const t = el as HTMLElement | null;
+  if (!t) return false;
+  const tag = t.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || t.isContentEditable;
+}
+
+function onGlobalKeyDown(e: KeyboardEvent): void {
+  if (isEditableTarget(e.target)) return;
+  if (e.shiftKey && e.ctrlKey && (e.key === 'M' || e.key === 'm')) {
+    e.preventDefault();
+    runCherryPick(selectedCommit.value);
+  } else if (e.shiftKey && e.altKey && (e.key === 'M' || e.key === 'm' || e.code === 'KeyM')) {
+    e.preventDefault();
+    runRevert(selectedCommit.value);
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", onGlobalKeyDown));
+onUnmounted(() => window.removeEventListener("keydown", onGlobalKeyDown));
 
 const firstRemoteIdx = computed(() => {
   return filteredCommits.value.findIndex((c) =>
@@ -398,9 +429,11 @@ function formatDate(iso: string): string {
         <div class="ctx-separator" />
         <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxCherryPick">
           <span class="ctx-label">Cherry-pick</span>
+          <span class="ctx-shortcut">Shift+Ctrl+M</span>
         </button>
         <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxRevert">
           <span class="ctx-label">Revert</span>
+          <span class="ctx-shortcut">Shift+Alt+M</span>
         </button>
         <div class="ctx-separator" />
         <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxReset('soft')">
