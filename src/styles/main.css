@@ -9,8 +9,14 @@
   --radius-lg: 6px;
 
   --toolbar-height: 40px;
-  --statusbar-height: 24px;
+  --statusbar-height: 22px;
   --panel-min-width: 200px;
+
+  /* VSCode-style status bar — фиксированный синий, независимо от темы */
+  --statusbar-bg: #007acc;
+  --statusbar-fg: #ffffff;
+  --statusbar-fg-muted: rgba(255, 255, 255, 0.85);
+  --statusbar-hover: rgba(255, 255, 255, 0.18);
 }
 
 /* LIGHT theme */
