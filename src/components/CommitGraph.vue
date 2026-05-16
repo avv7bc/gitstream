@@ -9,6 +9,7 @@ import { highlight } from "@/utils/highlight";
 const emit = defineEmits<{
   commit: [];
   discard: [];
+  createTag: [target: { oid: string; subject: string }];
 }>();
 
 const { commits, selectedCommit } = useLog();
@@ -41,6 +42,14 @@ function ctxAction(action: "commit" | "discard") {
   closeCtxMenu();
   if (action === "commit") emit("commit");
   else emit("discard");
+}
+
+function ctxCreateTag() {
+  const oid = ctxCommitOid.value;
+  closeCtxMenu();
+  if (!oid || oid === "__worktree__") return;
+  const c = commits.value.find((x) => x.oid === oid);
+  emit("createTag", { oid, subject: c?.message ?? "" });
 }
 
 const ctxIsWorkingTree = computed(() => ctxCommitOid.value === "__worktree__");
@@ -232,6 +241,8 @@ function formatDate(iso: string): string {
       >
         <button class="ctx-item" :disabled="!ctxIsWorkingTree" @click="ctxAction('commit')">Commit</button>
         <button class="ctx-item ctx-danger" :disabled="!ctxIsWorkingTree" @click="ctxAction('discard')">Discard</button>
+        <div class="ctx-separator" />
+        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxCreateTag">Create Tag here…</button>
       </div>
       <div v-if="ctxMenu" class="ctx-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu" />
     </Teleport>
@@ -470,5 +481,10 @@ function formatDate(iso: string): string {
 }
 .ctx-danger:hover {
   background: rgba(243, 139, 168, 0.1);
+}
+.ctx-separator {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 4px 0;
 }
 </style>

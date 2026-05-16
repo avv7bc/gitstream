@@ -59,9 +59,41 @@ export function useBranches() {
     await invoke("do_push_branch", { repoPath: repoPath.value, remote, branch, force });
   }
 
+  async function createTag(
+    name: string,
+    message: string | null,
+    target: string | null,
+    force: boolean,
+  ) {
+    if (!repoPath.value) return;
+    await invoke("do_create_tag", {
+      repoPath: repoPath.value,
+      name,
+      message,
+      target,
+      force,
+    });
+  }
+
+  async function deleteTag(name: string) {
+    if (!repoPath.value) return;
+    await invoke("do_delete_tag", { repoPath: repoPath.value, name });
+  }
+
+  async function pushTag(remote: string, name: string, del: boolean) {
+    if (!repoPath.value) return;
+    await invoke("do_push_tag", {
+      repoPath: repoPath.value,
+      remote,
+      name,
+      delete: del,
+    });
+  }
+
   return {
     branches, tags, stashes, remotes,
     refresh, checkout, checkoutRemote,
     mergeBranch, renameBranch, deleteBranch, pushBranch,
+    createTag, deleteTag, pushTag,
   };
 }

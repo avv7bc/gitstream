@@ -40,6 +40,9 @@ fn main() {
             commands::do_merge,
             commands::do_rename_branch,
             commands::do_delete_branch,
+            commands::do_create_tag,
+            commands::do_delete_tag,
+            commands::do_push_tag,
             commands::do_clone,
             commands::check_repo_path,
         ])
