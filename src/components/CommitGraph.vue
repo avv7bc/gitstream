@@ -31,17 +31,20 @@ function laneX(c: number): number {
 function laneColor(colorIdx: number): string {
   return `var(${GRAPH_PALETTE[colorIdx % GRAPH_PALETTE.length]})`;
 }
-function linePath(l: GraphLine): string {
+function linePath(l: GraphLine, topRow = false): string {
   const x1 = laneX(l.from_column);
   const x2 = laneX(l.to_column);
   const mid = GRAPH_ROW_H / 2;
   if (l.style === "straight") {
-    return `M ${x1} 0 L ${x1} ${GRAPH_ROW_H}`;
+    // На самой верхней строке strand начинается от узла, а не от верха
+    // ячейки — чтобы граф заканчивался на коммите (нет «палки» вверх к WT).
+    return `M ${x1} ${topRow ? mid : 0} L ${x1} ${GRAPH_ROW_H}`;
   }
   if (l.style === "fork") {
     const cy = (mid + GRAPH_ROW_H) / 2;
     return `M ${x1} ${mid} C ${x1} ${cy} ${x2} ${cy} ${x2} ${GRAPH_ROW_H}`;
   }
+  if (topRow) return "";
   const cy = mid / 2;
   return `M ${x1} 0 C ${x1} ${cy} ${x2} ${cy} ${x2} ${mid}`;
 }
@@ -240,7 +243,6 @@ function formatDate(iso: string): string {
       >
         <div class="graph-col">
           <svg :width="graphColW" height="24" class="graph-svg">
-            <line :x1="laneX(wtCol)" y1="12" :x2="laneX(wtCol)" y2="24" stroke="var(--red)" stroke-width="2" />
             <circle :cx="laneX(wtCol)" cy="12" r="5" fill="var(--green)" stroke="var(--bg-primary)" stroke-width="1.5" />
           </svg>
         </div>
@@ -266,7 +268,7 @@ function formatDate(iso: string): string {
             <path
               v-for="(ln, li) in commit.lines"
               :key="li"
-              :d="linePath(ln)"
+              :d="linePath(ln, idx === 0)"
               :stroke="laneColor(ln.color)"
               stroke-width="2"
               fill="none"
@@ -274,10 +276,10 @@ function formatDate(iso: string): string {
             <circle
               :cx="laneX(commit.column)"
               cy="12"
-              r="5"
-              :fill="isUnpushed(idx) ? 'var(--yellow)' : laneColor(commit.column)"
-              stroke="var(--bg-primary)"
-              stroke-width="1.5"
+              :r="isUnpushed(idx) ? 5 : 4"
+              :fill="isUnpushed(idx) ? 'var(--yellow)' : 'var(--bg-primary)'"
+              :stroke="isUnpushed(idx) ? 'var(--bg-primary)' : laneColor(commit.column)"
+              stroke-width="2"
             />
           </svg>
         </div>
