@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useLog } from "@/composables/useLog";
+import { useBranches } from "@/composables/useBranches";
+import RefIcon from "@/components/RefIcon.vue";
 import { useFiles } from "@/composables/useFiles";
 import { useRepo } from "@/composables/useRepo";
 import type { RefLabel } from "@/types";
@@ -13,6 +15,11 @@ const emit = defineEmits<{
 }>();
 
 const { commits, selectedCommit } = useLog();
+const { branches } = useBranches();
+const currentBranch = computed(() => branches.value.find((b) => b.is_current));
+function isCurrentBranchRow(c: { refs: { kind: string }[] }): boolean {
+  return c.refs.some((r) => r.kind === "current-branch");
+}
 const { files } = useFiles();
 const { repoPath } = useRepo();
 
@@ -217,12 +224,26 @@ function formatDate(iso: string): string {
 
         <!-- Message + refs -->
         <div class="message-col">
+          <template v-if="isCurrentBranchRow(commit)">
+            <span
+              v-if="currentBranch && currentBranch.ahead > 0"
+              class="ref-label ref-ahead"
+              :title="`${currentBranch.ahead} ahead`"
+            >+{{ currentBranch.ahead }}</span>
+            <span
+              v-if="currentBranch && currentBranch.behind > 0"
+              class="ref-label ref-behind"
+              :title="`${currentBranch.behind} behind`"
+            >&minus;{{ currentBranch.behind }}</span>
+          </template>
           <span
             v-for="r in commit.refs"
             :key="r.name"
             :class="refClass(r)"
-            v-html="highlight(r.name, graphFilter)"
-          />
+          >
+            <RefIcon :kind="r.kind" />
+            <span v-html="highlight(r.name, graphFilter)" />
+          </span>
           <span class="commit-message" v-html="highlight(commit.message, graphFilter)" />
         </div>
 
@@ -410,7 +431,9 @@ function formatDate(iso: string): string {
 
 /* Ref labels */
 .ref-label {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   padding: 0 5px;
   border-radius: 3px;
   font-size: var(--font-size-xs);
@@ -439,6 +462,23 @@ function formatDate(iso: string): string {
 .ref-stash {
   background: rgba(203, 166, 247, 0.15);
   color: var(--purple);
+}
+.ref-current-branch {
+  background: rgba(166, 227, 161, 0.35);
+  color: var(--green);
+  font-weight: 800;
+}
+.ref-ahead {
+  background: rgba(166, 227, 161, 0.2);
+  color: var(--green);
+}
+.ref-behind {
+  background: rgba(243, 139, 168, 0.2);
+  color: var(--red);
+}
+.ref-label .ref-icon {
+  width: 11px;
+  height: 11px;
 }
 
 /* Context menu */

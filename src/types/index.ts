@@ -27,7 +27,7 @@ export interface CommitInfo {
 
 export interface RefLabel {
   name: string;
-  kind: "local-branch" | "remote-branch" | "tag" | "head" | "stash";
+  kind: "local-branch" | "remote-branch" | "tag" | "head" | "stash" | "current-branch";
 }
 
 export interface GraphRow {

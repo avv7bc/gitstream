@@ -87,9 +87,11 @@ fn parse_ref_labels(raw: &str) -> Vec<RefLabel> {
         let r = r.trim();
         if r.is_empty() { return None; }
         if r == "HEAD" { return Some(RefLabel { name: "HEAD".to_string(), kind: "head".to_string() }); }
-        let r = r.strip_prefix("HEAD -> ").unwrap_or(r);
-        if r.starts_with("tag: ") {
-            Some(RefLabel { name: r[5..].to_string(), kind: "tag".to_string() })
+        if let Some(rest) = r.strip_prefix("HEAD -> ") {
+            return Some(RefLabel { name: rest.to_string(), kind: "current-branch".to_string() });
+        }
+        if let Some(t) = r.strip_prefix("tag: ") {
+            Some(RefLabel { name: t.to_string(), kind: "tag".to_string() })
         } else if r.contains('/') {
             Some(RefLabel { name: r.to_string(), kind: "remote-branch".to_string() })
         } else {
@@ -257,4 +259,51 @@ fn parse_diff_multi(diff_text: &str) -> Vec<FileDiff> {
         diffs.push(parse_diff_single(&current_chunk, &current_path));
     }
     diffs
+}
+
+#[cfg(test)]
+mod ref_label_tests {
+    use super::*;
+
+    fn kinds(raw: &str) -> Vec<(String, String)> {
+        parse_ref_labels(raw)
+            .into_iter()
+            .map(|r| (r.name, r.kind))
+            .collect()
+    }
+
+    #[test]
+    fn current_branch_from_head_arrow() {
+        assert_eq!(
+            kinds("HEAD -> main"),
+            vec![("main".to_string(), "current-branch".to_string())]
+        );
+    }
+
+    #[test]
+    fn standalone_head_is_head() {
+        assert_eq!(
+            kinds("HEAD"),
+            vec![("HEAD".to_string(), "head".to_string())]
+        );
+    }
+
+    #[test]
+    fn tag_remote_local_kinds() {
+        assert_eq!(kinds("tag: v1.0"), vec![("v1.0".to_string(), "tag".to_string())]);
+        assert_eq!(kinds("origin/main"), vec![("origin/main".to_string(), "remote-branch".to_string())]);
+        assert_eq!(kinds("dev"), vec![("dev".to_string(), "local-branch".to_string())]);
+    }
+
+    #[test]
+    fn combined_decoration() {
+        assert_eq!(
+            kinds("HEAD -> main, tag: v1, origin/main"),
+            vec![
+                ("main".to_string(), "current-branch".to_string()),
+                ("v1".to_string(), "tag".to_string()),
+                ("origin/main".to_string(), "remote-branch".to_string()),
+            ]
+        );
+    }
 }
