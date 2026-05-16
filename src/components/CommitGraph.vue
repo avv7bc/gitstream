@@ -109,7 +109,7 @@ function selectWorkingTree() {
 function getCurrentIndex(): number {
   // Working Tree is at position -1
   if (selectedCommit.value === "__worktree__") {
-    return changedCount.value > 0 ? -1 : 0; // fallback to 0 if WT not visible
+    return -1; // Working Tree is always shown at position -1
   }
 
   // Find commit in filtered list
@@ -119,7 +119,7 @@ function getCurrentIndex(): number {
 
 function navigateCommits(direction: 'up' | 'down'): void {
   const currentIdx = getCurrentIndex();
-  const hasWorkingTree = changedCount.value > 0;
+  const hasWorkingTree = true;
   const maxIdx = filteredCommits.value.length - 1;
 
   let newIdx: number;
@@ -222,7 +222,6 @@ function formatDate(iso: string): string {
     <div class="graph-body" tabindex="0" role="listbox" @keydown="handleKeyDown">
       <!-- Working Tree / Index row -->
       <div
-        v-if="changedCount > 0"
         class="graph-row wt-row"
         :class="{ selected: isWorkingTreeSelected }"
         @mousedown.shift.prevent
@@ -237,7 +236,7 @@ function formatDate(iso: string): string {
           </svg>
         </div>
         <div class="message-col">
-          <span class="wt-label">Working Tree/Index ({{ changedCount }} changed)</span>
+          <span class="wt-label">Working Tree/Index ({{ changedCount > 0 ? changedCount + ' changed' : 'clean' }})</span>
         </div>
         <span class="author-col"></span>
         <span class="date-col"></span>
