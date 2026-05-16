@@ -916,9 +916,9 @@ function selectItem(key: string) {
   background: rgba(243, 139, 168, 0.1);
 }
 .ctx-separator {
-  height: 1px;
-  background: var(--border-subtle);
-  margin: 4px 0;
+  height: 0;
+  border-top: 1px solid var(--border);
+  margin: 0;
 }
 
 .section-add-btn {
