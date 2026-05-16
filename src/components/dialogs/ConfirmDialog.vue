@@ -1,18 +1,25 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { useDraggable } from "@/composables/useDraggable";
 
-defineProps<{
+const props = defineProps<{
   message: string;
   confirmLabel?: string;
   danger?: boolean;
+  checkboxLabel?: string;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   close: [];
-  confirm: [];
+  confirm: [checkboxChecked: boolean];
 }>();
 
+const checked = ref(false);
 const { dragStyle, onDragStart } = useDraggable();
+
+function onConfirm() {
+  emit("confirm", props.checkboxLabel ? checked.value : false);
+}
 </script>
 
 <template>
@@ -27,6 +34,10 @@ const { dragStyle, onDragStart } = useDraggable();
 
       <div class="dialog-body">
         <p class="confirm-message">{{ message }}</p>
+        <label v-if="checkboxLabel" class="confirm-checkbox">
+          <input type="checkbox" v-model="checked" />
+          {{ checkboxLabel }}
+        </label>
       </div>
 
       <div class="dialog-footer">
@@ -34,7 +45,7 @@ const { dragStyle, onDragStart } = useDraggable();
         <button
           class="btn"
           :class="danger ? 'btn-danger' : 'btn-primary'"
-          @click="$emit('confirm')"
+          @click="onConfirm"
         >
           {{ confirmLabel || "Confirm" }}
         </button>
@@ -52,5 +63,14 @@ const { dragStyle, onDragStart } = useDraggable();
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
   line-height: 1.5;
+}
+
+.confirm-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
 }
 </style>
