@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +25,7 @@ impl Default for AppSettings {
 
 /// Чтение настроек из конкретного файла. Отсутствие файла или битый JSON →
 /// дефолты + перезапись валидным дефолтом.
-fn read_settings_at(path: &PathBuf) -> AppSettings {
+fn read_settings_at(path: &Path) -> AppSettings {
     match fs::read_to_string(path) {
         Ok(raw) => match serde_json::from_str::<AppSettings>(&raw) {
             Ok(s) => s,
@@ -44,7 +44,7 @@ fn read_settings_at(path: &PathBuf) -> AppSettings {
 }
 
 /// Запись настроек в конкретный файл (создаёт родительский каталог).
-fn write_settings_at(path: &PathBuf, settings: &AppSettings) -> Result<(), String> {
+fn write_settings_at(path: &Path, settings: &AppSettings) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
