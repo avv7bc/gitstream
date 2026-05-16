@@ -80,6 +80,31 @@ pub fn get_repo_info(repo_path: String) -> Result<RepoInfo, String> {
 }
 
 #[tauri::command]
+pub fn get_repo_state(repo_path: String) -> Result<String, String> {
+    query::repo_state(Path::new(&repo_path)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_accept_ours(repo_path: String, files: Vec<String>) -> Result<(), String> {
+    mutation::accept_ours(Path::new(&repo_path), &files).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_accept_theirs(repo_path: String, files: Vec<String>) -> Result<(), String> {
+    mutation::accept_theirs(Path::new(&repo_path), &files).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_op_abort(repo_path: String, state: String) -> Result<(), String> {
+    mutation::op_abort(Path::new(&repo_path), &state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_op_continue(repo_path: String, state: String) -> Result<(), String> {
+    mutation::op_continue(Path::new(&repo_path), &state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn get_status(repo_path: String) -> Result<Vec<FileStatus>, String> {
     query::status(Path::new(&repo_path)).map_err(|e| e.to_string())
 }
@@ -135,8 +160,84 @@ pub fn discard_files(repo_path: String, files: Vec<String>) -> Result<(), String
 }
 
 #[tauri::command]
+pub fn stage_hunk(repo_path: String, patch: String) -> Result<(), String> {
+    mutation::stage_hunk(Path::new(&repo_path), &patch).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn unstage_hunk(repo_path: String, patch: String) -> Result<(), String> {
+    mutation::unstage_hunk(Path::new(&repo_path), &patch).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn discard_hunk(repo_path: String, patch: String) -> Result<(), String> {
+    mutation::discard_hunk(Path::new(&repo_path), &patch).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn do_commit(repo_path: String, message: String, amend: bool) -> Result<String, String> {
     mutation::commit(Path::new(&repo_path), &message, amend).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_rebase(repo_path: String, onto: String) -> Result<String, String> {
+    mutation::rebase(Path::new(&repo_path), &onto).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_reset(repo_path: String, oid: String, mode: String) -> Result<(), String> {
+    mutation::reset(Path::new(&repo_path), &oid, &mode).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_revert(repo_path: String, oid: String, no_commit: bool) -> Result<(), String> {
+    mutation::revert(Path::new(&repo_path), &oid, no_commit).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_cherry_pick(repo_path: String, oid: String) -> Result<(), String> {
+    mutation::cherry_pick(Path::new(&repo_path), &oid).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_create_branch(
+    repo_path: String,
+    name: String,
+    start_point: Option<String>,
+    checkout: bool,
+) -> Result<(), String> {
+    mutation::create_branch(
+        Path::new(&repo_path),
+        &name,
+        start_point.as_deref(),
+        checkout,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_stash_save(
+    repo_path: String,
+    message: Option<String>,
+    include_untracked: bool,
+) -> Result<(), String> {
+    mutation::stash_save(Path::new(&repo_path), message.as_deref(), include_untracked)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_stash_apply(repo_path: String, index: usize) -> Result<(), String> {
+    mutation::stash_apply(Path::new(&repo_path), index).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_stash_pop(repo_path: String, index: usize) -> Result<(), String> {
+    mutation::stash_pop(Path::new(&repo_path), index).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_stash_drop(repo_path: String, index: usize) -> Result<(), String> {
+    mutation::stash_drop(Path::new(&repo_path), index).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

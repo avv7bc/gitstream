@@ -71,6 +71,8 @@ pub struct DiffLine {
 pub struct DiffHunk {
     pub header: String,
     pub lines: Vec<DiffLine>,
+    /// Дословный текст хунка (строка `@@ ...` + тело), для `git apply`.
+    pub raw: String,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -79,6 +81,9 @@ pub struct FileDiff {
     pub hunks: Vec<DiffHunk>,
     pub insertions: u32,
     pub deletions: u32,
+    /// Дословные строки заголовка патча до первого хунка
+    /// (`diff --git`, `index`, `---`, `+++`), для `git apply`.
+    pub header: String,
 }
 
 #[derive(Serialize, Clone, Debug)]

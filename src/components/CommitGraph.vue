@@ -12,9 +12,10 @@ const emit = defineEmits<{
   commit: [];
   discard: [];
   createTag: [target: { oid: string; subject: string }];
+  changed: [];
 }>();
 
-const { commits, selectedCommit } = useLog();
+const { commits, selectedCommit, resetTo, revertCommit, cherryPick } = useLog();
 const { branches } = useBranches();
 const currentBranch = computed(() => branches.value.find((b) => b.is_current));
 function isCurrentBranchRow(c: { refs: { kind: string }[] }): boolean {
@@ -102,6 +103,47 @@ function ctxCreateTag() {
   const oid = ctxCommitOid.value;
   closeCtxMenu();
   emitAddTag(oid);
+}
+
+async function ctxReset(mode: "soft" | "mixed" | "hard") {
+  const oid = ctxCommitOid.value;
+  closeCtxMenu();
+  if (!oid || oid === "__worktree__") return;
+  if (mode === "hard" && !window.confirm(
+    "Reset --hard discards all uncommitted changes. Continue?"
+  )) return;
+  try {
+    await resetTo(oid, mode);
+    emit("changed");
+  } catch (e) {
+    window.alert(`Reset failed: ${e}`);
+  }
+}
+
+async function ctxRevert() {
+  const oid = ctxCommitOid.value;
+  closeCtxMenu();
+  if (!oid || oid === "__worktree__") return;
+  try {
+    await revertCommit(oid, false);
+  } catch (e) {
+    window.alert(`Revert failed (resolve conflicts if any): ${e}`);
+  } finally {
+    emit("changed");
+  }
+}
+
+async function ctxCherryPick() {
+  const oid = ctxCommitOid.value;
+  closeCtxMenu();
+  if (!oid || oid === "__worktree__") return;
+  try {
+    await cherryPick(oid);
+  } catch (e) {
+    window.alert(`Cherry-pick failed (resolve conflicts if any): ${e}`);
+  } finally {
+    emit("changed");
+  }
 }
 
 const ctxIsWorkingTree = computed(() => ctxCommitOid.value === "__worktree__");
@@ -352,6 +394,23 @@ function formatDate(iso: string): string {
         <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxCreateTag">
           <span class="ctx-label">Add Tag</span>
           <span class="ctx-shortcut">Shift+F7</span>
+        </button>
+        <div class="ctx-separator" />
+        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxCherryPick">
+          <span class="ctx-label">Cherry-pick</span>
+        </button>
+        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxRevert">
+          <span class="ctx-label">Revert</span>
+        </button>
+        <div class="ctx-separator" />
+        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxReset('soft')">
+          <span class="ctx-label">Reset (soft)</span>
+        </button>
+        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxReset('mixed')">
+          <span class="ctx-label">Reset (mixed)</span>
+        </button>
+        <button class="ctx-item ctx-danger" :disabled="ctxIsWorkingTree" @click="ctxReset('hard')">
+          <span class="ctx-label">Reset (hard)</span>
         </button>
       </div>
       <div v-if="ctxMenu" class="ctx-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu" />

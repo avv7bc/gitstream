@@ -1,9 +1,79 @@
+use std::io::Write;
 use std::path::Path;
+use std::process::{Command, Stdio};
 
-use super::error::GitError;
+use super::error::{classify_git_error, GitError};
 
 fn run_git_mut(repo_path: &Path, args: &[&str]) -> Result<String, GitError> {
     super::query::run_git(repo_path, args)
+}
+
+/// Передаёт `patch` в stdin `git apply`. `reverse` — откат, `cached` — в индекс.
+fn apply_patch(repo_path: &Path, patch: &str, reverse: bool, cached: bool) -> Result<(), GitError> {
+    let mut args: Vec<&str> = vec!["apply", "--recount", "--whitespace=nowarn"];
+    if cached {
+        args.push("--cached");
+    }
+    if reverse {
+        args.push("--reverse");
+    }
+    args.push("-");
+
+    let mut child = Command::new("git")
+        .arg("-C")
+        .arg(repo_path)
+        .args(&args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| GitError::CommandFailed {
+            message: format!("Failed to run git apply: {}", e),
+            hint: Some("Is git installed and in PATH?".into()),
+        })?;
+
+    {
+        let stdin = child.stdin.as_mut().ok_or_else(|| GitError::CommandFailed {
+            message: "Failed to open git apply stdin".into(),
+            hint: None,
+        })?;
+        let mut data = patch.to_string();
+        if !data.ends_with('\n') {
+            data.push('\n');
+        }
+        stdin
+            .write_all(data.as_bytes())
+            .map_err(|e| GitError::CommandFailed {
+                message: format!("Failed to write patch: {}", e),
+                hint: None,
+            })?;
+    }
+
+    let output = child.wait_with_output().map_err(|e| GitError::CommandFailed {
+        message: format!("git apply failed: {}", e),
+        hint: None,
+    })?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(classify_git_error(&String::from_utf8_lossy(&output.stderr)))
+    }
+}
+
+/// stage выбранного хунка: патч из unstaged-диффа → индекс.
+pub fn stage_hunk(repo_path: &Path, patch: &str) -> Result<(), GitError> {
+    apply_patch(repo_path, patch, false, true)
+}
+
+/// unstage выбранного хунка: патч из staged-диффа → откат в индексе.
+pub fn unstage_hunk(repo_path: &Path, patch: &str) -> Result<(), GitError> {
+    apply_patch(repo_path, patch, true, true)
+}
+
+/// discard выбранного хунка: патч из unstaged-диффа → откат в рабочем дереве.
+pub fn discard_hunk(repo_path: &Path, patch: &str) -> Result<(), GitError> {
+    apply_patch(repo_path, patch, true, false)
 }
 
 pub fn stage(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
@@ -60,6 +130,141 @@ pub fn checkout_remote(repo_path: &Path, remote_branch: &str, local_name: Option
 
 pub fn merge(repo_path: &Path, branch: &str) -> Result<String, GitError> {
     run_git_mut(repo_path, &["merge", branch])
+}
+
+/// Перебазировать текущую ветку на `onto`. Конфликты разрешаются через ConflictBar.
+pub fn rebase(repo_path: &Path, onto: &str) -> Result<String, GitError> {
+    run_git_mut(repo_path, &["-c", "core.editor=true", "rebase", onto])
+}
+
+/// Разрешить конфликт в файлах в пользу нашей (`--ours`) версии и пометить resolved.
+pub fn accept_ours(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+    resolve_side(repo_path, files, "--ours")
+}
+
+/// Разрешить конфликт в файлах в пользу их (`--theirs`) версии и пометить resolved.
+pub fn accept_theirs(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+    resolve_side(repo_path, files, "--theirs")
+}
+
+fn resolve_side(repo_path: &Path, files: &[String], side: &str) -> Result<(), GitError> {
+    let file_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
+    let mut co: Vec<&str> = vec!["checkout", side, "--"];
+    co.extend(&file_refs);
+    run_git_mut(repo_path, &co)?;
+    let mut add: Vec<&str> = vec!["add", "--"];
+    add.extend(&file_refs);
+    run_git_mut(repo_path, &add)?;
+    Ok(())
+}
+
+/// Прервать незавершённую операцию по состоянию репозитория.
+pub fn op_abort(repo_path: &Path, state: &str) -> Result<(), GitError> {
+    let args: &[&str] = match state {
+        "rebasing" => &["rebase", "--abort"],
+        "cherry-picking" => &["cherry-pick", "--abort"],
+        "reverting" => &["revert", "--abort"],
+        _ => &["merge", "--abort"],
+    };
+    run_git_mut(repo_path, args)?;
+    Ok(())
+}
+
+/// Продолжить незавершённую операцию (после разрешения конфликтов).
+pub fn op_continue(repo_path: &Path, state: &str) -> Result<(), GitError> {
+    // GIT_EDITOR=true — не открываем редактор для сообщения.
+    let args: Vec<&str> = match state {
+        "rebasing" => vec!["-c", "core.editor=true", "rebase", "--continue"],
+        "cherry-picking" => vec!["-c", "core.editor=true", "cherry-pick", "--continue"],
+        "reverting" => vec!["-c", "core.editor=true", "revert", "--continue"],
+        _ => vec!["commit", "--no-edit"],
+    };
+    run_git_mut(repo_path, &args)?;
+    Ok(())
+}
+
+/// `mode`: "soft" | "mixed" | "hard".
+pub fn reset(repo_path: &Path, oid: &str, mode: &str) -> Result<(), GitError> {
+    let flag = match mode {
+        "soft" => "--soft",
+        "hard" => "--hard",
+        _ => "--mixed",
+    };
+    run_git_mut(repo_path, &["reset", flag, oid])?;
+    Ok(())
+}
+
+pub fn revert(repo_path: &Path, oid: &str, no_commit: bool) -> Result<(), GitError> {
+    let mut args: Vec<&str> = vec!["revert", "--no-edit"];
+    if no_commit {
+        args.push("--no-commit");
+    }
+    args.push(oid);
+    run_git_mut(repo_path, &args)?;
+    Ok(())
+}
+
+pub fn cherry_pick(repo_path: &Path, oid: &str) -> Result<(), GitError> {
+    run_git_mut(repo_path, &["cherry-pick", oid])?;
+    Ok(())
+}
+
+fn stash_ref(index: usize) -> String {
+    format!("stash@{{{}}}", index)
+}
+
+pub fn stash_save(
+    repo_path: &Path,
+    message: Option<&str>,
+    include_untracked: bool,
+) -> Result<(), GitError> {
+    let mut args: Vec<&str> = vec!["stash", "push"];
+    if include_untracked {
+        args.push("--include-untracked");
+    }
+    if let Some(msg) = message {
+        if !msg.is_empty() {
+            args.push("-m");
+            args.push(msg);
+        }
+    }
+    run_git_mut(repo_path, &args)?;
+    Ok(())
+}
+
+pub fn stash_apply(repo_path: &Path, index: usize) -> Result<(), GitError> {
+    run_git_mut(repo_path, &["stash", "apply", &stash_ref(index)])?;
+    Ok(())
+}
+
+pub fn stash_pop(repo_path: &Path, index: usize) -> Result<(), GitError> {
+    run_git_mut(repo_path, &["stash", "pop", &stash_ref(index)])?;
+    Ok(())
+}
+
+pub fn stash_drop(repo_path: &Path, index: usize) -> Result<(), GitError> {
+    run_git_mut(repo_path, &["stash", "drop", &stash_ref(index)])?;
+    Ok(())
+}
+
+pub fn create_branch(
+    repo_path: &Path,
+    name: &str,
+    start_point: Option<&str>,
+    checkout: bool,
+) -> Result<(), GitError> {
+    let mut args: Vec<&str> = if checkout {
+        vec!["switch", "-c", name]
+    } else {
+        vec!["branch", name]
+    };
+    if let Some(sp) = start_point {
+        if !sp.is_empty() {
+            args.push(sp);
+        }
+    }
+    run_git_mut(repo_path, &args)?;
+    Ok(())
 }
 
 pub fn rename_branch(repo_path: &Path, old_name: &str, new_name: &str) -> Result<(), GitError> {

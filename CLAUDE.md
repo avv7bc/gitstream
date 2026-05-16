@@ -64,14 +64,14 @@ src/                          # Vue.js frontend
 
 src-tauri/src/                # Rust backend
 ├── main.rs                   # Tauri bootstrap, регистрация commands
-├── commands.rs               # #[tauri::command] — 18 IPC endpoints
+├── commands.rs               # #[tauri::command] — IPC endpoints
 └── git/
     ├── types.rs              # Serialize-структуры
     ├── error.rs              # GitError, classify_git_error
     ├── query.rs              # run_git, status, log, branches, tags,
     │                         # stashes, remotes, repo_info, diff
-    └── mutation.rs           # stage, unstage, discard, commit,
-                              # checkout, fetch, pull, push, clone
+    └── mutation.rs           # stage, unstage, discard, commit, checkout,
+                              # merge, branch/tag ops, fetch, pull, push, clone
 ```
 
 **Layout UI:**
@@ -98,20 +98,25 @@ src-tauri/src/                # Rust backend
 
 ---
 
-## Scope MVP (реализовано)
+## Реализовано
 
 ### Операции
 - Stage / Unstage / Discard файлов
 - Commit (с amend)
-- Push / Pull / Fetch (с диалогами выбора remote)
+- Push / Pull / Fetch (с диалогами выбора remote, таймаут сетевых операций)
 - Clone репозитория
-- Checkout branch
+- Checkout branch (локальная + remote-ветка с созданием локальной)
+- Merge ветки
+- Ветки: rename, delete (с force)
+- Теги: create (lightweight/annotated), delete, push tag
+- Settings dialog (тема, таймаут сети)
 
 ### Просмотр
 - Unified + Side-by-side diff с переключателем
 - Лог коммитов с деталями
 - Список веток / тегов / stash
 - Панель файлов со статусами
+- File compare диалог
 
 ### Repositories (treeview)
 - Drag-and-drop: репозитории в папки, папки в папки, на верхний уровень
@@ -128,24 +133,39 @@ src-tauri/src/                # Rust backend
 - Все диалоги закрываются по Esc
 
 ### Архитектура
-- **Tauri IPC** — 18 команд: get_status, get_log, get_branches, get_tags, get_stashes, get_remotes, get_diff_file, get_diff_commit, get_repo_info, stage_files, unstage_files, discard_files, do_commit, do_checkout, do_fetch, do_pull, do_push, do_clone
+- **Tauri IPC** — `#[tauri::command]` endpoints (query + mutation)
 - **Git CLI** — парсинг `--porcelain=v2` (status), `--format` с NUL-разделителями (log, branches, tags), unified diff
 - **Composables** — реактивное состояние через Vue ref(), автообновление после мутаций
 - **Обработка ошибок** — classify_git_error: auth, network, conflict, hint-подсказки
+- **Сетевые операции** — async + spawn_blocking, настраиваемый таймаут (см. memory)
 
 ---
 
-## За пределами MVP (будущее)
+## Дорожная карта (в работе)
 
-- Merge / Rebase диалоги и interactive rebase UI
-- 3-way conflict resolver
-- Blame view
-- Stash операции (save/apply/pop/drop)
-- Settings dialog (user.name, email, тема)
-- Syntax highlighting в diff
+Порядок реализации до «полноценного Git-клиента»:
+
+1. **Частичный stage** — stage/unstage отдельных хунков и строк (`git apply --cached`)
+   прямо из DiffView
+2. **Stash-мутации** — save (с сообщением, `--include-untracked`), apply, pop, drop
+3. **Создание ветки** — от HEAD / выбранного коммита / другой ветки, опц. checkout
+4. **Reset / Revert / Cherry-pick** — из контекстного меню CommitGraph
+   (reset --soft/--mixed/--hard, revert, cherry-pick)
+5. **Разрешение конфликтов** — список конфликтных файлов, accept ours/theirs,
+   merge/rebase --abort/--continue
+6. **Rebase** — ветка на ветку, --abort/--continue (interactive — позже)
+
+## За пределами дорожной карты (будущее)
+
+- Interactive rebase UI, 3-way conflict resolver
+- Blame view, file history, reflog
+- Управление remote (add/remove/set-url, upstream-трекинг, prune)
+- Поиск/фильтрация в логе
+- git init / open локальной папки
+- Syntax highlighting в diff, word-level diff
 - Commit graph с визуальными линиями (lane allocation)
 - Сохранение дерева репозиториев в конфиг
-- Git-Flow поддержка
-- Submodules, LFS, GPG signing
+- Аутентификация (login/password, SSH passphrase)
+- GPG signing, Git-Flow, Submodules, LFS
 - Bisect, patches, bundles, archive
 

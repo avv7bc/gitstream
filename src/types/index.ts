@@ -70,6 +70,7 @@ export interface DiffLine {
 export interface DiffHunk {
   header: string;
   lines: DiffLine[];
+  raw: string;
 }
 
 export interface FileDiff {
@@ -77,6 +78,7 @@ export interface FileDiff {
   hunks: DiffHunk[];
   insertions: number;
   deletions: number;
+  header: string;
 }
 
 export type DiffMode = "unified" | "side-by-side";

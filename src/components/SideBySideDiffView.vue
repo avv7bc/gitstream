@@ -5,10 +5,35 @@ import { useFiles } from "@/composables/useFiles";
 import { useSyncScroll } from "@/composables/useSyncScroll";
 import { useSideBySideDiff } from "@/composables/useSideBySideDiff";
 
-const { currentDiff } = useDiff();
-const { selectedFile } = useFiles();
+const { currentDiff, diffContext } = useDiff();
+const { selectedFile, stageHunk, unstageHunk, discardHunk } = useFiles();
 const { leftPanelRef, rightPanelRef } = useSyncScroll();
 const { enrichAllHunks } = useSideBySideDiff();
+
+const busyHunk = ref<number | null>(null);
+
+function hunkPatch(rawHunk: string): string {
+  return (currentDiff.value?.header ?? "") + rawHunk;
+}
+
+async function onHunkAction(
+  action: "stage" | "unstage" | "discard",
+  hunkIdx: number,
+) {
+  const hunk = currentDiff.value?.hunks[hunkIdx];
+  if (!hunk || busyHunk.value !== null) return;
+  busyHunk.value = hunkIdx;
+  try {
+    const patch = hunkPatch(hunk.raw);
+    if (action === "stage") await stageHunk(patch);
+    else if (action === "unstage") await unstageHunk(patch);
+    else await discardHunk(patch);
+  } catch (e) {
+    console.error("Hunk action failed:", e);
+  } finally {
+    busyHunk.value = null;
+  }
+}
 
 const enrichedHunks = computed(() => {
   if (!currentDiff.value?.hunks) return [];
@@ -114,7 +139,37 @@ function scrollToHunk() {
       <div ref="rightPanelRef" class="diff-side new">
         <div class="side-label">New Version</div>
         <div v-for="(hunk, hi) in enrichedHunks" :key="`${hunk.header}`" :data-hunk-idx="hi" class="hunk-section">
-          <div class="hunk-header">{{ hunk.header }}</div>
+          <div class="hunk-header hunk-header-actions">
+            <span class="hunk-header-text">{{ hunk.header }}</span>
+            <span v-if="diffContext === 'unstaged'" class="hunk-btns">
+              <button
+                class="hunk-btn"
+                :disabled="busyHunk !== null"
+                @click="onHunkAction('stage', hi)"
+                title="Добавить хунк в индекс"
+              >
+                Stage
+              </button>
+              <button
+                class="hunk-btn danger"
+                :disabled="busyHunk !== null"
+                @click="onHunkAction('discard', hi)"
+                title="Отменить изменения хунка"
+              >
+                Discard
+              </button>
+            </span>
+            <span v-else-if="diffContext === 'staged'" class="hunk-btns">
+              <button
+                class="hunk-btn"
+                :disabled="busyHunk !== null"
+                @click="onHunkAction('unstage', hi)"
+                title="Убрать хунк из индекса"
+              >
+                Unstage
+              </button>
+            </span>
+          </div>
           <div
             v-for="line in hunk.lines"
             :key="`${line.content}-${line.kind}-new`"
@@ -268,6 +323,49 @@ function scrollToHunk() {
   border-top: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-subtle);
   user-select: none;
+}
+
+.hunk-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hunk-header-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hunk-btns {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.hunk-btn {
+  padding: 1px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+
+.hunk-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.hunk-btn.danger:hover:not(:disabled) {
+  background: var(--diff-removed-bg);
+  color: var(--red);
+}
+
+.hunk-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .diff-line {

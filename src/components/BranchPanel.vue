@@ -4,8 +4,10 @@ import { useBranches } from "@/composables/useBranches";
 import { highlight } from "@/utils/highlight";
 import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 import RenameBranchDialog from "@/components/dialogs/RenameBranchDialog.vue";
+import StashSaveDialog from "@/components/dialogs/StashSaveDialog.vue";
+import CreateBranchDialog from "@/components/dialogs/CreateBranchDialog.vue";
 import RefIcon from "@/components/RefIcon.vue";
-import type { BranchInfo, TagInfo } from "@/types";
+import type { BranchInfo, TagInfo, StashEntry } from "@/types";
 
 const emit = defineEmits<{
   checkoutRemote: [remoteBranch: string];
@@ -23,9 +25,40 @@ async function handleLocalDblClick(branch: { name: string; is_current: boolean }
 
 const {
   branches, tags, stashes, remotes,
-  checkout, mergeBranch, renameBranch, deleteBranch, pushBranch,
+  checkout, createBranch, mergeBranch, rebaseOnto, renameBranch, deleteBranch, pushBranch,
   deleteTag, pushTag,
+  stashSave, stashApply, stashPop, stashDrop,
 } = useBranches();
+
+// --- Create branch ---
+const showCreateBranchDialog = ref(false);
+const createBranchStart = ref<string | null>(null);
+
+function openCreateBranch(start: string | null) {
+  createBranchStart.value = start;
+  showCreateBranchDialog.value = true;
+}
+
+function handleCreateBranchCtx() {
+  const b = ctxBranch.value;
+  closeCtxMenu();
+  openCreateBranch(b ? b.name : null);
+}
+
+async function confirmCreateBranch(payload: {
+  name: string;
+  startPoint: string | null;
+  checkout: boolean;
+}) {
+  showCreateBranchDialog.value = false;
+  try {
+    await createBranch(payload.name, payload.startPoint, payload.checkout);
+    if (payload.checkout) emit("checkedOut");
+    else emit("branchesChanged");
+  } catch (e) {
+    window.alert(`Create branch failed: ${e}`);
+  }
+}
 
 // --- Context menu for local branches ---
 const ctxMenu = ref<{ x: number; y: number } | null>(null);
@@ -82,9 +115,10 @@ async function confirmMerge() {
   if (!b) return;
   try {
     await mergeBranch(b.name);
-    emit("branchesChanged");
   } catch (e) {
-    window.alert(`Merge failed: ${e}`);
+    window.alert(`Merge failed (resolve conflicts below if any): ${e}`);
+  } finally {
+    emit("branchesChanged");
   }
   targetBranch.value = null;
 }
@@ -98,6 +132,20 @@ async function handlePushCtx() {
     emit("branchesChanged");
   } catch (e) {
     window.alert(`Push failed: ${e}`);
+  }
+}
+
+async function handleRebaseCtx() {
+  const b = ctxBranch.value;
+  closeCtxMenu();
+  if (!b || b.is_current) return;
+  if (!window.confirm(`Rebase current branch onto '${b.name}'?`)) return;
+  try {
+    await rebaseOnto(b.name);
+  } catch (e) {
+    window.alert(`Rebase failed (resolve conflicts below if any): ${e}`);
+  } finally {
+    emit("branchesChanged");
   }
 }
 
@@ -215,6 +263,84 @@ async function confirmDeleteTag(alsoRemote: boolean) {
   targetTag.value = null;
 }
 
+// --- Stash context menu ---
+const stashCtxMenu = ref<{ x: number; y: number } | null>(null);
+const ctxStash = ref<StashEntry | null>(null);
+const showStashSaveDialog = ref(false);
+const showDropStashConfirm = ref(false);
+const targetStash = ref<StashEntry | null>(null);
+
+function onStashContextMenu(e: MouseEvent, stash: StashEntry) {
+  e.preventDefault();
+  e.stopPropagation();
+  stashCtxMenu.value = { x: e.clientX, y: e.clientY };
+  ctxStash.value = stash;
+}
+
+function closeStashCtxMenu() {
+  stashCtxMenu.value = null;
+  ctxStash.value = null;
+}
+
+async function handleStashApplyCtx() {
+  const s = ctxStash.value;
+  closeStashCtxMenu();
+  if (!s) return;
+  try {
+    await stashApply(s.index);
+    emit("branchesChanged");
+  } catch (e) {
+    window.alert(`Apply stash failed: ${e}`);
+  }
+}
+
+async function handleStashPopCtx() {
+  const s = ctxStash.value;
+  closeStashCtxMenu();
+  if (!s) return;
+  try {
+    await stashPop(s.index);
+    emit("branchesChanged");
+  } catch (e) {
+    window.alert(`Pop stash failed: ${e}`);
+  }
+}
+
+function handleStashDropCtx() {
+  targetStash.value = ctxStash.value;
+  closeStashCtxMenu();
+  showDropStashConfirm.value = true;
+}
+
+async function confirmDropStash() {
+  const s = targetStash.value;
+  showDropStashConfirm.value = false;
+  if (!s) {
+    targetStash.value = null;
+    return;
+  }
+  try {
+    await stashDrop(s.index);
+    emit("branchesChanged");
+  } catch (e) {
+    window.alert(`Drop stash failed: ${e}`);
+  }
+  targetStash.value = null;
+}
+
+async function confirmStashSave(payload: {
+  message: string | null;
+  includeUntracked: boolean;
+}) {
+  showStashSaveDialog.value = false;
+  try {
+    await stashSave(payload.message, payload.includeUntracked);
+    emit("branchesChanged");
+  } catch (e) {
+    window.alert(`Stash failed: ${e}`);
+  }
+}
+
 const filter = ref("");
 const expandedSections = ref({
   local: true,
@@ -292,6 +418,11 @@ function selectItem(key: string) {
           </svg>
           <span class="section-title">Local Branches</span>
           <span class="section-count">{{ localBranches.length }}</span>
+          <button
+            class="section-action"
+            title="Create branch"
+            @click.stop="openCreateBranch(null)"
+          >+</button>
         </div>
         <div v-if="expandedSections.local" class="section-items">
           <div
@@ -388,6 +519,11 @@ function selectItem(key: string) {
           </svg>
           <span class="section-title">Stashes</span>
           <span class="section-count">{{ filteredStashes.length }}</span>
+          <button
+            class="section-action"
+            title="Stash changes"
+            @click.stop="showStashSaveDialog = true"
+          >+</button>
         </div>
         <div v-if="expandedSections.stashes && filteredStashes.length" class="section-items">
           <div
@@ -396,6 +532,7 @@ function selectItem(key: string) {
             class="branch-item stash-item"
             :class="{ selected: selectedKey === `stash:${stash.index}` }"
             @mousedown="selectItem(`stash:${stash.index}`)"
+            @contextmenu="onStashContextMenu($event, stash)"
           >
             <RefIcon kind="stash" class="bp-icon bp-icon--stash" />
             <div class="stash-info">
@@ -426,8 +563,17 @@ function selectItem(key: string) {
           :disabled="ctxBranch?.is_current"
           @click="handleMergeCtx"
         >Merge</button>
+        <button
+          class="ctx-item"
+          :disabled="ctxBranch?.is_current"
+          @click="handleRebaseCtx"
+        >Rebase current onto this</button>
         <button class="ctx-item" @click="handlePushCtx">Push</button>
         <div class="ctx-separator" />
+        <button
+          class="ctx-item"
+          @click="handleCreateBranchCtx"
+        >Create branch from here…</button>
         <button class="ctx-item" @click="handleRenameCtx">Rename</button>
         <button
           class="ctx-item ctx-danger"
@@ -507,6 +653,46 @@ function selectItem(key: string) {
         :checkbox-label="hasRemote ? `Also delete on remote '${remotes[0]}'` : undefined"
         @close="showDeleteTagConfirm = false; targetTag = null"
         @confirm="confirmDeleteTag"
+      />
+
+      <div
+        v-if="stashCtxMenu"
+        class="ctx-menu"
+        :style="{ left: stashCtxMenu.x + 'px', top: stashCtxMenu.y + 'px' }"
+        @click.stop
+      >
+        <button class="ctx-item" @click="handleStashApplyCtx">Apply</button>
+        <button class="ctx-item" @click="handleStashPopCtx">Pop</button>
+        <div class="ctx-separator" />
+        <button class="ctx-item ctx-danger" @click="handleStashDropCtx">Drop</button>
+      </div>
+      <div
+        v-if="stashCtxMenu"
+        class="ctx-backdrop"
+        @click="closeStashCtxMenu"
+        @contextmenu.prevent="closeStashCtxMenu"
+      />
+
+      <ConfirmDialog
+        v-if="showDropStashConfirm && targetStash"
+        :message="`Drop stash '${targetStash.message}'?`"
+        confirm-label="Drop"
+        danger
+        @close="showDropStashConfirm = false; targetStash = null"
+        @confirm="confirmDropStash"
+      />
+
+      <StashSaveDialog
+        v-if="showStashSaveDialog"
+        @close="showStashSaveDialog = false"
+        @confirm="confirmStashSave"
+      />
+
+      <CreateBranchDialog
+        v-if="showCreateBranchDialog"
+        :default-start="createBranchStart"
+        @close="showCreateBranchDialog = false"
+        @confirm="confirmCreateBranch"
       />
     </Teleport>
   </div>
@@ -591,6 +777,25 @@ function selectItem(key: string) {
   color: var(--text-muted);
   font-size: var(--font-size-xs);
   font-weight: 400;
+}
+
+.section-action {
+  margin-left: 6px;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.section-action:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .section-items {

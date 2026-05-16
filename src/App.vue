@@ -8,6 +8,7 @@ import CommitDetails from "./components/CommitDetails.vue";
 import FileList from "./components/FileList.vue";
 import SideBySideDiffView from "./components/SideBySideDiffView.vue";
 import StatusBar from "./components/StatusBar.vue";
+import ConflictBar from "./components/ConflictBar.vue";
 import CommitDialog from "./components/dialogs/CommitDialog.vue";
 import CloneDialog from "./components/dialogs/CloneDialog.vue";
 import PushDialog from "./components/dialogs/PushDialog.vue";
@@ -25,6 +26,7 @@ import { useFiles } from "@/composables/useFiles";
 import { useBranches } from "@/composables/useBranches";
 import { useLog } from "@/composables/useLog";
 import { useRemote } from "@/composables/useRemote";
+import { useConflicts } from "@/composables/useConflicts";
 
 const { repoPath, onRepoOpened, restoreLastRepo } = useRepo();
 const { refresh: refreshFiles } = useFiles();
@@ -32,9 +34,15 @@ const { refresh: refreshBranches, createTag } = useBranches();
 const { refresh: refreshLog } = useLog();
 const { pull, push } = useRemote();
 const { target: compareTarget } = useFileCompare();
+const { refresh: refreshConflicts } = useConflicts();
 
 async function refreshAll() {
-  await Promise.all([refreshFiles(), refreshBranches(), refreshLog()]);
+  await Promise.all([
+    refreshFiles(),
+    refreshBranches(),
+    refreshLog(),
+    refreshConflicts(),
+  ]);
 }
 
 onRepoOpened(refreshAll);
@@ -273,6 +281,8 @@ function onMouseUp() {
       @add-group="handleAddGroup"
     />
 
+    <ConflictBar @changed="refreshAll()" />
+
     <!-- Main body -->
     <div class="app-body">
       <!-- LEFT SIDEBAR -->
@@ -309,6 +319,7 @@ function onMouseUp() {
               @commit="showCommitDialog = true"
               @discard="showDiscardDialog = true"
               @create-tag="openAddTag($event)"
+              @changed="refreshAll()"
             />
           </div>
 

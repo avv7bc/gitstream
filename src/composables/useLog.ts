@@ -21,10 +21,33 @@ export function useLog() {
     });
   }
 
+  async function resetTo(oid: string, mode: "soft" | "mixed" | "hard") {
+    if (!repoPath.value) return;
+    await invoke("do_reset", { repoPath: repoPath.value, oid, mode });
+  }
+
+  async function revertCommit(oid: string, noCommit: boolean) {
+    if (!repoPath.value) return;
+    await invoke("do_revert", { repoPath: repoPath.value, oid, noCommit });
+  }
+
+  async function cherryPick(oid: string) {
+    if (!repoPath.value) return;
+    await invoke("do_cherry_pick", { repoPath: repoPath.value, oid });
+  }
+
   function clear() {
     commits.value = [];
     selectedCommit.value = null;
   }
 
-  return { commits, selectedCommit, refresh, clear };
+  return {
+    commits,
+    selectedCommit,
+    refresh,
+    clear,
+    resetTo,
+    revertCommit,
+    cherryPick,
+  };
 }

@@ -46,6 +46,25 @@ export function useBranches() {
     await invoke("do_merge", { repoPath: repoPath.value, branch });
   }
 
+  async function createBranch(
+    name: string,
+    startPoint: string | null,
+    checkout: boolean,
+  ) {
+    if (!repoPath.value) return;
+    await invoke("do_create_branch", {
+      repoPath: repoPath.value,
+      name,
+      startPoint,
+      checkout,
+    });
+  }
+
+  async function rebaseOnto(onto: string) {
+    if (!repoPath.value) return;
+    await invoke("do_rebase", { repoPath: repoPath.value, onto });
+  }
+
   async function renameBranch(oldName: string, newName: string) {
     if (!repoPath.value) return;
     await invoke("do_rename_branch", { repoPath: repoPath.value, oldName, newName });
@@ -83,6 +102,30 @@ export function useBranches() {
     });
   }
 
+  async function stashSave(message: string | null, includeUntracked: boolean) {
+    if (!repoPath.value) return;
+    await invoke("do_stash_save", {
+      repoPath: repoPath.value,
+      message,
+      includeUntracked,
+    });
+  }
+
+  async function stashApply(index: number) {
+    if (!repoPath.value) return;
+    await invoke("do_stash_apply", { repoPath: repoPath.value, index });
+  }
+
+  async function stashPop(index: number) {
+    if (!repoPath.value) return;
+    await invoke("do_stash_pop", { repoPath: repoPath.value, index });
+  }
+
+  async function stashDrop(index: number) {
+    if (!repoPath.value) return;
+    await invoke("do_stash_drop", { repoPath: repoPath.value, index });
+  }
+
   async function deleteTag(name: string) {
     if (!repoPath.value) return;
     await invoke("do_delete_tag", { repoPath: repoPath.value, name });
@@ -102,7 +145,8 @@ export function useBranches() {
   return {
     branches, tags, stashes, remotes,
     refresh, checkout, checkoutRemote,
-    mergeBranch, renameBranch, deleteBranch, pushBranch,
+    createBranch, mergeBranch, rebaseOnto, renameBranch, deleteBranch, pushBranch,
     createTag, deleteTag, pushTag,
+    stashSave, stashApply, stashPop, stashDrop,
   };
 }

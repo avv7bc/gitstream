@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { FileStatus } from "@/types";
 import { useRepo } from "./useRepo";
+import { useDiff } from "./useDiff";
 
 const files = ref<FileStatus[]>([]);
 const selectedFile = ref<string | null>(null);
@@ -36,5 +37,30 @@ export function useFiles() {
     await refresh();
   }
 
-  return { files, selectedFile, refresh, stageFiles, unstageFiles, discardFiles };
+  async function applyHunk(
+    command: "stage_hunk" | "unstage_hunk" | "discard_hunk",
+    patch: string,
+  ) {
+    if (!repoPath.value) return;
+    const { reloadDiff } = useDiff();
+    await invoke(command, { repoPath: repoPath.value, patch });
+    await refresh();
+    await reloadDiff();
+  }
+
+  const stageHunk = (patch: string) => applyHunk("stage_hunk", patch);
+  const unstageHunk = (patch: string) => applyHunk("unstage_hunk", patch);
+  const discardHunk = (patch: string) => applyHunk("discard_hunk", patch);
+
+  return {
+    files,
+    selectedFile,
+    refresh,
+    stageFiles,
+    unstageFiles,
+    discardFiles,
+    stageHunk,
+    unstageHunk,
+    discardHunk,
+  };
 }

@@ -171,6 +171,28 @@ pub fn remotes(repo_path: &Path) -> Result<Vec<String>, GitError> {
     Ok(output.lines().filter(|l| !l.is_empty()).map(|l| l.to_string()).collect())
 }
 
+/// Состояние репозитория: незавершённая merge/rebase/cherry-pick/revert.
+/// Возвращает "clean" | "merging" | "rebasing" | "cherry-picking" | "reverting".
+pub fn repo_state(repo_path: &Path) -> Result<String, GitError> {
+    let git_dir_raw = run_git(repo_path, &["rev-parse", "--git-dir"])?;
+    let git_dir = git_dir_raw.trim();
+    let base = Path::new(repo_path).join(git_dir);
+    let exists = |p: &str| base.join(p).exists();
+
+    let state = if exists("rebase-merge") || exists("rebase-apply") {
+        "rebasing"
+    } else if exists("CHERRY_PICK_HEAD") {
+        "cherry-picking"
+    } else if exists("REVERT_HEAD") {
+        "reverting"
+    } else if exists("MERGE_HEAD") {
+        "merging"
+    } else {
+        "clean"
+    };
+    Ok(state.to_string())
+}
+
 pub fn repo_info(repo_path: &Path) -> Result<RepoInfo, GitError> {
     let path = run_git(repo_path, &["rev-parse", "--show-toplevel"])?;
     let branch = run_git(repo_path, &["branch", "--show-current"])?;
@@ -202,20 +224,36 @@ fn parse_diff_single(diff_text: &str, fallback_path: &str) -> FileDiff {
     let mut hunks = Vec::new();
     let mut current_lines: Vec<DiffLine> = Vec::new();
     let mut current_header = String::new();
+    let mut current_raw = String::new();
+    let mut patch_header = String::new();
+    let mut seen_hunk = false;
     let mut insertions = 0u32;
     let mut deletions = 0u32;
     let mut old_line = 0u32;
     let mut new_line = 0u32;
     let mut path = fallback_path.to_string();
 
+    let push_hunk =
+        |hunks: &mut Vec<DiffHunk>, header: &str, lines: &mut Vec<DiffLine>, raw: &mut String| {
+            hunks.push(DiffHunk {
+                header: header.to_string(),
+                lines: std::mem::take(lines),
+                raw: std::mem::take(raw),
+            });
+        };
+
     for line in diff_text.lines() {
         if line.starts_with("+++ b/") {
             path = line[6..].to_string();
-        } else if line.starts_with("@@ ") {
+        }
+        if line.starts_with("@@ ") {
             if !current_header.is_empty() {
-                hunks.push(DiffHunk { header: current_header.clone(), lines: std::mem::take(&mut current_lines) });
+                push_hunk(&mut hunks, &current_header, &mut current_lines, &mut current_raw);
             }
+            seen_hunk = true;
             current_header = line.to_string();
+            current_raw.push_str(line);
+            current_raw.push('\n');
             if let Some(nums) = line.strip_prefix("@@ ") {
                 let parts: Vec<&str> = nums.split(' ').collect();
                 if parts.len() >= 2 {
@@ -223,24 +261,37 @@ fn parse_diff_single(diff_text: &str, fallback_path: &str) -> FileDiff {
                     new_line = parts[1].trim_start_matches('+').split(',').next().and_then(|s| s.parse().ok()).unwrap_or(1);
                 }
             }
+        } else if !seen_hunk {
+            patch_header.push_str(line);
+            patch_header.push('\n');
         } else if line.starts_with('+') && !line.starts_with("+++") {
             insertions += 1;
             current_lines.push(DiffLine { kind: "added".to_string(), old_lineno: None, new_lineno: Some(new_line), content: line[1..].to_string() });
             new_line += 1;
+            current_raw.push_str(line);
+            current_raw.push('\n');
         } else if line.starts_with('-') && !line.starts_with("---") {
             deletions += 1;
             current_lines.push(DiffLine { kind: "removed".to_string(), old_lineno: Some(old_line), new_lineno: None, content: line[1..].to_string() });
             old_line += 1;
+            current_raw.push_str(line);
+            current_raw.push('\n');
         } else if line.starts_with(' ') {
             current_lines.push(DiffLine { kind: "context".to_string(), old_lineno: Some(old_line), new_lineno: Some(new_line), content: line[1..].to_string() });
             old_line += 1;
             new_line += 1;
+            current_raw.push_str(line);
+            current_raw.push('\n');
+        } else if line.starts_with('\\') {
+            // "\ No newline at end of file" — часть тела хунка
+            current_raw.push_str(line);
+            current_raw.push('\n');
         }
     }
     if !current_header.is_empty() {
-        hunks.push(DiffHunk { header: current_header, lines: current_lines });
+        push_hunk(&mut hunks, &current_header, &mut current_lines, &mut current_raw);
     }
-    FileDiff { path, hunks, insertions, deletions }
+    FileDiff { path, hunks, insertions, deletions, header: patch_header }
 }
 
 fn parse_diff_multi(diff_text: &str) -> Vec<FileDiff> {
