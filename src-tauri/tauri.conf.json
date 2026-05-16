@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicbarker/tauri/main/crates/tauri-cli/schema.json",
   "productName": "GitStream",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "identifier": "com.gitstream.app",
   "build": {
     "frontendDist": "../dist",

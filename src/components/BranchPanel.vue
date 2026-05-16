@@ -4,6 +4,7 @@ import { useBranches } from "@/composables/useBranches";
 import { highlight } from "@/utils/highlight";
 import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 import RenameBranchDialog from "@/components/dialogs/RenameBranchDialog.vue";
+import RefIcon from "@/components/RefIcon.vue";
 import type { BranchInfo, TagInfo } from "@/types";
 
 const emit = defineEmits<{
@@ -302,11 +303,7 @@ function selectItem(key: string) {
             @dblclick="handleLocalDblClick(branch)"
             @contextmenu="onBranchContextMenu($event, branch)"
           >
-            <svg width="14" height="14" viewBox="0 0 16 16" class="branch-icon">
-              <path d="M5 3a2 2 0 100 4 2 2 0 000-4zM5 9a2 2 0 100 4 2 2 0 000-4z"
-                    fill="none" stroke="currentColor" stroke-width="1.2"/>
-              <path d="M5 7v2" fill="none" stroke="currentColor" stroke-width="1.2"/>
-            </svg>
+            <RefIcon kind="local-branch" class="bp-icon bp-icon--branch" />
             <span class="branch-name" v-html="highlight(branch.name, filter)" />
             <span v-if="branch.ahead > 0" class="ahead-badge" :title="`${branch.ahead} ahead`">
               {{ branch.ahead }}
@@ -340,10 +337,7 @@ function selectItem(key: string) {
             @mousedown="selectItem(`remote:${branch.name}`)"
             @dblclick="emit('checkoutRemote', branch.name)"
           >
-            <svg width="14" height="14" viewBox="0 0 16 16" class="branch-icon remote">
-              <circle cx="8" cy="4" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
-              <path d="M8 6v4M4 12h8M4 12v-2M12 12v-2" fill="none" stroke="currentColor" stroke-width="1.2"/>
-            </svg>
+            <RefIcon kind="remote-branch" class="bp-icon bp-icon--remote" />
             <span class="branch-name" v-html="highlight(branch.name, filter)" />
           </div>
         </div>
@@ -376,10 +370,7 @@ function selectItem(key: string) {
             @mousedown="selectItem(`tag:${tag.name}`)"
             @contextmenu="onTagContextMenu($event, tag)"
           >
-            <svg width="14" height="14" viewBox="0 0 16 16" class="tag-icon">
-              <path d="M2 9V2h7l5 5-7 7-5-5z" fill="none" stroke="currentColor" stroke-width="1.2"/>
-              <circle cx="6" cy="6" r="1" fill="currentColor"/>
-            </svg>
+            <RefIcon kind="tag" class="bp-icon bp-icon--tag" />
             <span class="branch-name" v-html="highlight(tag.name, filter)" />
           </div>
         </div>
@@ -406,10 +397,7 @@ function selectItem(key: string) {
             :class="{ selected: selectedKey === `stash:${stash.index}` }"
             @mousedown="selectItem(`stash:${stash.index}`)"
           >
-            <svg width="14" height="14" viewBox="0 0 16 16" class="stash-icon">
-              <rect x="3" y="3" width="10" height="3" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/>
-              <rect x="3" y="8" width="10" height="3" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/>
-            </svg>
+            <RefIcon kind="stash" class="bp-icon bp-icon--stash" />
             <div class="stash-info">
               <span class="branch-name" v-html="highlight(stash.message, filter)" />
               <span class="stash-date" v-html="highlight(stash.date, filter)" />
@@ -632,19 +620,16 @@ function selectItem(key: string) {
   font-weight: 600;
 }
 
-.branch-icon {
-  flex-shrink: 0;
+.bp-icon--branch {
   color: var(--green);
 }
-.branch-icon.remote {
+.bp-icon--remote {
   color: var(--text-muted);
 }
-.tag-icon {
-  flex-shrink: 0;
+.bp-icon--tag {
   color: var(--yellow);
 }
-.stash-icon {
-  flex-shrink: 0;
+.bp-icon--stash {
   color: var(--purple);
 }
 
