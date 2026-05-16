@@ -23,6 +23,16 @@ pub struct CommitInfo {
     pub date: String,
     pub parents: Vec<String>,
     pub refs: Vec<RefLabel>,
+    pub column: u32,
+    pub lines: Vec<GraphLine>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct GraphLine {
+    pub from_column: u32,
+    pub to_column: u32,
+    pub color: u32,
+    pub style: String,
 }
 
 #[derive(Serialize, Clone, Debug)]

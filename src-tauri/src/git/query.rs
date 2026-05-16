@@ -76,8 +76,11 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
             message: parts[2].to_string(), author: parts[3].to_string(),
             author_email: parts[4].to_string(), date: parts[5].to_string(),
             parents, refs,
+            column: 0,
+            lines: Vec::new(),
         });
     }
+    super::graph::assign_lanes(&mut commits);
     Ok(commits)
 }
 
