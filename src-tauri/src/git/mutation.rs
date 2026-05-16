@@ -1,7 +1,6 @@
 use std::path::Path;
-use std::process::Command;
 
-use super::error::{classify_git_error, GitError};
+use super::error::GitError;
 
 fn run_git_mut(repo_path: &Path, args: &[&str]) -> Result<String, GitError> {
     super::query::run_git(repo_path, args)
@@ -59,34 +58,6 @@ pub fn checkout_remote(repo_path: &Path, remote_branch: &str, local_name: Option
     Ok(())
 }
 
-pub fn fetch(repo_path: &Path, remote: &str) -> Result<String, GitError> {
-    run_git_mut(repo_path, &["fetch", remote])
-}
-
-pub fn pull(repo_path: &Path, remote: &str, rebase: bool) -> Result<String, GitError> {
-    if rebase {
-        run_git_mut(repo_path, &["pull", "--rebase", remote])
-    } else {
-        run_git_mut(repo_path, &["pull", remote])
-    }
-}
-
-pub fn push(repo_path: &Path, remote: &str, force: bool) -> Result<String, GitError> {
-    if force {
-        run_git_mut(repo_path, &["push", "--force", remote])
-    } else {
-        run_git_mut(repo_path, &["push", remote])
-    }
-}
-
-pub fn push_branch(repo_path: &Path, remote: &str, branch: &str, force: bool) -> Result<String, GitError> {
-    if force {
-        run_git_mut(repo_path, &["push", "--force", remote, branch])
-    } else {
-        run_git_mut(repo_path, &["push", remote, branch])
-    }
-}
-
 pub fn merge(repo_path: &Path, branch: &str) -> Result<String, GitError> {
     run_git_mut(repo_path, &["merge", branch])
 }
@@ -131,31 +102,45 @@ pub fn delete_tag(repo_path: &Path, name: &str) -> Result<(), GitError> {
     Ok(())
 }
 
-pub fn push_tag(
-    repo_path: &Path,
-    remote: &str,
-    name: &str,
-    delete: bool,
-) -> Result<String, GitError> {
+pub fn fetch_args(remote: &str) -> Vec<String> {
+    vec!["fetch".into(), remote.into()]
+}
+
+pub fn pull_args(remote: &str, rebase: bool) -> Vec<String> {
+    if rebase {
+        vec!["pull".into(), "--rebase".into(), remote.into()]
+    } else {
+        vec!["pull".into(), remote.into()]
+    }
+}
+
+pub fn push_args(remote: &str, force: bool) -> Vec<String> {
+    if force {
+        vec!["push".into(), "--force".into(), remote.into()]
+    } else {
+        vec!["push".into(), remote.into()]
+    }
+}
+
+pub fn push_branch_args(remote: &str, branch: &str, force: bool) -> Vec<String> {
+    if force {
+        vec!["push".into(), "--force".into(), remote.into(), branch.into()]
+    } else {
+        vec!["push".into(), remote.into(), branch.into()]
+    }
+}
+
+pub fn push_tag_args(remote: &str, name: &str, delete: bool) -> Vec<String> {
     let refspec = if delete {
         format!(":refs/tags/{}", name)
     } else {
         format!("refs/tags/{}", name)
     };
-    run_git_mut(repo_path, &["push", remote, &refspec])
+    vec!["push".into(), remote.into(), refspec]
 }
 
-pub fn clone_repo(url: &str, dest: &str) -> Result<String, GitError> {
-    let output = Command::new("git")
-        .args(["clone", url, dest])
-        .output()
-        .map_err(|e| GitError::CommandFailed { message: format!("Failed to run git clone: {}", e), hint: None })?;
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        Err(classify_git_error(&stderr))
-    }
+pub fn clone_args(url: &str, dest: &str) -> Vec<String> {
+    vec!["clone".into(), url.into(), dest.into()]
 }
 
 #[cfg(test)]
@@ -232,5 +217,51 @@ mod tag_tests {
         delete_tag(&dir, "v1.0").unwrap();
         assert!(!list_tags(&dir).contains("v1.0"));
         fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn fetch_args_basic() {
+        assert_eq!(fetch_args("origin"), vec!["fetch", "origin"]);
+    }
+
+    #[test]
+    fn pull_args_rebase_toggle() {
+        assert_eq!(pull_args("origin", false), vec!["pull", "origin"]);
+        assert_eq!(pull_args("origin", true), vec!["pull", "--rebase", "origin"]);
+    }
+
+    #[test]
+    fn push_args_force_toggle() {
+        assert_eq!(push_args("origin", false), vec!["push", "origin"]);
+        assert_eq!(push_args("origin", true), vec!["push", "--force", "origin"]);
+    }
+
+    #[test]
+    fn push_branch_args_force_toggle() {
+        assert_eq!(push_branch_args("origin", "main", false), vec!["push", "origin", "main"]);
+        assert_eq!(
+            push_branch_args("origin", "main", true),
+            vec!["push", "--force", "origin", "main"]
+        );
+    }
+
+    #[test]
+    fn push_tag_args_delete_toggle() {
+        assert_eq!(
+            push_tag_args("origin", "v1.0", false),
+            vec!["push", "origin", "refs/tags/v1.0"]
+        );
+        assert_eq!(
+            push_tag_args("origin", "v1.0", true),
+            vec!["push", "origin", ":refs/tags/v1.0"]
+        );
+    }
+
+    #[test]
+    fn clone_args_basic() {
+        assert_eq!(
+            clone_args("https://x/y.git", "/tmp/y"),
+            vec!["clone", "https://x/y.git", "/tmp/y"]
+        );
     }
 }

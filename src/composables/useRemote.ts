@@ -1,12 +1,14 @@
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useRepo } from "./useRepo";
+import { useSettings } from "./useSettings";
 
 const isBusy = ref(false);
 const lastError = ref<string | null>(null);
 
 export function useRemote() {
   const { repoPath } = useRepo();
+  const { networkTimeoutSecs } = useSettings();
 
   async function wrapAsync(fn: () => Promise<unknown>) {
     isBusy.value = true;
@@ -21,19 +23,45 @@ export function useRemote() {
   }
 
   async function fetchRemote(remote: string) {
-    await wrapAsync(() => invoke("do_fetch", { repoPath: repoPath.value!, remote }));
+    await wrapAsync(() =>
+      invoke("do_fetch", {
+        repoPath: repoPath.value!,
+        remote,
+        timeoutSecs: networkTimeoutSecs.value,
+      })
+    );
   }
 
   async function pull(remote: string, rebase: boolean) {
-    await wrapAsync(() => invoke("do_pull", { repoPath: repoPath.value!, remote, rebase }));
+    await wrapAsync(() =>
+      invoke("do_pull", {
+        repoPath: repoPath.value!,
+        remote,
+        rebase,
+        timeoutSecs: networkTimeoutSecs.value,
+      })
+    );
   }
 
   async function push(remote: string, force: boolean) {
-    await wrapAsync(() => invoke("do_push", { repoPath: repoPath.value!, remote, force }));
+    await wrapAsync(() =>
+      invoke("do_push", {
+        repoPath: repoPath.value!,
+        remote,
+        force,
+        timeoutSecs: networkTimeoutSecs.value,
+      })
+    );
   }
 
   async function cloneRepo(url: string, dest: string) {
-    await wrapAsync(() => invoke("do_clone", { url, dest }));
+    await wrapAsync(() =>
+      invoke("do_clone", {
+        url,
+        dest,
+        timeoutSecs: networkTimeoutSecs.value,
+      })
+    );
   }
 
   return { isBusy, lastError, fetchRemote, pull, push, cloneRepo };

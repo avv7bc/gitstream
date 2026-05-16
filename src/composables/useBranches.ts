@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { BranchInfo, TagInfo, StashEntry } from "@/types";
 import { useRepo } from "./useRepo";
+import { useSettings } from "./useSettings";
 
 const branches = ref<BranchInfo[]>([]);
 const tags = ref<TagInfo[]>([]);
@@ -10,6 +11,7 @@ const remotes = ref<string[]>([]);
 
 export function useBranches() {
   const { repoPath } = useRepo();
+  const { networkTimeoutSecs } = useSettings();
 
   async function refresh() {
     if (!repoPath.value) return;
@@ -56,7 +58,13 @@ export function useBranches() {
 
   async function pushBranch(branch: string, remote: string, force: boolean) {
     if (!repoPath.value) return;
-    await invoke("do_push_branch", { repoPath: repoPath.value, remote, branch, force });
+    await invoke("do_push_branch", {
+      repoPath: repoPath.value,
+      remote,
+      branch,
+      force,
+      timeoutSecs: networkTimeoutSecs.value,
+    });
   }
 
   async function createTag(
@@ -87,6 +95,7 @@ export function useBranches() {
       remote,
       name,
       delete: del,
+      timeoutSecs: networkTimeoutSecs.value,
     });
   }
 

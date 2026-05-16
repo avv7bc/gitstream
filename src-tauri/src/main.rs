@@ -2,6 +2,7 @@
 
 mod commands;
 mod git;
+mod settings;
 
 fn main() {
     tauri::Builder::default()
@@ -44,6 +45,8 @@ fn main() {
             commands::do_delete_tag,
             commands::do_push_tag,
             commands::do_clone,
+            settings::get_settings,
+            settings::set_settings,
             commands::check_repo_path,
         ])
         .run(tauri::generate_context!())
