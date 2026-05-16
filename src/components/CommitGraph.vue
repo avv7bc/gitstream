@@ -243,6 +243,16 @@ function formatDate(iso: string): string {
       >
         <div class="graph-col">
           <svg :width="graphColW" height="24" class="graph-svg">
+            <line
+              v-if="filteredCommits.length"
+              :x1="laneX(wtCol)"
+              y1="12"
+              :x2="laneX(wtCol)"
+              y2="24"
+              :stroke="laneColor(wtCol)"
+              stroke-width="2"
+              stroke-opacity="0.35"
+            />
             <circle :cx="laneX(wtCol)" cy="12" r="5" fill="var(--green)" stroke="var(--bg-primary)" stroke-width="1.5" />
           </svg>
         </div>
@@ -265,6 +275,16 @@ function formatDate(iso: string): string {
         <!-- Graph column with SVG lane lines -->
         <div class="graph-col">
           <svg :width="graphColW" height="24" class="graph-svg">
+            <line
+              v-if="idx === 0"
+              :x1="laneX(commit.column)"
+              y1="0"
+              :x2="laneX(commit.column)"
+              y2="12"
+              :stroke="laneColor(commit.column)"
+              stroke-width="2"
+              stroke-opacity="0.35"
+            />
             <path
               v-for="(ln, li) in commit.lines"
               :key="li"
