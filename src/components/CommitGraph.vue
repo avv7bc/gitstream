@@ -89,12 +89,16 @@ function ctxAction(action: "commit" | "discard") {
   else emit("discard");
 }
 
-function ctxCreateTag() {
-  const oid = ctxCommitOid.value;
-  closeCtxMenu();
+function emitAddTag(oid: string | null) {
   if (!oid || oid === "__worktree__") return;
   const c = commits.value.find((x) => x.oid === oid);
   emit("createTag", { oid, subject: c?.message ?? "" });
+}
+
+function ctxCreateTag() {
+  const oid = ctxCommitOid.value;
+  closeCtxMenu();
+  emitAddTag(oid);
 }
 
 const ctxIsWorkingTree = computed(() => ctxCommitOid.value === "__worktree__");
@@ -148,6 +152,11 @@ function navigateCommits(direction: 'up' | 'down'): void {
 }
 
 function handleKeyDown(e: KeyboardEvent): void {
+  if (e.shiftKey && e.key === 'F7') {
+    e.preventDefault();
+    emitAddTag(selectedCommit.value);
+    return;
+  }
   if (e.key === 'ArrowUp') {
     e.preventDefault();
     navigateCommits('up');
@@ -311,10 +320,17 @@ function formatDate(iso: string): string {
         :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }"
         @click.stop
       >
-        <button class="ctx-item" :disabled="!ctxIsWorkingTree" @click="ctxAction('commit')">Commit</button>
-        <button class="ctx-item ctx-danger" :disabled="!ctxIsWorkingTree" @click="ctxAction('discard')">Discard</button>
+        <button class="ctx-item" :disabled="!ctxIsWorkingTree" @click="ctxAction('commit')">
+          <span class="ctx-label">Commit</span>
+        </button>
+        <button class="ctx-item ctx-danger" :disabled="!ctxIsWorkingTree" @click="ctxAction('discard')">
+          <span class="ctx-label">Discard</span>
+        </button>
         <div class="ctx-separator" />
-        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxCreateTag">Create Tag here…</button>
+        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxCreateTag">
+          <span class="ctx-label">Add Tag</span>
+          <span class="ctx-shortcut">Shift+F7</span>
+        </button>
       </div>
       <div v-if="ctxMenu" class="ctx-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu" />
     </Teleport>
@@ -549,7 +565,10 @@ function formatDate(iso: string): string {
   padding: 4px 0;
 }
 .ctx-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
   width: 100%;
   padding: 6px 12px;
   text-align: left;
@@ -558,6 +577,14 @@ function formatDate(iso: string): string {
   background: none;
   border: none;
   cursor: pointer;
+}
+.ctx-label {
+  white-space: nowrap;
+}
+.ctx-shortcut {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
 }
 .ctx-item:hover:not(:disabled) {
   background: var(--bg-hover);
