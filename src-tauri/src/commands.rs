@@ -8,10 +8,14 @@ use tokio::process::Command as TokioCommand;
 use crate::git::{query, mutation, types::*};
 
 pub(crate) const DEFAULT_NETWORK_TIMEOUT_SECS: u64 = 10;
+pub(crate) const MAX_NETWORK_TIMEOUT_SECS: u64 = 600;
 
 pub(crate) fn effective_timeout_secs(timeout_secs: Option<u64>) -> u64 {
+    // Frontend already clamps to 1..=600, but the backend stays self-protecting
+    // against future callers / hand-edited settings.json. None/Some(0) → default.
     timeout_secs
         .filter(|&s| s > 0)
+        .map(|s| s.min(MAX_NETWORK_TIMEOUT_SECS))
         .unwrap_or(DEFAULT_NETWORK_TIMEOUT_SECS)
 }
 
@@ -314,5 +318,7 @@ mod network_timeout_tests {
         assert_eq!(effective_timeout_secs(Some(0)), DEFAULT_NETWORK_TIMEOUT_SECS);
         assert_eq!(effective_timeout_secs(None), DEFAULT_NETWORK_TIMEOUT_SECS);
         assert_eq!(effective_timeout_secs(Some(25)), 25);
+        assert_eq!(effective_timeout_secs(Some(99999)), MAX_NETWORK_TIMEOUT_SECS);
+        assert_eq!(effective_timeout_secs(Some(600)), 600);
     }
 }
