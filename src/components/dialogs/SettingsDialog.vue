@@ -120,6 +120,8 @@ onUnmounted(() => {
 const { mode } = useTheme();
 const { networkTimeoutSecs } = useSettings();
 
+const timeoutOptions = [5, 10, 30, 60];
+
 const themes: { value: ThemeMode; label: string }[] = [
   { value: "system", label: "System (как в ОС)" },
   { value: "light", label: "Light" },
@@ -130,7 +132,6 @@ const themes: { value: ThemeMode; label: string }[] = [
   { value: "dracula", label: "Dracula" },
 ];
 
-const tab = ref<"user" | "workspace">("user");
 const activeCategory = ref("appearance");
 const search = ref("");
 
@@ -232,26 +233,6 @@ const activeCategoryLabel = computed(
         </div>
       </div>
 
-      <!-- Tabs row -->
-      <div class="vs-tabs-row">
-        <div class="vs-tabs">
-          <button
-            class="vs-tab"
-            :class="{ active: tab === 'user' }"
-            @click="tab = 'user'"
-          >
-            Пользователь
-          </button>
-          <button
-            class="vs-tab"
-            disabled
-          >
-            Рабочая область
-          </button>
-        </div>
-        <div class="vs-sync-info">Последняя синхронизация: 8 с назад</div>
-      </div>
-
       <!-- Body -->
       <div class="vs-body">
         <!-- Sidebar categories -->
@@ -292,14 +273,9 @@ const activeCategoryLabel = computed(
               </select>
             </div>
             <div v-if="s.id === 'network-timeout'" class="vs-setting-control">
-              <input
-                v-model.number="networkTimeoutSecs"
-                type="number"
-                min="1"
-                max="600"
-                step="1"
-                class="vs-number"
-              />
+              <select v-model.number="networkTimeoutSecs" class="vs-select">
+                <option v-for="t in timeoutOptions" :key="t" :value="t">{{ t }} сек</option>
+              </select>
             </div>
           </div>
         </main>
@@ -423,45 +399,6 @@ const activeCategoryLabel = computed(
   padding-right: 4px;
 }
 
-/* Tabs row */
-.vs-tabs-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  padding: 0 16px;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border);
-  user-select: none;
-}
-.vs-tabs {
-  display: flex;
-  gap: 0;
-}
-.vs-tab {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  padding: 8px 14px;
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-.vs-tab:hover:not(:disabled) { color: var(--text-primary); }
-.vs-tab.active {
-  color: var(--text-primary);
-  border-bottom-color: var(--accent);
-}
-.vs-tab:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.vs-sync-info {
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
-  padding-bottom: 8px;
-}
-
 /* Body */
 .vs-body {
   flex: 1;
@@ -569,18 +506,5 @@ const activeCategoryLabel = computed(
 .vs-select option {
   background-color: var(--bg-tertiary);
   color: var(--text-primary);
-}
-.vs-number {
-  width: 120px;
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  padding: 6px 10px;
-  font-size: var(--font-size-sm);
-  border-radius: var(--radius);
-  outline: none;
-}
-.vs-number:focus {
-  border-color: var(--accent);
 }
 </style>

@@ -5,20 +5,20 @@ interface AppSettings {
   network_timeout_secs: number;
 }
 
+const TIMEOUT_OPTIONS = [5, 10, 30, 60];
 const DEFAULT_TIMEOUT = 10;
-const MIN_TIMEOUT = 1;
-const MAX_TIMEOUT = 600;
 
 const networkTimeoutSecs = ref<number>(DEFAULT_TIMEOUT);
 let loaded = false;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Значение всегда приводится к одному из допустимых вариантов combo.
 function clamp(v: number): number {
   if (!Number.isFinite(v)) return DEFAULT_TIMEOUT;
-  const n = Math.round(v);
-  if (n < MIN_TIMEOUT) return MIN_TIMEOUT;
-  if (n > MAX_TIMEOUT) return MAX_TIMEOUT;
-  return n;
+  if (TIMEOUT_OPTIONS.includes(v)) return v;
+  return TIMEOUT_OPTIONS.reduce((best, o) =>
+    Math.abs(o - v) < Math.abs(best - v) ? o : best
+  );
 }
 
 async function loadSettings() {
