@@ -232,7 +232,7 @@ function formatDate(iso: string): string {
         <div class="graph-col">
           <svg :width="graphColW" height="24" class="graph-svg">
             <line :x1="laneX(wtCol)" y1="12" :x2="laneX(wtCol)" y2="24" stroke="var(--red)" stroke-width="2" />
-            <circle :cx="laneX(wtCol)" cy="12" r="4" fill="var(--red)" stroke="var(--bg-primary)" stroke-width="1.5" />
+            <circle :cx="laneX(wtCol)" cy="12" r="5" fill="var(--green)" stroke="var(--bg-primary)" stroke-width="1.5" />
           </svg>
         </div>
         <div class="message-col">
@@ -265,7 +265,7 @@ function formatDate(iso: string): string {
             <circle
               :cx="laneX(commit.column)"
               cy="12"
-              r="4"
+              r="5"
               :fill="isUnpushed(idx) ? 'var(--yellow)' : laneColor(commit.column)"
               stroke="var(--bg-primary)"
               stroke-width="1.5"
