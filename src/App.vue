@@ -136,6 +136,7 @@ const dialogs = [showCommitDialog, showCloneDialog, showPushDialog, showPullDial
 function onKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") {
     if (checkoutRemoteTarget.value) { checkoutRemoteTarget.value = null; return; }
+    if (showAddTagDialog.value) { showAddTagDialog.value = false; addTagTarget.value = null; return; }
     for (const d of dialogs) {
       if (d.value) { d.value = false; return; }
     }
