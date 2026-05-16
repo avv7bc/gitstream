@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add full git tag lifecycle to GitStream — create (lightweight/annotated, force), delete (local + optionally remote), and push a single tag — modeled on SmartGit.
+**Goal:** Add full git tag lifecycle to GitStream — create (lightweight/annotated, force), delete (local + optionally remote), and push a single tag — modeled on common desktop git clients.
 
 **Architecture:** Extend existing modules rather than add new subsystems. Rust tag mutations go in `mutation.rs` (local ops sync, push async via `spawn_blocking` like `do_push`). Tag composable functions extend `useBranches.ts` (tags already live there). New `AddTagDialog.vue`; `ConfirmDialog.vue` gains an optional checkbox for "also delete on remote". Entry points: a "Create Tag here…" item in the existing `CommitGraph` context menu, and a `+` button + per-tag context menu in the `BranchPanel` Tags section.
 
@@ -996,7 +996,7 @@ git commit -m "chore: bump version to 0.1.8"
 - Push single tag — Task 1 (`push_tag`), 2 (`do_push_tag` async), 3 (`pushTag`), 7 (`handlePushTagCtx`). ✓
 - Entry point: CommitGraph commit context menu — Task 6 + 8. ✓
 - Entry point: Tags section button + per-tag menu — Task 7. ✓
-- SmartGit model (no push in Add dialog; message-driven annotated; Force) — Task 4. ✓
+- Reference UX model (no push in Add dialog; message-driven annotated; Force) — Task 4. ✓
 - Async network push via spawn_blocking — Task 2 uses existing `run_with_timeout`. ✓
 - Draggable dialog — Task 4 uses `useDraggable`. ✓
 - Error handling via alert / showError + classify_git_error — Tasks 7, 8. ✓
