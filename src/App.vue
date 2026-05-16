@@ -156,8 +156,13 @@ function onKeydown(e: KeyboardEvent) {
 }
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
+function onContextMenu(e: MouseEvent) {
+  e.preventDefault();
+}
+
 onMounted(() => {
   window.addEventListener("keydown", onKeydown);
+  window.addEventListener("contextmenu", onContextMenu);
   restoreLastRepo();
   pollTimer = setInterval(() => {
     if (repoPath.value) {
@@ -169,6 +174,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   window.removeEventListener("keydown", onKeydown);
+  window.removeEventListener("contextmenu", onContextMenu);
   if (pollTimer) clearInterval(pollTimer);
 });
 
