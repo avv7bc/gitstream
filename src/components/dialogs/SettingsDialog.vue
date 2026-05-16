@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useTheme, type ThemeMode } from "@/composables/useTheme";
+import { useSettings } from "@/composables/useSettings";
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -117,6 +118,7 @@ onUnmounted(() => {
 });
 
 const { mode } = useTheme();
+const { networkTimeoutSecs } = useSettings();
 
 const themes: { value: ThemeMode; label: string }[] = [
   { value: "system", label: "System (как в ОС)" },
@@ -134,6 +136,7 @@ const search = ref("");
 
 const categories = [
   { id: "appearance", label: "Внешний вид" },
+  { id: "network", label: "Сеть" },
 ];
 
 interface SettingItem {
@@ -149,6 +152,13 @@ const settings: SettingItem[] = [
     category: "appearance",
     label: "Workbench: Color Theme",
     description: "Задаёт цветовую тему интерфейса. Тема «System» подстраивается под настройки операционной системы.",
+  },
+  {
+    id: "network-timeout",
+    category: "network",
+    label: "Network: Timeout (сек)",
+    description:
+      "Максимальное время сетевой git-операции (fetch, pull, push, clone). По истечении операция прерывается, а зависший процесс git принудительно завершается.",
   },
 ];
 
@@ -280,6 +290,16 @@ const activeCategoryLabel = computed(
               <select v-model="mode" class="vs-select">
                 <option v-for="t in themes" :key="t.value" :value="t.value">{{ t.label }}</option>
               </select>
+            </div>
+            <div v-if="s.id === 'network-timeout'" class="vs-setting-control">
+              <input
+                v-model.number="networkTimeoutSecs"
+                type="number"
+                min="1"
+                max="600"
+                step="1"
+                class="vs-number"
+              />
             </div>
           </div>
         </main>
@@ -549,5 +569,18 @@ const activeCategoryLabel = computed(
 .vs-select option {
   background-color: var(--bg-tertiary);
   color: var(--text-primary);
+}
+.vs-number {
+  width: 120px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius);
+  outline: none;
+}
+.vs-number:focus {
+  border-color: var(--accent);
 }
 </style>
