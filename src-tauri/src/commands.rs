@@ -160,6 +160,16 @@ pub fn discard_files(repo_path: String, files: Vec<String>) -> Result<(), String
 }
 
 #[tauri::command]
+pub fn remove_files(repo_path: String, files: Vec<String>) -> Result<(), String> {
+    mutation::remove(Path::new(&repo_path), &files).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_files(repo_path: String, files: Vec<String>) -> Result<(), String> {
+    mutation::delete(Path::new(&repo_path), &files).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn stage_hunk(repo_path: String, patch: String) -> Result<(), String> {
     mutation::stage_hunk(Path::new(&repo_path), &patch).map_err(|e| e.to_string())
 }

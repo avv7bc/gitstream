@@ -60,6 +60,18 @@ export function useFiles() {
     await refreshAfterMutation();
   }
 
+  async function removeFiles(paths: string[]) {
+    if (!repoPath.value) return;
+    await invoke("remove_files", { repoPath: repoPath.value, files: paths });
+    await refreshAfterMutation();
+  }
+
+  async function deleteFiles(paths: string[]) {
+    if (!repoPath.value) return;
+    await invoke("delete_files", { repoPath: repoPath.value, files: paths });
+    await refreshAfterMutation();
+  }
+
   async function applyHunk(
     command: "stage_hunk" | "unstage_hunk" | "discard_hunk",
     patch: string,
@@ -100,6 +112,8 @@ export function useFiles() {
     stageFiles,
     unstageFiles,
     discardFiles,
+    removeFiles,
+    deleteFiles,
     stageHunk,
     unstageHunk,
     discardHunk,

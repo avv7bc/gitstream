@@ -32,6 +32,8 @@ fn main() {
             commands::stage_files,
             commands::unstage_files,
             commands::discard_files,
+            commands::remove_files,
+            commands::delete_files,
             commands::stage_hunk,
             commands::unstage_hunk,
             commands::discard_hunk,
