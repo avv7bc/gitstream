@@ -373,6 +373,91 @@ fn parse_hunk_header(h: &str) -> Option<(usize, usize, String)> {
     Some((old_start, new_start, tail.to_string()))
 }
 
+/// Пересобирает один хунк, оставляя только выбранные изменённые (+/-) строки.
+/// `selected` — 0-based порядковые номера +/- строк тела хунка (в порядке raw).
+/// Невыбранные '-' превращаются в контекст, невыбранные '+' выбрасываются.
+/// Возвращает None, если в результате не осталось ни одной +/- строки.
+fn rebuild_hunk(raw: &str, selected: &[usize]) -> Option<String> {
+    let mut lines = raw.split('\n');
+    let header = lines.next()?;
+    let (old_start, new_start, tail) = parse_hunk_header(header)?;
+
+    let sel: std::collections::HashSet<usize> = selected.iter().copied().collect();
+    let mut body = String::new();
+    let mut old_count = 0usize;
+    let mut new_count = 0usize;
+    let mut changed_ord = 0usize;
+    let mut kept_any = false;
+    let mut last_kept = false;
+
+    for line in lines {
+        if line.is_empty() {
+            continue; // хвостовой пустой элемент после последнего '\n'
+        }
+        let tag = line.as_bytes()[0] as char;
+        match tag {
+            ' ' => {
+                body.push_str(line);
+                body.push('\n');
+                old_count += 1;
+                new_count += 1;
+                last_kept = true;
+            }
+            '-' => {
+                let is_sel = sel.contains(&changed_ord);
+                changed_ord += 1;
+                old_count += 1;
+                if is_sel {
+                    body.push_str(line);
+                    body.push('\n');
+                    kept_any = true;
+                    last_kept = true;
+                } else {
+                    body.push(' ');
+                    body.push_str(&line[1..]);
+                    body.push('\n');
+                    new_count += 1;
+                    last_kept = true;
+                }
+            }
+            '+' => {
+                let is_sel = sel.contains(&changed_ord);
+                changed_ord += 1;
+                if is_sel {
+                    body.push_str(line);
+                    body.push('\n');
+                    new_count += 1;
+                    kept_any = true;
+                    last_kept = true;
+                } else {
+                    last_kept = false;
+                }
+            }
+            '\\' => {
+                if last_kept {
+                    body.push_str(line);
+                    body.push('\n');
+                }
+            }
+            _ => {
+                body.push_str(line);
+                body.push('\n');
+                last_kept = true;
+            }
+        }
+    }
+
+    if !kept_any {
+        return None;
+    }
+
+    let new_header = format!(
+        "@@ -{},{} +{},{} @@{}",
+        old_start, old_count, new_start, new_count, tail
+    );
+    Some(format!("{}\n{}", new_header, body))
+}
+
 #[cfg(test)]
 mod tag_tests {
     use super::*;
@@ -514,5 +599,45 @@ mod partial_line_tests {
         assert_eq!(os, 1);
         assert_eq!(ns, 1);
         assert_eq!(tail, "");
+    }
+
+    #[test]
+    fn rebuild_keeps_only_selected_added_line() {
+        let raw = "@@ -1,1 +1,3 @@\n ctx\n+A\n+B\n";
+        let out = rebuild_hunk(raw, &[0]).unwrap();
+        assert_eq!(out, "@@ -1,1 +1,2 @@\n ctx\n+A\n");
+    }
+
+    #[test]
+    fn rebuild_unselected_removal_becomes_context() {
+        let raw = "@@ -1,3 +1,1 @@\n ctx\n-X\n-Y\n";
+        let out = rebuild_hunk(raw, &[1]).unwrap();
+        assert_eq!(out, "@@ -1,3 +1,2 @@\n ctx\n X\n-Y\n");
+    }
+
+    #[test]
+    fn rebuild_returns_none_when_nothing_selected() {
+        let raw = "@@ -1,1 +1,2 @@\n ctx\n+A\n";
+        assert!(rebuild_hunk(raw, &[]).is_none());
+    }
+
+    #[test]
+    fn rebuild_no_newline_marker_follows_kept_line() {
+        let raw = "@@ -0,0 +1,1 @@\n+A\n\\ No newline at end of file\n";
+        let out = rebuild_hunk(raw, &[0]).unwrap();
+        assert_eq!(out, "@@ -0,0 +1,1 @@\n+A\n\\ No newline at end of file\n");
+    }
+
+    #[test]
+    fn rebuild_no_newline_marker_dropped_with_unselected_line() {
+        let raw = "@@ -1,1 +1,2 @@\n ctx\n+A\n\\ No newline at end of file\n";
+        assert!(rebuild_hunk(raw, &[]).is_none());
+    }
+
+    #[test]
+    fn rebuild_preserves_header_tail() {
+        let raw = "@@ -10,2 +10,3 @@ fn foo()\n ctx\n+A\n ctx2\n";
+        let out = rebuild_hunk(raw, &[0]).unwrap();
+        assert_eq!(out, "@@ -10,2 +10,3 @@ fn foo()\n ctx\n+A\n ctx2\n");
     }
 }
