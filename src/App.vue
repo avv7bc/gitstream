@@ -162,7 +162,24 @@ function onKeydown(e: KeyboardEvent) {
     showSettingsDialog.value = true;
   }
 }
-let pollTimer: ReturnType<typeof setInterval> | null = null;
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let pollStopped = false;
+
+// Самопланирующийся поллинг: следующий цикл стартует только после того,
+// как завершился предыдущий. Иначе перекрывающиеся обновления резолвятся
+// не по порядку и список веток «прыгает» (мигание).
+async function pollTick() {
+  if (pollStopped) return;
+  if (repoPath.value) {
+    try {
+      await Promise.all([refreshFiles(), refreshLog(), refreshBranches()]);
+    } catch {
+      /* фоновый поллинг не должен ломать UI */
+    }
+  }
+  if (pollStopped) return;
+  pollTimer = setTimeout(pollTick, 2000);
+}
 
 function onContextMenu(e: MouseEvent) {
   e.preventDefault();
@@ -172,18 +189,13 @@ onMounted(() => {
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("contextmenu", onContextMenu);
   restoreLastRepo();
-  pollTimer = setInterval(() => {
-    if (repoPath.value) {
-      refreshFiles();
-      refreshLog();
-      refreshBranches();
-    }
-  }, 2000);
+  pollTimer = setTimeout(pollTick, 2000);
 });
 onUnmounted(() => {
   window.removeEventListener("keydown", onKeydown);
   window.removeEventListener("contextmenu", onContextMenu);
-  if (pollTimer) clearInterval(pollTimer);
+  pollStopped = true;
+  if (pollTimer) clearTimeout(pollTimer);
 });
 
 // --- Resizable panel sizes (persisted to localStorage) ---

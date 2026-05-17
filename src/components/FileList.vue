@@ -21,15 +21,23 @@ const commitFiles = ref<FileDiff[]>([]);
 
 const isWorkingTree = computed(() => !selectedCommit.value || selectedCommit.value === "__worktree__");
 
-// Load commit files when a commit is selected
+// Load commit files when a commit is selected.
+// Защита от гонки: при быстрой навигации по коммитам (стрелки ↑/↓)
+// применяем только самый свежий ответ, иначе показываются файлы чужого коммита.
+let commitFilesSeq = 0;
 watch(selectedCommit, async (oid) => {
   if (!oid || oid === "__worktree__" || !repoPath.value) {
+    commitFilesSeq++;
     commitFiles.value = [];
     return;
   }
+  const seq = ++commitFilesSeq;
   try {
-    commitFiles.value = await invoke<FileDiff[]>("get_diff_commit", { repoPath: repoPath.value, oid });
+    const data = await invoke<FileDiff[]>("get_diff_commit", { repoPath: repoPath.value, oid });
+    if (seq !== commitFilesSeq) return;
+    commitFiles.value = data;
   } catch {
+    if (seq !== commitFilesSeq) return;
     commitFiles.value = [];
   }
 });

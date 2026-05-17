@@ -11,6 +11,10 @@ const diffContext = ref<"unstaged" | "staged" | "commit" | null>(null);
 let lastFile: { path: string; staged: boolean } | null = null;
 let lastCommit: { oid: string; filePath?: string } | null = null;
 
+// Защита от гонки: при быстрой смене файла/коммита применяем только
+// самый свежий ответ, иначе показывается дифф не того файла (мигание).
+let diffSeq = 0;
+
 export function useDiff() {
   const { repoPath } = useRepo();
 
@@ -19,11 +23,14 @@ export function useDiff() {
     lastFile = { path, staged };
     lastCommit = null;
     diffContext.value = staged ? "staged" : "unstaged";
-    currentDiff.value = await invoke<FileDiff>("get_diff_file", {
+    const seq = ++diffSeq;
+    const data = await invoke<FileDiff>("get_diff_file", {
       repoPath: repoPath.value,
       file: path,
       staged,
     });
+    if (seq !== diffSeq) return;
+    currentDiff.value = data;
   }
 
   async function diffCommit(oid: string, filePath?: string) {
@@ -31,10 +38,12 @@ export function useDiff() {
     lastCommit = { oid, filePath };
     lastFile = null;
     diffContext.value = "commit";
+    const seq = ++diffSeq;
     const diffs = await invoke<FileDiff[]>("get_diff_commit", {
       repoPath: repoPath.value,
       oid,
     });
+    if (seq !== diffSeq) return;
     if (filePath) {
       currentDiff.value = diffs.find((d) => d.path === filePath) ?? null;
     } else {

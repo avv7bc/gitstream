@@ -6,6 +6,9 @@ import { useRepo } from "./useRepo";
 const commits = ref<CommitInfo[]>([]);
 const selectedCommit = ref<string | null>(null);
 
+// Защита от гонки перекрывающихся refresh: применяем только самый свежий ответ.
+let refreshSeq = 0;
+
 export function useLog() {
   const { repoPath } = useRepo();
 
@@ -15,10 +18,14 @@ export function useLog() {
       selectedCommit.value = null;
       return;
     }
-    commits.value = await invoke<CommitInfo[]>("get_log", {
+    const seq = ++refreshSeq;
+    const data = await invoke<CommitInfo[]>("get_log", {
       repoPath: repoPath.value,
       limit: limit ?? 500,
     });
+    // Более новый refresh уже стартовал — отбрасываем устаревший ответ.
+    if (seq !== refreshSeq) return;
+    commits.value = data;
   }
 
   async function resetTo(oid: string, mode: "soft" | "mixed" | "hard") {

@@ -11,17 +11,24 @@ export type RepoState =
 
 const repoState = ref<RepoState>("clean");
 
+// Защита от гонки перекрывающихся refresh: применяем только самый свежий ответ.
+let refreshSeq = 0;
+
 export function useConflicts() {
   const { repoPath } = useRepo();
 
   async function refresh() {
     if (!repoPath.value) {
+      refreshSeq++;
       repoState.value = "clean";
       return;
     }
-    repoState.value = await invoke<RepoState>("get_repo_state", {
+    const seq = ++refreshSeq;
+    const state = await invoke<RepoState>("get_repo_state", {
       repoPath: repoPath.value,
     });
+    if (seq !== refreshSeq) return;
+    repoState.value = state;
   }
 
   async function acceptOurs(files: string[]) {

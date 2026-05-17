@@ -9,18 +9,24 @@ const tags = ref<TagInfo[]>([]);
 const stashes = ref<StashEntry[]>([]);
 const remotes = ref<string[]>([]);
 
+// Защита от гонки перекрывающихся refresh: применяем только самый свежий ответ.
+let refreshSeq = 0;
+
 export function useBranches() {
   const { repoPath } = useRepo();
   const { networkTimeoutSecs } = useSettings();
 
   async function refresh() {
     if (!repoPath.value) return;
+    const seq = ++refreshSeq;
     const [b, t, s, r] = await Promise.all([
       invoke<BranchInfo[]>("get_branches", { repoPath: repoPath.value }),
       invoke<TagInfo[]>("get_tags", { repoPath: repoPath.value }),
       invoke<StashEntry[]>("get_stashes", { repoPath: repoPath.value }),
       invoke<string[]>("get_remotes", { repoPath: repoPath.value }),
     ]);
+    // Более новый refresh уже стартовал — отбрасываем устаревший ответ.
+    if (seq !== refreshSeq) return;
     branches.value = b;
     tags.value = t;
     stashes.value = s;

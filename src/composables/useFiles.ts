@@ -7,6 +7,9 @@ import { useDiff } from "./useDiff";
 const files = ref<FileStatus[]>([]);
 const selectedFile = ref<string | null>(null);
 
+// Защита от гонки перекрывающихся refresh: применяем только самый свежий ответ.
+let refreshSeq = 0;
+
 export function useFiles() {
   const { repoPath } = useRepo();
 
@@ -16,7 +19,11 @@ export function useFiles() {
       selectedFile.value = null;
       return;
     }
-    files.value = await invoke<FileStatus[]>("get_status", { repoPath: repoPath.value });
+    const seq = ++refreshSeq;
+    const data = await invoke<FileStatus[]>("get_status", { repoPath: repoPath.value });
+    // Более новый refresh уже стартовал — отбрасываем устаревший ответ.
+    if (seq !== refreshSeq) return;
+    files.value = data;
   }
 
   // После изменения индекса/рабочего дерева: обновить список файлов и
