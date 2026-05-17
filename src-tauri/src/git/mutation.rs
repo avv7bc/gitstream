@@ -4,6 +4,20 @@ use std::process::{Command, Stdio};
 
 use super::error::{classify_git_error, GitError};
 
+#[derive(serde::Deserialize)]
+pub struct LineHunkSelection {
+    pub raw: String,
+    pub selected: Vec<usize>,
+}
+
+#[derive(serde::Deserialize, Clone, Copy, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum LineOp {
+    Stage,
+    Unstage,
+    Discard,
+}
+
 fn run_git_mut(repo_path: &Path, args: &[&str]) -> Result<String, GitError> {
     super::query::run_git(repo_path, args)
 }
@@ -460,6 +474,43 @@ fn rebuild_hunk(raw: &str, selected: &[usize]) -> Option<String> {
     Some(format!("{}\n{}", new_header, body))
 }
 
+/// Собирает частичный патч: file_header + непустые пересобранные хунки.
+/// None, если ни в одном хунке ничего не выбрано.
+fn build_partial_patch(file_header: &str, hunks: &[LineHunkSelection]) -> Option<String> {
+    let mut out = String::new();
+    let mut any = false;
+    for h in hunks {
+        if let Some(rebuilt) = rebuild_hunk(&h.raw, &h.selected) {
+            out.push_str(&rebuilt);
+            any = true;
+        }
+    }
+    if !any {
+        return None;
+    }
+    Some(format!("{}{}", file_header, out))
+}
+
+/// Применяет выбранные строки. Трансформация хунка одинакова для всех op —
+/// различаются только флаги git apply.
+pub fn apply_lines(
+    repo_path: &Path,
+    file_header: &str,
+    hunks: &[LineHunkSelection],
+    op: LineOp,
+) -> Result<(), GitError> {
+    let patch = match build_partial_patch(file_header, hunks) {
+        Some(p) => p,
+        None => return Ok(()),
+    };
+    let (reverse, cached) = match op {
+        LineOp::Stage => (false, true),
+        LineOp::Unstage => (true, true),
+        LineOp::Discard => (true, false),
+    };
+    apply_patch(repo_path, &patch, reverse, cached)
+}
+
 #[cfg(test)]
 mod tag_tests {
     use super::*;
@@ -654,5 +705,80 @@ mod partial_line_tests {
         let raw = "@@ -10,2 +10,3 @@ fn foo()\n ctx\n+A\n ctx2\n";
         let out = rebuild_hunk(raw, &[0]).unwrap();
         assert_eq!(out, "@@ -10,2 +10,3 @@ fn foo()\n ctx\n+A\n ctx2\n");
+    }
+
+    use std::fs;
+    use std::process::Command as ProcCommand;
+
+    fn temp_repo_pl() -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "gitstream_pl_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let run = |args: &[&str]| {
+            ProcCommand::new("git").current_dir(&dir).args(args).output().unwrap();
+        };
+        run(&["init", "-q"]);
+        run(&["config", "user.email", "t@t.t"]);
+        run(&["config", "user.name", "t"]);
+        fs::write(dir.join("f.txt"), "l1\nl2\nl3\n").unwrap();
+        run(&["add", "."]);
+        run(&["commit", "-qm", "init"]);
+        dir
+    }
+
+    fn staged_content(dir: &std::path::Path) -> String {
+        let out = ProcCommand::new("git")
+            .current_dir(dir)
+            .args(["show", ":f.txt"])
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&out.stdout).to_string()
+    }
+
+    #[test]
+    fn build_partial_patch_none_when_empty() {
+        let hunks = vec![LineHunkSelection {
+            raw: "@@ -1,1 +1,2 @@\n l1\n+x\n".to_string(),
+            selected: vec![],
+        }];
+        assert!(build_partial_patch("HEADER\n", &hunks).is_none());
+    }
+
+    #[test]
+    fn build_partial_patch_prepends_header_and_skips_empty_hunks() {
+        let hunks = vec![
+            LineHunkSelection {
+                raw: "@@ -1,1 +1,2 @@\n l1\n+x\n".to_string(),
+                selected: vec![0],
+            },
+            LineHunkSelection {
+                raw: "@@ -5,1 +6,2 @@\n l5\n+y\n".to_string(),
+                selected: vec![],
+            },
+        ];
+        let p = build_partial_patch("HDR\n", &hunks).unwrap();
+        assert_eq!(p, "HDR\n@@ -1,1 +1,2 @@\n l1\n+x\n");
+    }
+
+    #[test]
+    fn apply_lines_stages_only_selected_line() {
+        let dir = temp_repo_pl();
+        fs::write(dir.join("f.txt"), "l1\nl2\nNEW\nl3X\n").unwrap();
+        let file_header =
+            "diff --git a/f.txt b/f.txt\nindex 0000000..1111111 100644\n--- a/f.txt\n+++ b/f.txt\n";
+        let raw = "@@ -1,3 +1,4 @@\n l1\n l2\n+NEW\n-l3\n+l3X\n";
+        let hunks = vec![LineHunkSelection {
+            raw: raw.to_string(),
+            selected: vec![0],
+        }];
+        apply_lines(&dir, file_header, &hunks, LineOp::Stage).unwrap();
+        assert_eq!(staged_content(&dir), "l1\nl2\nNEW\nl3\n");
+        fs::remove_dir_all(&dir).ok();
     }
 }
