@@ -347,7 +347,7 @@ function onMouseUp() {
             </div>
             <div class="resize-handle-h" @mousedown="onMouseDown($event, 'right-row')" />
             <div class="files-pane">
-              <FileList />
+              <FileList @commit="showCommitDialog = true" />
             </div>
           </div>
         </div>
