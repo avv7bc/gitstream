@@ -637,6 +637,8 @@ mod tag_tests {
 #[cfg(test)]
 mod partial_line_tests {
     use super::*;
+    use std::fs;
+    use std::process::Command as ProcCommand;
 
     #[test]
     fn parses_header_with_section_tail() {
@@ -706,9 +708,6 @@ mod partial_line_tests {
         let out = rebuild_hunk(raw, &[0]).unwrap();
         assert_eq!(out, "@@ -10,2 +10,3 @@ fn foo()\n ctx\n+A\n ctx2\n");
     }
-
-    use std::fs;
-    use std::process::Command as ProcCommand;
 
     fn temp_repo_pl() -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!(
