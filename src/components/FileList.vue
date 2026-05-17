@@ -244,6 +244,8 @@ function compareCommitFile(path: string) {
       </div>
     </div>
 
+    <!-- @contextmenu.prevent на контейнере гасит нативное меню браузера на пустой области;
+         меню файла открывается обработчиком на самом .file-item (событие всплывает). -->
     <div class="file-list-body" @mousedown="(e) => e.detail > 1 && e.preventDefault()" @contextmenu.prevent>
       <!-- Working tree files -->
       <template v-if="isWorkingTree">

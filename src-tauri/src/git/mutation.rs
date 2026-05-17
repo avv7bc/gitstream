@@ -649,6 +649,23 @@ mod tag_tests {
     }
 
     #[test]
+    fn remove_mixed_tracked_and_untracked_batch() {
+        let dir = temp_repo();
+        fs::write(dir.join("u.txt"), "x").unwrap();
+        remove(&dir, &["a.txt".to_string(), "u.txt".to_string()]).unwrap();
+        assert!(!dir.join("a.txt").exists());
+        assert!(!dir.join("u.txt").exists());
+        let out = Command::new("git")
+            .current_dir(&dir)
+            .args(["status", "--porcelain"])
+            .output()
+            .unwrap();
+        // tracked a.txt -> staged deletion "D  a.txt"; untracked u.txt -> gone, no entry
+        assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "D  a.txt");
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn delete_removes_file_from_disk_only() {
         let dir = temp_repo();
         delete(&dir, &["a.txt".to_string()]).unwrap();
