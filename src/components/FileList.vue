@@ -127,7 +127,7 @@ function compareCommitFile(path: string) {
         <input
           v-model="fileFilter"
           type="text"
-          placeholder="File Filter"
+          placeholder="Filter"
           class="file-filter-input"
         />
         <div class="filter-tabs">
@@ -242,6 +242,7 @@ function compareCommitFile(path: string) {
   width: 140px;
   padding: 2px 6px;
   font-size: var(--font-size-xs);
+  border-color: color-mix(in srgb, var(--border-subtle) 45%, transparent);
 }
 
 .panel-title {

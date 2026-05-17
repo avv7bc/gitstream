@@ -488,6 +488,7 @@ function formatDate(iso: string): string {
   font-size: var(--font-size-xs);
   width: 120px;
   height: 20px;
+  border-color: color-mix(in srgb, var(--border-subtle) 45%, transparent);
 }
 
 .graph-header {

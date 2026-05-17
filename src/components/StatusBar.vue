@@ -38,7 +38,7 @@ const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
     </div>
 
     <div class="statusbar-right">
-      <span class="version">0.1.28</span>
+      <span class="version">0.1.32</span>
     </div>
   </div>
 </template>

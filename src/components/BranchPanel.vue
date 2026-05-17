@@ -395,8 +395,6 @@ function selectItem(key: string) {
   <div class="branch-panel" @contextmenu.prevent>
     <div class="panel-title-bar">
       <span class="panel-title">Branches</span>
-    </div>
-    <div class="panel-header">
       <input
         v-model="filter"
         type="text"
@@ -723,15 +721,12 @@ function selectItem(key: string) {
   height: 100%;
 }
 
-.panel-header {
-  padding: 8px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
 .filter-input {
-  width: 100%;
-  padding: 4px 8px;
-  font-size: var(--font-size-sm);
+  width: 120px;
+  margin-left: auto;
+  padding: 2px 6px;
+  font-size: var(--font-size-xs);
+  border-color: color-mix(in srgb, var(--border-subtle) 45%, transparent);
 }
 
 .sections {

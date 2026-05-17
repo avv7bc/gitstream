@@ -380,7 +380,7 @@ const activeCategoryLabel = computed(
   display: flex;
   align-items: center;
   background: var(--bg-tertiary);
-  border: 1px solid var(--accent);
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 45%, transparent);
   border-radius: var(--radius);
   padding: 0 4px 0 0;
 }
