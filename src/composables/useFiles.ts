@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { invoke } from "@/composables/useProgress";
-import type { FileStatus } from "@/types";
+import type { FileStatus, LineOp, LineHunkSelection } from "@/types";
 import { useRepo } from "./useRepo";
 import { useDiff } from "./useDiff";
 
@@ -76,9 +76,9 @@ export function useFiles() {
   const discardHunk = (patch: string) => applyHunk("discard_hunk", patch);
 
   async function applyLines(
-    op: "stage" | "unstage" | "discard",
+    op: LineOp,
     fileHeader: string,
-    hunks: { raw: string; selected: number[] }[],
+    hunks: LineHunkSelection[],
   ) {
     if (!repoPath.value) return;
     if (hunks.length === 0) return;
