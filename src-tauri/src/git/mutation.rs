@@ -115,21 +115,27 @@ pub fn discard(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
 }
 
 /// `git rm` для tracked-файлов (удаляет с диска + стейджит удаление).
-/// Untracked-файл `git rm` не берёт — для него фоллбэк: удалить с диска.
+/// Сначала пробуем пакетный `git rm -- <files>`. Если пакет не прошёл
+/// (например, среди файлов есть untracked), повторяем по одному: для каждого
+/// файла пробуем `git rm -- <file>`; только если и одиночный вызов не прошёл —
+/// удаляем файл с диска напрямую (untracked-случай). Tracked-файлы при этом
+/// остаются правильно застейджены через git rm, а не просто удалены с диска.
 pub fn remove(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
     let mut args = vec!["rm", "--"];
     let file_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
     args.extend(file_refs);
-    match run_git_mut(repo_path, &args) {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            // Вероятно среди файлов untracked — удаляем их с диска напрямую.
-            for f in files {
-                std::fs::remove_file(repo_path.join(f)).ok();
-            }
-            Ok(())
+    if run_git_mut(repo_path, &args).is_ok() {
+        return Ok(());
+    }
+    // Пакетный git rm не прошёл — повторяем per-file.
+    for f in files {
+        let single_args = vec!["rm", "--", f.as_str()];
+        if run_git_mut(repo_path, &single_args).is_err() {
+            // git rm не знает этот файл (untracked) — удаляем с диска.
+            std::fs::remove_file(repo_path.join(f)).ok();
         }
     }
+    Ok(())
 }
 
 /// Удаляет файлы только с диска (git не трогаем — tracked станет
