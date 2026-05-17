@@ -1,7 +1,8 @@
 {
   "name": "gitstream",
   "private": true,
-  "version": "0.2.10",
+  "version": "0.2.11",
+  "license": "0BSD",
   "type": "module",
   "scripts": {
     "dev": "vite",

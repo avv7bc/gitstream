@@ -121,3 +121,8 @@ npm run dev          # только Vite (без Tauri, для отладки UI
 npm run build        # type-check + сборка frontend
 npx vue-tsc --noEmit # проверка TypeScript без сборки
 ```
+
+## Лицензия
+
+[BSD Zero Clause License (0BSD)](LICENSE) — используй, копируй, модифицируй и распространяй
+без каких-либо ограничений и без обязательного указания авторства.
