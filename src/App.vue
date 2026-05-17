@@ -279,6 +279,7 @@ function onMouseUp() {
       @settings="showSettingsDialog = true"
       @add-repository="handleAddRepository"
       @add-group="handleAddGroup"
+      @discard="showDiscardDialog = true"
     />
 
     <ConflictBar @changed="refreshAll()" />

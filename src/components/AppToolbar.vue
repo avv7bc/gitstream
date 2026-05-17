@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
-
+import { ref, computed } from "vue";
+import { useFiles } from "@/composables/useFiles";
 
 defineEmits<{
   commit: [];
@@ -11,7 +11,32 @@ defineEmits<{
   settings: [];
   addRepository: [];
   addGroup: [];
+  discard: [];
 }>();
+
+const { files, selectedFile, stageFiles, unstageFiles } = useFiles();
+
+const selectedStatus = computed(() =>
+  files.value.find((f) => f.path === selectedFile.value) ?? null,
+);
+
+const canStage = computed(
+  () => !!selectedStatus.value && selectedStatus.value.staged !== "staged",
+);
+const canUnstage = computed(
+  () =>
+    !!selectedStatus.value &&
+    (selectedStatus.value.staged === "staged" ||
+      selectedStatus.value.staged === "partial"),
+);
+const canDiscard = computed(() => !!selectedStatus.value);
+
+function doStage() {
+  if (canStage.value && selectedFile.value) stageFiles([selectedFile.value]);
+}
+function doUnstage() {
+  if (canUnstage.value && selectedFile.value) unstageFiles([selectedFile.value]);
+}
 
 const showRepoMenu = ref(false);
 
@@ -95,19 +120,19 @@ function closeMenu() {
     <div class="toolbar-separator" />
 
     <div class="toolbar-group">
-      <button class="toolbar-btn" title="Stage" disabled>
+      <button class="toolbar-btn" title="Stage" :disabled="!canStage" @click="doStage">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M3 8l3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.5"/>
         </svg>
         <span>Stage</span>
       </button>
-      <button class="toolbar-btn" title="Unstage" disabled>
+      <button class="toolbar-btn" title="Unstage" :disabled="!canUnstage" @click="doUnstage">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5"/>
         </svg>
         <span>Unstage</span>
       </button>
-      <button class="toolbar-btn" title="Discard" disabled>
+      <button class="toolbar-btn" title="Discard" :disabled="!canDiscard" @click="$emit('discard')">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M3 5h10l-1 9H4L3 5zM6 2h4M2 5h12" fill="none" stroke="currentColor" stroke-width="1.5"/>
         </svg>
