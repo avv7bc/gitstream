@@ -14,7 +14,7 @@ const emit = defineEmits<{ commit: [] }>();
 const { files, selectedFile, stageFiles, unstageFiles, discardFiles, removeFiles, deleteFiles } = useFiles();
 const { selectedCommit } = useLog();
 const { repoPath } = useRepo();
-const { diffFile, diffCommit } = useDiff();
+const { diffFile, diffCommit, clearDiff } = useDiff();
 const { open: openCompare } = useFileCompare();
 
 const activeFilter = ref<string>("all");
@@ -96,6 +96,9 @@ watch(selectedCommit, async (oid) => {
   if (!oid || oid === "__worktree__" || !repoPath.value) {
     commitFilesSeq++;
     commitFiles.value = [];
+    // Коммит больше не выбран (в т.ч. сброс при смене репозитория) —
+    // diff-панель не должна показывать дифф старого коммита.
+    if (!oid) clearDiff();
     return;
   }
   const seq = ++commitFilesSeq;

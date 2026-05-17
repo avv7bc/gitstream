@@ -26,6 +26,16 @@ export function useLog() {
     // Более новый refresh уже стартовал — отбрасываем устаревший ответ.
     if (seq !== refreshSeq) return;
     commits.value = data;
+    // Выделение указывает на коммит, которого больше нет в свежем логе
+    // (смена репозитория, reset/rebase/удаление ветки) — сбрасываем его,
+    // иначе панель Files показывает файлы чужого/исчезнувшего коммита.
+    if (
+      selectedCommit.value &&
+      selectedCommit.value !== "__worktree__" &&
+      !data.some((c) => c.oid === selectedCommit.value)
+    ) {
+      selectedCommit.value = null;
+    }
   }
 
   async function resetTo(oid: string, mode: "soft" | "mixed" | "hard") {
