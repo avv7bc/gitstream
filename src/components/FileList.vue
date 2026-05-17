@@ -19,6 +19,9 @@ const activeFilter = ref<string>("all");
 const fileFilter = ref("");
 const commitFiles = ref<FileDiff[]>([]);
 
+const selectedPaths = ref<string[]>([]);
+const anchorPath = ref<string | null>(null);
+
 const isWorkingTree = computed(() => !selectedCommit.value || selectedCommit.value === "__worktree__");
 
 // Load commit files when a commit is selected.
@@ -26,6 +29,8 @@ const isWorkingTree = computed(() => !selectedCommit.value || selectedCommit.val
 // применяем только самый свежий ответ, иначе показываются файлы чужого коммита.
 let commitFilesSeq = 0;
 watch(selectedCommit, async (oid) => {
+  selectedPaths.value = [];
+  anchorPath.value = null;
   if (!oid || oid === "__worktree__" || !repoPath.value) {
     commitFilesSeq++;
     commitFiles.value = [];
@@ -97,7 +102,24 @@ function fileDir(path: string): string {
   return parts.join("/");
 }
 
-async function selectFile(path: string) {
+async function selectFile(path: string, e?: MouseEvent) {
+  const list = filteredFiles.value.map((f) => f.path);
+  if (e?.shiftKey && anchorPath.value) {
+    const a = list.indexOf(anchorPath.value);
+    const b = list.indexOf(path);
+    if (a !== -1 && b !== -1) {
+      const [lo, hi] = a < b ? [a, b] : [b, a];
+      selectedPaths.value = list.slice(lo, hi + 1);
+    }
+  } else if (e?.ctrlKey || e?.metaKey) {
+    const i = selectedPaths.value.indexOf(path);
+    if (i === -1) selectedPaths.value = [...selectedPaths.value, path];
+    else selectedPaths.value = selectedPaths.value.filter((p) => p !== path);
+    anchorPath.value = path;
+  } else {
+    selectedPaths.value = [path];
+    anchorPath.value = path;
+  }
   selectedFile.value = path;
   if (isWorkingTree.value) {
     const f = files.value.find((x) => x.path === path);
@@ -160,8 +182,8 @@ function compareCommitFile(path: string) {
           v-for="file in filteredFiles"
           :key="file.path"
           class="file-item"
-          :class="{ selected: selectedFile === file.path }"
-          @click="selectFile(file.path)"
+          :class="{ selected: selectedPaths.includes(file.path) }"
+          @click="selectFile(file.path, $event)"
           @dblclick="compareWorkingTreeFile(file.path)"
         >
           <span
