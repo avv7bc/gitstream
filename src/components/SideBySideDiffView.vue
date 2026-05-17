@@ -74,12 +74,6 @@ function scrollToHunk() {
   <div class="diff-view">
     <div class="panel-title-bar">
       <span class="panel-title">Changes of {{ diffFileName }}</span>
-    </div>
-
-    <div class="diff-header">
-      <div class="diff-file-info">
-        <span class="diff-compare-mode">Working Tree vs Index</span>
-      </div>
       <div class="diff-actions">
         <button
           class="diff-nav-btn"
@@ -207,6 +201,7 @@ function scrollToHunk() {
 .panel-title-bar {
   display: flex;
   align-items: center;
+  gap: 8px;
   height: 28px;
   padding: 0 8px;
   background: var(--bg-tertiary);
@@ -223,31 +218,11 @@ function scrollToHunk() {
   letter-spacing: 0.5px;
 }
 
-.diff-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-secondary);
-  flex-shrink: 0;
-}
-
-.diff-file-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.diff-compare-mode {
-  color: var(--text-muted);
-  font-size: var(--font-size-xs);
-}
-
 .diff-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
 }
 
 .diff-nav-btn {
