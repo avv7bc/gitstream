@@ -35,6 +35,7 @@ fn main() {
             commands::stage_hunk,
             commands::unstage_hunk,
             commands::discard_hunk,
+            commands::apply_lines,
             commands::do_commit,
             commands::do_rebase,
             commands::do_reset,

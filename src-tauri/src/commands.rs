@@ -175,6 +175,17 @@ pub fn discard_hunk(repo_path: String, patch: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn apply_lines(
+    repo_path: String,
+    file_header: String,
+    hunks: Vec<mutation::LineHunkSelection>,
+    op: mutation::LineOp,
+) -> Result<(), String> {
+    mutation::apply_lines(Path::new(&repo_path), &file_header, &hunks, op)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn do_commit(repo_path: String, message: String, amend: bool) -> Result<String, String> {
     mutation::commit(Path::new(&repo_path), &message, amend).map_err(|e| e.to_string())
 }
