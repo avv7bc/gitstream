@@ -81,6 +81,13 @@ export interface FileDiff {
   header: string;
 }
 
+export type LineOp = "stage" | "unstage" | "discard";
+
+export interface LineHunkSelection {
+  raw: string;
+  selected: number[];
+}
+
 export type DiffMode = "unified" | "side-by-side";
 
 export interface RepoInfo {
