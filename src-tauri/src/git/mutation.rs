@@ -348,6 +348,31 @@ pub fn clone_args(url: &str, dest: &str) -> Vec<String> {
     vec!["clone".into(), url.into(), dest.into()]
 }
 
+/// Разбирает заголовок хунка "@@ -a,b +c,d @@ tail".
+/// Возвращает (old_start, new_start, tail) — где tail включает ведущий пробел.
+fn parse_hunk_header(h: &str) -> Option<(usize, usize, String)> {
+    let rest = h.strip_prefix("@@ ")?;
+    let close = rest.find(" @@")?;
+    let ranges = &rest[..close];
+    let tail = &rest[close + 3..];
+    let mut it = ranges.split(' ');
+    let old = it.next()?;
+    let new = it.next()?;
+    let old_start: usize = old
+        .trim_start_matches('-')
+        .split(',')
+        .next()?
+        .parse()
+        .ok()?;
+    let new_start: usize = new
+        .trim_start_matches('+')
+        .split(',')
+        .next()?
+        .parse()
+        .ok()?;
+    Some((old_start, new_start, tail.to_string()))
+}
+
 #[cfg(test)]
 mod tag_tests {
     use super::*;
@@ -468,5 +493,26 @@ mod tag_tests {
             clone_args("https://x/y.git", "/tmp/y"),
             vec!["clone", "https://x/y.git", "/tmp/y"]
         );
+    }
+}
+
+#[cfg(test)]
+mod partial_line_tests {
+    use super::*;
+
+    #[test]
+    fn parses_header_with_section_tail() {
+        let (os, ns, tail) = parse_hunk_header("@@ -12,7 +12,8 @@ fn foo()").unwrap();
+        assert_eq!(os, 12);
+        assert_eq!(ns, 12);
+        assert_eq!(tail, " fn foo()");
+    }
+
+    #[test]
+    fn parses_header_without_counts_and_tail() {
+        let (os, ns, tail) = parse_hunk_header("@@ -1 +1 @@").unwrap();
+        assert_eq!(os, 1);
+        assert_eq!(ns, 1);
+        assert_eq!(tail, "");
     }
 }
