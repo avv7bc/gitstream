@@ -114,6 +114,37 @@ pub fn discard(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
     Ok(())
 }
 
+/// `git rm` для tracked-файлов (удаляет с диска + стейджит удаление).
+/// Untracked-файл `git rm` не берёт — для него фоллбэк: удалить с диска.
+pub fn remove(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+    let mut args = vec!["rm", "--"];
+    let file_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
+    args.extend(file_refs);
+    match run_git_mut(repo_path, &args) {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            // Вероятно среди файлов untracked — удаляем их с диска напрямую.
+            for f in files {
+                std::fs::remove_file(repo_path.join(f)).ok();
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Удаляет файлы только с диска (git не трогаем — tracked станет
+/// "deleted, unstaged").
+pub fn delete(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+    for f in files {
+        std::fs::remove_file(repo_path.join(f))
+            .map_err(|e| GitError::CommandFailed {
+                message: format!("Failed to delete file {}: {}", f, e),
+                hint: None,
+            })?;
+    }
+    Ok(())
+}
+
 pub fn commit(repo_path: &Path, message: &str, amend: bool) -> Result<String, GitError> {
     let mut args = vec!["commit", "-m", message];
     if amend { args.push("--amend"); }
@@ -584,6 +615,45 @@ mod tag_tests {
         create_tag(&dir, "v1.0", None, None, false).unwrap();
         delete_tag(&dir, "v1.0").unwrap();
         assert!(!list_tags(&dir).contains("v1.0"));
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn remove_tracked_file_stages_deletion() {
+        let dir = temp_repo();
+        remove(&dir, &["a.txt".to_string()]).unwrap();
+        assert!(!dir.join("a.txt").exists());
+        let out = Command::new("git")
+            .current_dir(&dir)
+            .args(["status", "--porcelain"])
+            .output()
+            .unwrap();
+        // staged deletion -> "D  a.txt"
+        assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "D  a.txt");
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn remove_untracked_file_falls_back_to_disk_delete() {
+        let dir = temp_repo();
+        fs::write(dir.join("u.txt"), "x").unwrap();
+        remove(&dir, &["u.txt".to_string()]).unwrap();
+        assert!(!dir.join("u.txt").exists());
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn delete_removes_file_from_disk_only() {
+        let dir = temp_repo();
+        delete(&dir, &["a.txt".to_string()]).unwrap();
+        assert!(!dir.join("a.txt").exists());
+        let out = Command::new("git")
+            .current_dir(&dir)
+            .args(["status", "--porcelain"])
+            .output()
+            .unwrap();
+        // unstaged deletion -> " D a.txt"
+        assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "D a.txt");
         fs::remove_dir_all(&dir).ok();
     }
 
