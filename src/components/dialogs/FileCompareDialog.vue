@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/composables/useProgress";
 import { useFileCompare } from "@/composables/useFileCompare";
 import { useRepo } from "@/composables/useRepo";
 import { useDraggable } from "@/composables/useDraggable";

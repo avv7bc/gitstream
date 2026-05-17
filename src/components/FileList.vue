@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/composables/useProgress";
 import { useFiles } from "@/composables/useFiles";
 import { useLog } from "@/composables/useLog";
 import { useRepo } from "@/composables/useRepo";

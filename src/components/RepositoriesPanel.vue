@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/composables/useProgress";
 import { useRepo } from "@/composables/useRepo";
 import type { RepoInfo } from "@/types";
 import AddGroupDialog from "@/components/dialogs/AddGroupDialog.vue";
