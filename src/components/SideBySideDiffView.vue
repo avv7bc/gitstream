@@ -1,16 +1,93 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useDiff } from "@/composables/useDiff";
 import { useFiles } from "@/composables/useFiles";
 import { useSyncScroll } from "@/composables/useSyncScroll";
 import { useSideBySideDiff } from "@/composables/useSideBySideDiff";
 
 const { currentDiff, diffContext } = useDiff();
-const { selectedFile, stageHunk, unstageHunk, discardHunk } = useFiles();
+const { selectedFile, stageHunk, unstageHunk, discardHunk, applyLines } = useFiles();
 const { leftPanelRef, rightPanelRef } = useSyncScroll();
 const { enrichAllHunks } = useSideBySideDiff();
 
 const busyHunk = ref<number | null>(null);
+
+// id строки = "<hunkIdx>:<lineIdxInHunkLines>"
+const selectedLines = ref<Set<string>>(new Set());
+const selAnchor = ref<string | null>(null);
+
+const hasSelection = computed(() => selectedLines.value.size > 0);
+
+function isSelectable(kind: string) {
+  return kind === "added" || kind === "removed";
+}
+
+// Плоский список выделяемых строк в порядке отображения (для Shift-диапазона).
+const selectableFlat = computed(() => {
+  const arr: string[] = [];
+  enrichedHunks.value.forEach((h, hi) => {
+    h.lines.forEach((ln, li) => {
+      if (isSelectable(ln.kind)) arr.push(`${hi}:${li}`);
+    });
+  });
+  return arr;
+});
+
+function clearSelection() {
+  selectedLines.value = new Set();
+  selAnchor.value = null;
+}
+
+function onLineClick(hi: number, li: number, kind: string, ev: MouseEvent) {
+  if (!isSelectable(kind)) return;
+  const id = `${hi}:${li}`;
+  if (ev.shiftKey && selAnchor.value) {
+    const flat = selectableFlat.value;
+    const a = flat.indexOf(selAnchor.value);
+    const b = flat.indexOf(id);
+    if (a !== -1 && b !== -1) {
+      const [lo, hiIdx] = a <= b ? [a, b] : [b, a];
+      selectedLines.value = new Set(flat.slice(lo, hiIdx + 1));
+    }
+  } else if (ev.ctrlKey || ev.metaKey) {
+    const next = new Set(selectedLines.value);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    selectedLines.value = next;
+    selAnchor.value = id;
+  } else {
+    selectedLines.value = new Set([id]);
+    selAnchor.value = id;
+  }
+}
+
+// Группирует выделение по хункам, считая ordinal среди +/- строк хунка.
+function buildSelectionPayload(): { raw: string; selected: number[] }[] {
+  const result: { raw: string; selected: number[] }[] = [];
+  enrichedHunks.value.forEach((h, hi) => {
+    let ord = -1;
+    const selected: number[] = [];
+    h.lines.forEach((ln, li) => {
+      if (isSelectable(ln.kind)) {
+        ord++;
+        if (selectedLines.value.has(`${hi}:${li}`)) selected.push(ord);
+      }
+    });
+    if (selected.length > 0 && currentDiff.value) {
+      result.push({ raw: currentDiff.value.hunks[hi].raw, selected });
+    }
+  });
+  return result;
+}
+
+// Сброс выделения при смене файла/контекста.
+watch([currentDiff, diffContext], clearSelection);
+
+// Будут подключены к шаблону в Task 7.
+void (applyLines as unknown);
+void (hasSelection as unknown);
+void (onLineClick as unknown);
+void (buildSelectionPayload as unknown);
 
 function hunkPatch(rawHunk: string): string {
   return (currentDiff.value?.header ?? "") + rawHunk;
