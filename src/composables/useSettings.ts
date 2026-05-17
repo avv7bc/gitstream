@@ -1,5 +1,5 @@
 import { ref, watch } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/composables/useProgress";
 
 interface AppSettings {
   network_timeout_secs: number;
