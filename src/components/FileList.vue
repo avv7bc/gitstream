@@ -47,6 +47,11 @@ watch(selectedCommit, async (oid) => {
   }
 });
 
+watch([activeFilter, fileFilter], () => {
+  selectedPaths.value = [];
+  anchorPath.value = null;
+});
+
 const filteredFiles = computed(() => {
   if (!isWorkingTree.value) return [];
   let result = files.value;
@@ -104,7 +109,7 @@ function fileDir(path: string): string {
 
 async function selectFile(path: string, e?: MouseEvent) {
   const list = filteredFiles.value.map((f) => f.path);
-  if (e?.shiftKey && anchorPath.value) {
+  if (e?.shiftKey && anchorPath.value !== null) {
     const a = list.indexOf(anchorPath.value);
     const b = list.indexOf(path);
     if (a !== -1 && b !== -1) {
@@ -120,6 +125,8 @@ async function selectFile(path: string, e?: MouseEvent) {
     selectedPaths.value = [path];
     anchorPath.value = path;
   }
+  // selectedFile всегда = последний кликнутый: diff остаётся виден даже после
+  // снятия выделения (Ctrl+клик) — поведение как в эталонном клиенте.
   selectedFile.value = path;
   if (isWorkingTree.value) {
     const f = files.value.find((x) => x.path === path);
