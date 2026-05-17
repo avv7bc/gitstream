@@ -25,13 +25,15 @@ import { useRepo } from "@/composables/useRepo";
 import { useFiles } from "@/composables/useFiles";
 import { useBranches } from "@/composables/useBranches";
 import { useLog } from "@/composables/useLog";
+import { useDiff } from "@/composables/useDiff";
 import { useRemote } from "@/composables/useRemote";
 import { useConflicts } from "@/composables/useConflicts";
 
 const { repoPath, onRepoOpened, restoreLastRepo } = useRepo();
-const { refresh: refreshFiles } = useFiles();
+const { refresh: refreshFiles, selectedFile } = useFiles();
 const { refresh: refreshBranches, createTag } = useBranches();
-const { refresh: refreshLog } = useLog();
+const { refresh: refreshLog, selectedCommit } = useLog();
+const { clearDiff } = useDiff();
 const { pull, push } = useRemote();
 const { target: compareTarget } = useFileCompare();
 const { refresh: refreshConflicts } = useConflicts();
@@ -45,7 +47,17 @@ async function refreshAll() {
   ]);
 }
 
-onRepoOpened(refreshAll);
+// Открыт другой репозиторий: выделение коммита/файла и дифф — это
+// модульные синглтоны, относящиеся к предыдущему репо. Сбрасываем их
+// до загрузки данных нового, иначе панель Changes показывает дифф из
+// старого репозитория (FileList обновляется через refreshFiles, а
+// currentDiff/selectedFile — нет).
+onRepoOpened(async () => {
+  selectedCommit.value = null;
+  selectedFile.value = null;
+  clearDiff();
+  await refreshAll();
+});
 
 watch(repoPath, (val) => {
   if (!val) refreshAll();
