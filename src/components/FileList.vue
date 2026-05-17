@@ -93,12 +93,14 @@ let commitFilesSeq = 0;
 watch(selectedCommit, async (oid) => {
   selectedPaths.value = [];
   anchorPath.value = null;
+  // Любая смена выбора в графе (коммит→коммит, коммит→worktree, сброс)
+  // делает показанный дифф неактуальным — панель Changes пуста, пока
+  // пользователь не кликнет файл нового выбора.
+  selectedFile.value = null;
+  clearDiff();
   if (!oid || oid === "__worktree__" || !repoPath.value) {
     commitFilesSeq++;
     commitFiles.value = [];
-    // Коммит больше не выбран (в т.ч. сброс при смене репозитория) —
-    // diff-панель не должна показывать дифф старого коммита.
-    if (!oid) clearDiff();
     return;
   }
   const seq = ++commitFilesSeq;
