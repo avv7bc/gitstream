@@ -3,9 +3,11 @@ import { computed } from "vue";
 import { useRepo } from "@/composables/useRepo";
 import { useRemote } from "@/composables/useRemote";
 import { useBranches } from "@/composables/useBranches";
+import { useProgress } from "@/composables/useProgress";
 
 const { repoInfo } = useRepo();
-const { isBusy, lastError } = useRemote();
+const { lastError } = useRemote();
+const { isWorking, progressLabel } = useProgress();
 const { branches } = useBranches();
 
 const currentBranchInfo = computed(() => branches.value.find((b) => b.is_current));
@@ -34,11 +36,17 @@ const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
     </div>
 
     <div class="statusbar-center">
-      <span class="status-message">{{ lastError ?? (isBusy ? 'Working...' : '') }}</span>
+      <span v-if="lastError" class="status-message">{{ lastError }}</span>
+      <span v-else-if="isWorking" class="status-message progress">
+        <svg class="codicon spin" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M8 1.5a6.5 6.5 0 1 0 6.5 6.5h-1.5a5 5 0 1 1-5-5V1.5z"/>
+        </svg>
+        <span>{{ progressLabel }}</span>
+      </span>
     </div>
 
     <div class="statusbar-right">
-      <span class="version">0.1.34</span>
+      <span class="version">0.1.35</span>
     </div>
   </div>
 </template>
@@ -111,5 +119,20 @@ const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
 }
 .version {
   color: var(--statusbar-fg-muted);
+}
+
+.status-message.progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.codicon.spin {
+  animation: gs-spin 0.8s linear infinite;
+}
+
+@keyframes gs-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>

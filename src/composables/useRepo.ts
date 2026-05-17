@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/composables/useProgress";
 import type { RepoInfo } from "@/types";
 
 const LAST_REPO_KEY = "gitstream:last-repo-path";

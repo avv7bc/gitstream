@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/composables/useProgress";
 import type { CommitInfo } from "@/types";
 import { useRepo } from "./useRepo";
 

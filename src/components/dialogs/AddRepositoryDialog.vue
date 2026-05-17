@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/composables/useProgress";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useDraggable } from "@/composables/useDraggable";
 import type { RepoPathCheck } from "@/types";
