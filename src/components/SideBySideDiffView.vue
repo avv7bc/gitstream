@@ -83,11 +83,39 @@ function buildSelectionPayload(): { raw: string; selected: number[] }[] {
 // Сброс выделения при смене файла/контекста.
 watch([currentDiff, diffContext], clearSelection);
 
-// Будут подключены к шаблону в Task 7.
-void (applyLines as unknown);
-void (hasSelection as unknown);
-void (onLineClick as unknown);
-void (buildSelectionPayload as unknown);
+async function onSelectionAction(action: "stage" | "unstage" | "discard") {
+  if (!hasSelection.value || busyHunk.value !== null) return;
+  const payload = buildSelectionPayload();
+  if (payload.length === 0) return;
+  if (action === "discard") {
+    const n = selectedLines.value.size;
+    if (!window.confirm(`Отменить изменения в выбранных строках (${n})? Это действие необратимо.`)) {
+      return;
+    }
+  }
+  busyHunk.value = -1; // блокирует все кнопки на время операции
+  try {
+    await applyLines(action, currentDiff.value?.header ?? "", payload);
+    clearSelection();
+  } catch (e) {
+    console.error("Selection action failed:", e);
+  } finally {
+    busyHunk.value = null;
+  }
+}
+
+function onStageBtn(hi: number) {
+  if (hasSelection.value) onSelectionAction("stage");
+  else onHunkAction("stage", hi);
+}
+function onUnstageBtn(hi: number) {
+  if (hasSelection.value) onSelectionAction("unstage");
+  else onHunkAction("unstage", hi);
+}
+function onDiscardBtn(hi: number) {
+  if (hasSelection.value) onSelectionAction("discard");
+  else onHunkAction("discard", hi);
+}
 
 function hunkPatch(rawHunk: string): string {
   return (currentDiff.value?.header ?? "") + rawHunk;
@@ -152,6 +180,9 @@ function scrollToHunk() {
     <div class="panel-title-bar">
       <span class="panel-title">Changes of {{ diffFileName }}</span>
       <div class="diff-actions">
+        <span class="sel-counter" v-if="hasSelection">
+          выбрано {{ selectedLines.size }}
+        </span>
         <button
           class="diff-nav-btn"
           :disabled="!hasHunks || currentHunkIndex === 0"
@@ -184,10 +215,18 @@ function scrollToHunk() {
         <div v-for="(hunk, hi) in enrichedHunks" :key="`${hunk.header}`" :data-hunk-idx="hi" class="hunk-section">
           <div class="hunk-header">{{ hunk.header }}</div>
           <div
-            v-for="line in hunk.lines"
+            v-for="(line, li) in hunk.lines"
             :key="`${line.content}-${line.kind}-old`"
             class="diff-line"
-            :class="[line.kind, { hidden: line.kind === 'added' }]"
+            :class="[
+              line.kind,
+              {
+                hidden: line.kind === 'added',
+                'line-selected': selectedLines.has(`${hi}:${li}`),
+                selectable: isSelectable(line.kind),
+              },
+            ]"
+            @click="onLineClick(hi, li, line.kind, $event)"
           >
             <span class="line-no">{{ line.old_lineno ?? "" }}</span>
             <span class="line-prefix">{{ line.kind === "removed" ? "-" : " " }}</span>
@@ -216,7 +255,7 @@ function scrollToHunk() {
               <button
                 class="hunk-btn"
                 :disabled="busyHunk !== null"
-                @click="onHunkAction('stage', hi)"
+                @click="onStageBtn(hi)"
                 title="Добавить хунк в индекс"
               >
                 Stage
@@ -224,7 +263,7 @@ function scrollToHunk() {
               <button
                 class="hunk-btn danger"
                 :disabled="busyHunk !== null"
-                @click="onHunkAction('discard', hi)"
+                @click="onDiscardBtn(hi)"
                 title="Отменить изменения хунка"
               >
                 Discard
@@ -234,7 +273,7 @@ function scrollToHunk() {
               <button
                 class="hunk-btn"
                 :disabled="busyHunk !== null"
-                @click="onHunkAction('unstage', hi)"
+                @click="onUnstageBtn(hi)"
                 title="Убрать хунк из индекса"
               >
                 Unstage
@@ -242,10 +281,18 @@ function scrollToHunk() {
             </span>
           </div>
           <div
-            v-for="line in hunk.lines"
+            v-for="(line, li) in hunk.lines"
             :key="`${line.content}-${line.kind}-new`"
             class="diff-line"
-            :class="[line.kind, { hidden: line.kind === 'removed' }]"
+            :class="[
+              line.kind,
+              {
+                hidden: line.kind === 'removed',
+                'line-selected': selectedLines.has(`${hi}:${li}`),
+                selectable: isSelectable(line.kind),
+              },
+            ]"
+            @click="onLineClick(hi, li, line.kind, $event)"
           >
             <span class="line-no">{{ line.new_lineno ?? "" }}</span>
             <span class="line-prefix">{{ line.kind === "added" ? "+" : " " }}</span>
@@ -482,5 +529,20 @@ function scrollToHunk() {
 
 .word-diff.removed {
   background: var(--diff-word-removed-bg);
+}
+
+.diff-line.selectable {
+  cursor: pointer;
+}
+
+.diff-line.line-selected {
+  background: var(--accent-soft, rgba(137, 180, 250, 0.25));
+  box-shadow: inset 2px 0 0 var(--blue, #89b4fa);
+}
+
+.sel-counter {
+  font-size: var(--font-size-xs);
+  color: var(--blue, #89b4fa);
+  user-select: none;
 }
 </style>
