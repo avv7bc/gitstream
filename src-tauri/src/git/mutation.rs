@@ -440,6 +440,8 @@ fn rebuild_hunk(raw: &str, selected: &[usize]) -> Option<String> {
                 }
             }
             _ => {
+                // Недостижимо для корректного unified diff (строки тела
+                // начинаются с ' '/'+'/'-'/'\\'); счётчики намеренно не трогаем.
                 body.push_str(line);
                 body.push('\n');
                 last_kept = true;
@@ -632,6 +634,19 @@ mod partial_line_tests {
     fn rebuild_no_newline_marker_dropped_with_unselected_line() {
         let raw = "@@ -1,1 +1,2 @@\n ctx\n+A\n\\ No newline at end of file\n";
         assert!(rebuild_hunk(raw, &[]).is_none());
+    }
+
+    #[test]
+    fn rebuild_no_newline_marker_kept_after_unselected_removal() {
+        // -X (ord 0) не выбрана → контекст; +A (ord 1) выбрана → результат Some.
+        // Маркер "\ No newline" относится к -X-as-context и должен сохраниться.
+        let raw = "@@ -1,2 +1,2 @@\n ctx\n-X\n\\ No newline at end of file\n+A\n";
+        let out = rebuild_hunk(raw, &[1]).unwrap();
+        // Невыбранное -X стало контекстом → новая сторона выросла до 3 строк.
+        assert_eq!(
+            out,
+            "@@ -1,2 +1,3 @@\n ctx\n X\n\\ No newline at end of file\n+A\n"
+        );
     }
 
     #[test]
