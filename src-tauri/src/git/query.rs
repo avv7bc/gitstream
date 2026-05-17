@@ -23,6 +23,23 @@ pub fn run_git(repo_path: &Path, args: &[&str]) -> Result<String, GitError> {
     }
 }
 
+/// Запускает git, возвращая stdout независимо от кода возврата.
+/// Нужно для `diff --no-index`, который при наличии различий выходит с кодом 1.
+fn run_git_lenient(repo_path: &Path, args: &[&str]) -> String {
+    Command::new("git")
+        .arg("-C")
+        .arg(repo_path)
+        .args(args)
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default()
+}
+
+/// Файл не отслеживается git (нет ни в индексе, ни в HEAD).
+fn is_untracked(repo_path: &Path, file: &str) -> bool {
+    run_git(repo_path, &["ls-files", "--error-unmatch", "--", file]).is_err()
+}
+
 pub fn status(repo_path: &Path) -> Result<Vec<FileStatus>, GitError> {
     let output = run_git(repo_path, &["status", "--porcelain=v2"])?;
     let mut files = Vec::new();
@@ -205,6 +222,12 @@ pub fn repo_info(repo_path: &Path) -> Result<RepoInfo, GitError> {
 }
 
 pub fn diff_file(repo_path: &Path, file: &str, staged: bool) -> Result<FileDiff, GitError> {
+    // Untracked-файл отсутствует в индексе/HEAD — обычный `git diff` пуст.
+    // Синтезируем дифф «всё добавлено» сравнением с /dev/null.
+    if !staged && is_untracked(repo_path, file) {
+        let output = run_git_lenient(repo_path, &["diff", "--no-index", "--", "/dev/null", file]);
+        return Ok(parse_diff_single(&output, file));
+    }
     let args = if staged {
         vec!["diff", "--cached", "--", file]
     } else {
@@ -359,5 +382,38 @@ mod ref_label_tests {
                 ("origin/main".to_string(), "remote-branch".to_string()),
             ]
         );
+    }
+}
+
+#[cfg(test)]
+mod diff_untracked_tests {
+    use super::*;
+    use std::fs;
+
+    fn git(dir: &Path, args: &[&str]) {
+        Command::new("git").arg("-C").arg(dir).args(args).output().unwrap();
+    }
+
+    #[test]
+    fn untracked_file_diff_shows_content() {
+        let dir = std::env::temp_dir().join(format!("gitstream_untracked_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "-q"]);
+        fs::write(dir.join("new.txt"), "alpha\nbeta\ngamma\n").unwrap();
+
+        let diff = diff_file(&dir, "new.txt", false).unwrap();
+
+        let added: Vec<&str> = diff
+            .hunks
+            .iter()
+            .flat_map(|h| h.lines.iter())
+            .filter(|l| l.kind == "added")
+            .map(|l| l.content.as_str())
+            .collect();
+        assert_eq!(added, vec!["alpha", "beta", "gamma"]);
+        assert_eq!(diff.path, "new.txt");
+
+        let _ = fs::remove_dir_all(&dir);
     }
 }
