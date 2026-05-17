@@ -1,0 +1,63 @@
+# SKELETON — not yet build-ready. Finalize in Stages 2–3 of the plan
+# (docs/superpowers/plans/2026-05-17-flathub-publishing.md).
+#
+# Open items before this builds on Flathub:
+#  - generated-sources-node.json  (flatpak-node-generator npm package-lock.json)
+#  - generated-sources-cargo.json (flatpak-cargo-generator src-tauri/Cargo.lock)
+#  - pin runtime-version to the current Flathub-supported GNOME release
+#
+# Git/sandbox decision RESOLVED (ref: flathub/com.github.git_cola.git-cola):
+#  - `git` is bundled as a module from kernel.org (git.json); the GNOME runtime
+#    already provides curl/openssl/zlib/expat, so no extra dependency modules.
+#  - --filesystem=home (Flathub-preferred narrow scope; repos normally live in
+#    $HOME). Widen to --filesystem=host only if users keep repos elsewhere.
+app-id: io.github.avv7bc.gitstream
+runtime: org.gnome.Platform
+runtime-version: '46' # TODO: verify latest supported GNOME runtime at submission
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+  - org.freedesktop.Sdk.Extension.node20
+command: gitstream
+
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --share=network          # fetch / pull / push / clone
+  - --socket=ssh-auth        # SSH remotes (ssh-agent)
+  - --socket=gpg-agent       # signed commits / tags
+  - --filesystem=home        # user-chosen local repositories (normally in $HOME)
+  # Optional: system tray support
+  # - --talk-name=org.kde.StatusNotifierWatcher
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin
+  env:
+    CARGO_HOME: /run/build/gitstream/cargo
+
+modules:
+  - git.json
+
+  - name: gitstream
+    buildsystem: simple
+    build-commands:
+      - npm ci --offline
+      - npm run build
+      - cargo build --release --manifest-path src-tauri/Cargo.toml --offline
+      - install -Dm755 src-tauri/target/release/gitstream
+          ${FLATPAK_DEST}/bin/gitstream
+      - install -Dm644 flatpak/io.github.avv7bc.gitstream.desktop
+          ${FLATPAK_DEST}/share/applications/io.github.avv7bc.gitstream.desktop
+      - install -Dm644 flatpak/io.github.avv7bc.gitstream.metainfo.xml
+          ${FLATPAK_DEST}/share/metainfo/io.github.avv7bc.gitstream.metainfo.xml
+      - install -Dm644 flatpak/io.github.avv7bc.gitstream.png
+          ${FLATPAK_DEST}/share/icons/hicolor/512x512/apps/io.github.avv7bc.gitstream.png
+      - install -Dm644 LICENSE
+          ${FLATPAK_DEST}/share/licenses/${FLATPAK_ID}/LICENSE
+    sources:
+      - type: git
+        url: https://github.com/avv7bc/gitstream.git
+        tag: v0.2.12 # TODO: tag the release commit and point here
+      # - generated-sources-node.json
+      # - generated-sources-cargo.json
