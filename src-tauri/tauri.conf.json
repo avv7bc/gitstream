@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "GitStream",
-  "version": "0.2.12",
-  "identifier": "io.github.avv7bc.gitstream",
+  "version": "0.2.13",
+  "identifier": "com.gitstream.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
