@@ -230,6 +230,76 @@
   --diff-word-removed-bg: rgba(239, 68, 68, 0.35);
 }
 
+/* GitHub Dark Default theme */
+:root[data-theme="github"] {
+  --bg-primary: #0d1117;       /* canvas.default */
+  --bg-secondary: #010409;     /* canvas.inset — sidebar */
+  --bg-tertiary: #161b22;      /* canvas.overlay — inputs, dropdowns */
+  --bg-surface: #161b22;       /* canvas.subtle */
+  --bg-hover: rgba(110,118,129,0.1);
+  --bg-active: rgba(110,118,129,0.4);
+
+  --text-primary: #e6edf3;     /* fg.default */
+  --text-secondary: #7d8590;   /* fg.muted */
+  --text-muted: #6e7681;       /* fg.subtle */
+
+  --border: #30363d;           /* border.default */
+  --border-subtle: #21262d;    /* border.muted */
+
+  --accent: #2f81f7;           /* accent.fg */
+  --accent-hover: #388bfd;
+
+  --green: #3fb950;            /* success.fg */
+  --red: #f85149;              /* danger.fg */
+  --yellow: #d29922;           /* attention.fg */
+  --blue: #2f81f7;             /* accent.fg */
+  --purple: #a371f7;           /* done.fg */
+  --teal: #58a6ff;
+  --orange: #db6d28;           /* severe.fg */
+
+  --diff-added-bg: rgba(46,160,67,0.15);
+  --diff-added-line: rgba(46,160,67,0.08);
+  --diff-removed-bg: rgba(248,81,73,0.15);
+  --diff-removed-line: rgba(248,81,73,0.08);
+  --diff-word-added-bg: rgba(46,160,67,0.4);
+  --diff-word-removed-bg: rgba(248,81,73,0.4);
+}
+
+/* Sublime Text 4 — Monokai Pro theme */
+:root[data-theme="sublime"] {
+  --bg-primary: #2d2a2e;       /* background */
+  --bg-secondary: #221f22;     /* darker panels / sidebar */
+  --bg-tertiary: #403e41;      /* input / elevated surface */
+  --bg-surface: #403e41;       /* surface */
+  --bg-hover: #363337;
+  --bg-active: #5b595c;        /* selection */
+
+  --text-primary: #fcfcfa;
+  --text-secondary: #c1bfc4;
+  --text-muted: #727072;       /* comment */
+
+  --border: #403e41;
+  --border-subtle: #363337;
+
+  --accent: #78dce8;           /* cyan/blue */
+  --accent-hover: #92e9f4;
+
+  --green: #a9dc76;
+  --red: #ff6188;
+  --yellow: #ffd866;
+  --blue: #78dce8;
+  --purple: #ab9df2;
+  --teal: #78dce8;
+  --orange: #fc9867;
+
+  --diff-added-bg: rgba(169, 220, 118, 0.15);
+  --diff-added-line: rgba(169, 220, 118, 0.07);
+  --diff-removed-bg: rgba(255, 97, 136, 0.18);
+  --diff-removed-line: rgba(255, 97, 136, 0.09);
+  --diff-word-added-bg: rgba(169, 220, 118, 0.35);
+  --diff-word-removed-bg: rgba(255, 97, 136, 0.35);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -295,7 +365,9 @@ mark.hl {
 :root[data-theme="material"] mark.hl,
 :root[data-theme="smartgit"] mark.hl,
 :root[data-theme="catppuccin"] mark.hl,
-:root[data-theme="dracula"] mark.hl {
+:root[data-theme="dracula"] mark.hl,
+:root[data-theme="sublime"] mark.hl,
+:root[data-theme="github"] mark.hl {
   background: rgba(243, 156, 18, 0.35);
   color: var(--text-primary);
 }

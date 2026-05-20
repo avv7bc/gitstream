@@ -130,6 +130,8 @@ const themes: { value: ThemeMode; label: string }[] = [
   { value: "smartgit", label: "SmartGit" },
   { value: "catppuccin", label: "Catppuccin Mocha" },
   { value: "dracula", label: "Dracula" },
+  { value: "sublime", label: "Sublime Text 4 (Monokai Pro)" },
+  { value: "github", label: "GitHub Dark" },
 ];
 
 const activeCategory = ref("appearance");
