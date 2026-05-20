@@ -376,6 +376,16 @@ pub fn do_delete_tag(repo_path: String, name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn get_repo_stats(repo_path: String, since_days: Option<u32>) -> Result<RepoStats, String> {
+    let path = std::path::PathBuf::from(repo_path);
+    tokio::task::spawn_blocking(move || {
+        query::repo_stats(&path, since_days).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub fn check_repo_path(path: String) -> Result<RepoPathCheck, String> {
     let p = PathBuf::from(&path);
     if !p.exists() {

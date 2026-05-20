@@ -68,6 +68,7 @@ fn main() {
             settings::get_settings,
             settings::set_settings,
             commands::check_repo_path,
+            commands::get_repo_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

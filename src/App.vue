@@ -18,6 +18,7 @@ import CheckoutRemoteDialog from "./components/dialogs/CheckoutRemoteDialog.vue"
 import ConfirmDialog from "./components/dialogs/ConfirmDialog.vue";
 import DiscardDialog from "./components/dialogs/DiscardDialog.vue";
 import SettingsDialog from "./components/dialogs/SettingsDialog.vue";
+import StatsDialog from "./components/dialogs/StatsDialog.vue";
 import FileCompareDialog from "./components/dialogs/FileCompareDialog.vue";
 import AddTagDialog from "./components/dialogs/AddTagDialog.vue";
 import { useFileCompare } from "@/composables/useFileCompare";
@@ -73,6 +74,7 @@ const showConfirmDialog = ref(false);
 const showDiscardDialog = ref(false);
 const showErrorDialog = ref(false);
 const showSettingsDialog = ref(false);
+const showStatsDialog = ref(false);
 const showAddTagDialog = ref(false);
 const addTagTarget = ref<{ oid: string; subject: string } | null>(null);
 
@@ -151,7 +153,7 @@ function handleAddGroup() {
 }
 
 // --- Close any open dialog on Esc ---
-const dialogs = [showCommitDialog, showCloneDialog, showPushDialog, showPullDialog, showCheckoutDialog, showConfirmDialog, showDiscardDialog, showErrorDialog, showSettingsDialog];
+const dialogs = [showCommitDialog, showCloneDialog, showPushDialog, showPullDialog, showCheckoutDialog, showConfirmDialog, showDiscardDialog, showErrorDialog, showSettingsDialog, showStatsDialog];
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") {
@@ -301,6 +303,7 @@ function onMouseUp() {
       @pull="showPullDialog = true"
       @checkout="showCheckoutDialog = true"
       @settings="showSettingsDialog = true"
+      @stats="showStatsDialog = true"
       @add-repository="handleAddRepository"
       @add-group="handleAddGroup"
       @discard="showDiscardDialog = true"
@@ -396,6 +399,7 @@ function onMouseUp() {
     />
     <DiscardDialog v-if="showDiscardDialog" @close="showDiscardDialog = false; refreshAll()" />
     <SettingsDialog v-if="showSettingsDialog" @close="showSettingsDialog = false" />
+    <StatsDialog v-if="showStatsDialog" @close="showStatsDialog = false" />
     <AddTagDialog
       v-if="showAddTagDialog"
       :target="addTagTarget"

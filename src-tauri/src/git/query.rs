@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 
@@ -336,6 +337,128 @@ fn parse_diff_multi(diff_text: &str) -> Vec<FileDiff> {
         diffs.push(parse_diff_single(&current_chunk, &current_path));
     }
     diffs
+}
+
+pub fn repo_stats(repo_path: &Path, since_days: Option<u32>) -> Result<RepoStats, GitError> {
+    let since_arg;
+    let mut args = vec![
+        "log",
+        "--format=COMMIT%x01%ae%x01%an%x01%ad",
+        "--date=format:%Y-%m-%d %H %w",
+        "--numstat",
+    ];
+    if let Some(days) = since_days {
+        since_arg = format!("--after={} days ago", days);
+        args.push(&since_arg);
+    }
+
+    let output = run_git(repo_path, &args)?;
+
+    let mut author_map: HashMap<String, AuthorStat> = HashMap::new();
+    let mut author_days: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut global_days: HashSet<String> = HashSet::new();
+    let mut by_weekday = vec![0u32; 7];
+    let mut by_hour = vec![0u32; 24];
+    let mut by_month: HashMap<String, u32> = HashMap::new();
+    let mut day_counts: HashMap<String, u32> = HashMap::new();
+
+    let mut cur_email = String::new();
+
+    for line in output.lines() {
+        if let Some(rest) = line.strip_prefix("COMMIT\x01") {
+            let parts: Vec<&str> = rest.splitn(3, '\x01').collect();
+            if parts.len() < 3 { continue; }
+            let email = parts[0];
+            let name = parts[1];
+            let date_str = parts[2]; // "YYYY-MM-DD HH W"
+
+            let dparts: Vec<&str> = date_str.split(' ').collect();
+            if dparts.len() < 3 { continue; }
+            let ymd = dparts[0];
+            let hour: usize = dparts[1].parse::<usize>().unwrap_or(0).min(23);
+            let wday: usize = dparts[2].parse::<usize>().unwrap_or(0);
+            // git %w: 0=Sun → index 6, 1=Mon → 0, ..., 6=Sat → 5
+            let wday_idx = (wday + 6) % 7;
+
+            global_days.insert(ymd.to_string());
+            by_weekday[wday_idx] += 1;
+            by_hour[hour] += 1;
+            if ymd.len() >= 7 {
+                *by_month.entry(ymd[..7].to_string()).or_default() += 1;
+            }
+            *day_counts.entry(ymd.to_string()).or_default() += 1;
+
+            cur_email = email.to_string();
+            let entry = author_map.entry(email.to_string()).or_insert_with(|| AuthorStat {
+                name: name.to_string(),
+                email: email.to_string(),
+                commits: 0,
+                insertions: 0,
+                deletions: 0,
+                active_days: 0,
+                first_date: ymd.to_string(),
+                last_date: ymd.to_string(),
+            });
+            entry.commits += 1;
+            entry.name = name.to_string();
+            if ymd < entry.first_date.as_str() { entry.first_date = ymd.to_string(); }
+            if ymd > entry.last_date.as_str() { entry.last_date = ymd.to_string(); }
+
+            author_days.entry(email.to_string()).or_default().insert(ymd.to_string());
+        } else {
+            // numstat line: "<ins>\t<del>\t<file>", binary shows "-\t-\t..."
+            let parts: Vec<&str> = line.splitn(3, '\t').collect();
+            if parts.len() >= 2 {
+                if let (Ok(ins), Ok(del)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                    if let Some(author) = author_map.get_mut(&cur_email) {
+                        author.insertions += ins;
+                        author.deletions += del;
+                    }
+                }
+            }
+        }
+    }
+
+    for (email, days) in &author_days {
+        if let Some(author) = author_map.get_mut(email) {
+            author.active_days = days.len() as u32;
+        }
+    }
+
+    let mut authors: Vec<AuthorStat> = author_map.into_values().collect();
+    authors.sort_by(|a, b| b.commits.cmp(&a.commits));
+
+    let mut months: Vec<MonthEntry> = by_month.into_iter()
+        .map(|(month, commits)| MonthEntry { month, commits })
+        .collect();
+    months.sort_by(|a, b| a.month.cmp(&b.month));
+
+    let mut by_day: Vec<DayEntry> = day_counts.into_iter()
+        .map(|(date, count)| DayEntry { date, count })
+        .collect();
+    by_day.sort_by(|a, b| a.date.cmp(&b.date));
+
+    let total_commits: u32 = authors.iter().map(|a| a.commits).sum();
+    let total_insertions: u32 = authors.iter().map(|a| a.insertions).sum();
+    let total_deletions: u32 = authors.iter().map(|a| a.deletions).sum();
+    let first_commit_date = authors.iter().map(|a| a.first_date.as_str()).min().unwrap_or("").to_string();
+    let last_commit_date = authors.iter().map(|a| a.last_date.as_str()).max().unwrap_or("").to_string();
+    let total_authors = authors.len() as u32;
+
+    Ok(RepoStats {
+        total_commits,
+        total_insertions,
+        total_deletions,
+        first_commit_date,
+        last_commit_date,
+        active_days: global_days.len() as u32,
+        total_authors,
+        authors,
+        by_weekday,
+        by_hour,
+        by_month: months,
+        by_day,
+    })
 }
 
 #[cfg(test)]

@@ -9,6 +9,7 @@ defineEmits<{
   pull: [];
   checkout: [];
   settings: [];
+  stats: [];
   addRepository: [];
   addGroup: [];
   discard: [];
@@ -182,6 +183,13 @@ function closeMenu() {
     <div class="toolbar-spacer" />
 
     <div class="toolbar-group">
+      <button class="toolbar-btn icon-only" @click="$emit('stats')" title="Repository Statistics">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="10" width="3" height="4" rx="0.5"/>
+          <rect x="6.5" y="6" width="3" height="8" rx="0.5"/>
+          <rect x="11" y="2" width="3" height="12" rx="0.5"/>
+        </svg>
+      </button>
       <button class="toolbar-btn icon-only" @click="$emit('settings')" title="Settings">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
           <line x1="4" y1="6" x2="20" y2="6"/>

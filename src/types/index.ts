@@ -101,3 +101,39 @@ export interface RepoPathCheck {
   is_git_repo: boolean;
   display_name: string;
 }
+
+export interface AuthorStat {
+  name: string;
+  email: string;
+  commits: number;
+  insertions: number;
+  deletions: number;
+  active_days: number;
+  first_date: string;
+  last_date: string;
+}
+
+export interface MonthEntry {
+  month: string;
+  commits: number;
+}
+
+export interface DayEntry {
+  date: string;
+  count: number;
+}
+
+export interface RepoStats {
+  total_commits: number;
+  total_insertions: number;
+  total_deletions: number;
+  first_commit_date: string;
+  last_commit_date: string;
+  active_days: number;
+  total_authors: number;
+  authors: AuthorStat[];
+  by_weekday: number[];
+  by_hour: number[];
+  by_month: MonthEntry[];
+  by_day: DayEntry[];
+}

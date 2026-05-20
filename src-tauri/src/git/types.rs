@@ -99,3 +99,43 @@ pub struct RepoPathCheck {
     pub is_git_repo: bool,
     pub display_name: String,
 }
+
+#[derive(Serialize, Clone, Debug)]
+pub struct AuthorStat {
+    pub name: String,
+    pub email: String,
+    pub commits: u32,
+    pub insertions: u32,
+    pub deletions: u32,
+    pub active_days: u32,
+    pub first_date: String,
+    pub last_date: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct MonthEntry {
+    pub month: String,
+    pub commits: u32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct DayEntry {
+    pub date: String,
+    pub count: u32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct RepoStats {
+    pub total_commits: u32,
+    pub total_insertions: u32,
+    pub total_deletions: u32,
+    pub first_commit_date: String,
+    pub last_commit_date: String,
+    pub active_days: u32,
+    pub total_authors: u32,
+    pub authors: Vec<AuthorStat>,
+    pub by_weekday: Vec<u32>,
+    pub by_hour: Vec<u32>,
+    pub by_month: Vec<MonthEntry>,
+    pub by_day: Vec<DayEntry>,
+}
