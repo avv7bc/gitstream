@@ -40,7 +40,8 @@ jobs:
             libxdo-dev \
             libssl-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev
+            librsvg2-dev \
+            rpm
 
       - uses: actions/setup-node@v4
         with:
@@ -61,11 +62,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          find src-tauri/target/release/bundle \
-            \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" \) \
-            | xargs gh release upload "${{ github.ref_name }}" \
-                --repo "${{ github.repository }}" \
-                --clobber
+          shopt -s nullglob
+          files=(
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          )
+          echo "Files to upload: ${files[*]}"
+          gh release upload "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --clobber \
+            "${files[@]}"
 
   build-macos:
     needs: create-release
@@ -92,11 +99,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          find src-tauri/target/release/bundle \
-            \( -name "*.dmg" -o -name "*.tar.gz" \) \
-            | xargs gh release upload "${{ github.ref_name }}" \
-                --repo "${{ github.repository }}" \
-                --clobber
+          shopt -s nullglob
+          files=(
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.tar.gz
+          )
+          echo "Files to upload: ${files[*]}"
+          gh release upload "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --clobber \
+            "${files[@]}"
 
   build-windows:
     needs: create-release
@@ -122,10 +134,9 @@ jobs:
       - name: Upload artifacts
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
         run: |
-          find src-tauri/target/release/bundle \
-            \( -name "*.msi" -o -name "*.exe" \) \
-            | xargs gh release upload "${{ github.ref_name }}" \
-                --repo "${{ github.repository }}" \
-                --clobber
+          $msi = Get-ChildItem "src-tauri\target\release\bundle\msi\*.msi" -ErrorAction SilentlyContinue
+          $exe = Get-ChildItem "src-tauri\target\release\bundle\nsis\*-setup.exe" -ErrorAction SilentlyContinue
+          $files = @($msi) + @($exe) | ForEach-Object { $_.FullName }
+          Write-Host "Files to upload: $files"
+          gh release upload "${{ github.ref_name }}" --repo "${{ github.repository }}" --clobber $files
