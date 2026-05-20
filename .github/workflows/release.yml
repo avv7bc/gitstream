@@ -13,27 +13,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform:
-          - ubuntu-22.04
-          - macos-latest
-          - windows-latest
+        include:
+          - platform: ubuntu-22.04
+            bundles: deb,appimage,rpm
+            deps: |
+              sudo apt-get update
+              sudo apt-get install -y \
+                libwebkit2gtk-4.1-dev \
+                build-essential \
+                libxdo-dev \
+                libssl-dev \
+                libayatana-appindicator3-dev \
+                librsvg2-dev \
+                rpm
+          - platform: macos-latest
+            bundles: dmg,app
+            deps: echo "no extra deps"
+          - platform: windows-latest
+            bundles: msi,nsis
+            deps: echo "no extra deps"
 
     runs-on: ${{ matrix.platform }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            build-essential \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
+      - name: Install dependencies
+        run: ${{ matrix.deps }}
 
       - uses: actions/setup-node@v4
         with:
@@ -55,3 +61,4 @@ jobs:
           releaseName: ${{ github.ref_name }}
           releaseDraft: true
           prerelease: false
+          args: --bundles ${{ matrix.bundles }}
