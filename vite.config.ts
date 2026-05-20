@@ -1,8 +1,10 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { resolve } from "path";
+import { readFileSync } from "fs";
 
 const host = process.env.TAURI_DEV_HOST;
+const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf-8"));
 
 export default defineConfig(async () => ({
   plugins: [vue()],
@@ -10,6 +12,9 @@ export default defineConfig(async () => ({
     alias: {
       "@": resolve(__dirname, "src"),
     },
+  },
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
   },
   clearScreen: false,
   server: {

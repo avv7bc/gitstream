@@ -13,6 +13,8 @@ const { branches } = useBranches();
 const currentBranchInfo = computed(() => branches.value.find((b) => b.is_current));
 const ahead = computed(() => currentBranchInfo.value?.ahead ?? 0);
 const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
+
+const appVersion = __APP_VERSION__;
 </script>
 
 <template>
@@ -46,7 +48,7 @@ const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
     </div>
 
     <div class="statusbar-right">
-      <span class="version">0.3.1</span>
+      <span class="version">{{ appVersion }}</span>
     </div>
   </div>
 </template>
