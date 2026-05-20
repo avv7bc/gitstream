@@ -19,8 +19,10 @@ import ConfirmDialog from "./components/dialogs/ConfirmDialog.vue";
 import DiscardDialog from "./components/dialogs/DiscardDialog.vue";
 import SettingsDialog from "./components/dialogs/SettingsDialog.vue";
 import StatsDialog from "./components/dialogs/StatsDialog.vue";
+import SquashDialog from "./components/dialogs/SquashDialog.vue";
 import FileCompareDialog from "./components/dialogs/FileCompareDialog.vue";
 import AddTagDialog from "./components/dialogs/AddTagDialog.vue";
+import type { CommitInfo } from "@/types";
 import { useFileCompare } from "@/composables/useFileCompare";
 import { useRepo } from "@/composables/useRepo";
 import { useFiles } from "@/composables/useFiles";
@@ -33,7 +35,7 @@ import { useConflicts } from "@/composables/useConflicts";
 const { repoPath, onRepoOpened, restoreLastRepo } = useRepo();
 const { refresh: refreshFiles, selectedFile } = useFiles();
 const { refresh: refreshBranches, createTag } = useBranches();
-const { refresh: refreshLog, selectedCommit } = useLog();
+const { refresh: refreshLog, selectedCommit, commits, squashCommits } = useLog();
 const { clearDiff } = useDiff();
 const { pull, push } = useRemote();
 const { target: compareTarget } = useFileCompare();
@@ -77,6 +79,26 @@ const showSettingsDialog = ref(false);
 const showStatsDialog = ref(false);
 const showAddTagDialog = ref(false);
 const addTagTarget = ref<{ oid: string; subject: string } | null>(null);
+const squashPayload = ref<{ oids: string[]; commits: CommitInfo[] } | null>(null);
+
+function onSquash(payload: { oids: string[] }) {
+  const squashCommitsList = payload.oids
+    .map(oid => commits.value.find(c => c.oid === oid))
+    .filter(Boolean) as CommitInfo[];
+  squashPayload.value = { oids: payload.oids, commits: squashCommitsList };
+}
+
+async function doSquash(message: string) {
+  if (!squashPayload.value) return;
+  const { oids } = squashPayload.value;
+  squashPayload.value = null;
+  try {
+    await squashCommits(oids, message);
+    await refreshAll();
+  } catch (e) {
+    showError(String(e));
+  }
+}
 
 function openAddTag(target: { oid: string; subject: string } | null) {
   addTagTarget.value = target;
@@ -348,6 +370,7 @@ function onMouseUp() {
               @discard="showDiscardDialog = true"
               @create-tag="openAddTag($event)"
               @changed="refreshAll()"
+              @squash="onSquash($event)"
             />
           </div>
 
@@ -405,6 +428,13 @@ function onMouseUp() {
       :target="addTagTarget"
       @close="showAddTagDialog = false; addTagTarget = null"
       @confirm="handleCreateTag"
+    />
+    <SquashDialog
+      v-if="squashPayload"
+      :oids="squashPayload.oids"
+      :commits="squashPayload.commits"
+      @confirm="doSquash($event)"
+      @close="squashPayload = null"
     />
     <FileCompareDialog v-if="compareTarget" />
     <ConfirmDialog

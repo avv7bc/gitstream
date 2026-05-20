@@ -386,6 +386,16 @@ pub async fn get_repo_stats(repo_path: String, since_days: Option<u32>) -> Resul
 }
 
 #[tauri::command]
+pub async fn do_squash(repo_path: String, oids: Vec<String>, message: String) -> Result<(), String> {
+    let path = std::path::PathBuf::from(repo_path);
+    tokio::task::spawn_blocking(move || {
+        mutation::squash(&path, &oids, &message).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub fn check_repo_path(path: String) -> Result<RepoPathCheck, String> {
     let p = PathBuf::from(&path);
     if !p.exists() {

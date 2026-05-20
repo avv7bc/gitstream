@@ -53,6 +53,11 @@ export function useLog() {
     await invoke("do_cherry_pick", { repoPath: repoPath.value, oid });
   }
 
+  async function squashCommits(oids: string[], message: string) {
+    if (!repoPath.value) return;
+    await invoke("do_squash", { repoPath: repoPath.value, oids, message });
+  }
+
   function clear() {
     commits.value = [];
     selectedCommit.value = null;
@@ -66,5 +71,6 @@ export function useLog() {
     resetTo,
     revertCommit,
     cherryPick,
+    squashCommits,
   };
 }

@@ -13,6 +13,7 @@ const emit = defineEmits<{
   discard: [];
   createTag: [target: { oid: string; subject: string }];
   changed: [];
+  squash: [payload: { oids: string[] }];
 }>();
 
 const { commits, selectedCommit, resetTo, revertCommit, cherryPick } = useLog();
@@ -72,6 +73,42 @@ const repoName = computed(() => {
   const parts = repoPath.value.replace(/\/+$/, "").split("/");
   return parts[parts.length - 1];
 });
+
+// Range selection
+const rangeAnchor = ref<string | null>(null);
+const selectedOids = ref<string[]>([]);
+
+const headOid = computed(() => filteredCommits.value[0]?.oid ?? null);
+const rangeIncludesHead = computed(() =>
+  !!headOid.value && selectedOids.value.includes(headOid.value)
+);
+
+function handleCommitClick(oid: string, e: MouseEvent) {
+  if (
+    e.shiftKey &&
+    rangeAnchor.value &&
+    rangeAnchor.value !== "__worktree__"
+  ) {
+    const anchorIdx = filteredCommits.value.findIndex(c => c.oid === rangeAnchor.value);
+    const clickIdx  = filteredCommits.value.findIndex(c => c.oid === oid);
+    if (anchorIdx !== -1 && clickIdx !== -1) {
+      const lo = Math.min(anchorIdx, clickIdx);
+      const hi = Math.max(anchorIdx, clickIdx);
+      selectedOids.value = filteredCommits.value.slice(lo, hi + 1).map(c => c.oid);
+      selectedCommit.value = oid;
+      return;
+    }
+  }
+  rangeAnchor.value = oid;
+  selectedOids.value = [oid];
+  selectedCommit.value = oid;
+}
+
+function handleWtClick() {
+  rangeAnchor.value = "__worktree__";
+  selectedOids.value = [];
+  selectedCommit.value = "__worktree__";
+}
 
 const ctxMenu = ref<{ x: number; y: number } | null>(null);
 const ctxCommitOid = ref<string | null>(null);
@@ -154,7 +191,16 @@ async function ctxCherryPick() {
   await runCherryPick(oid);
 }
 
+function ctxSquash() {
+  const oids = selectedOids.value.slice(); // newest→oldest (filteredCommits order)
+  closeCtxMenu();
+  emit("squash", { oids });
+}
+
 const ctxIsWorkingTree = computed(() => ctxCommitOid.value === "__worktree__");
+const canSquash = computed(() =>
+  selectedOids.value.length >= 2 && rangeIncludesHead.value
+);
 
 const changedCount = computed(() => files.value.length);
 const isWorkingTreeSelected = computed(() => selectedCommit.value === "__worktree__");
@@ -310,7 +356,7 @@ function formatDate(iso: string): string {
         class="graph-row wt-row"
         :class="{ selected: isWorkingTreeSelected }"
         @mousedown.shift.prevent
-        @click="selectWorkingTree"
+        @click="handleWtClick"
         @dblclick="emit('commit')"
         @contextmenu="onContextMenu($event, '__worktree__')"
       >
@@ -340,9 +386,9 @@ function formatDate(iso: string): string {
         v-for="(commit, idx) in filteredCommits"
         :key="commit.oid"
         class="graph-row"
-        :class="{ selected: selectedCommit === commit.oid, unpushed: isUnpushed(idx) }"
+        :class="{ selected: selectedCommit === commit.oid, unpushed: isUnpushed(idx), 'in-range': selectedOids.includes(commit.oid) && selectedOids.length > 1 }"
         @mousedown.shift.prevent
-        @click="selectedCommit = commit.oid"
+        @click="handleCommitClick(commit.oid, $event)"
         @contextmenu="onContextMenu($event, commit.oid)"
       >
         <!-- Graph column with SVG lane lines -->
@@ -445,6 +491,10 @@ function formatDate(iso: string): string {
         <button class="ctx-item ctx-danger" :disabled="ctxIsWorkingTree" @click="ctxReset('hard')">
           <span class="ctx-label">Reset (hard)</span>
         </button>
+        <div class="ctx-separator" />
+        <button class="ctx-item" :disabled="!canSquash" @click="ctxSquash">
+          <span class="ctx-label">Squash…</span>
+        </button>
       </div>
       <div v-if="ctxMenu" class="ctx-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu" />
     </Teleport>
@@ -526,6 +576,9 @@ function formatDate(iso: string): string {
 }
 .graph-row.selected {
   background: var(--bg-surface);
+}
+.graph-row.in-range {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .graph-row.unpushed .commit-message {
   color: #e8e8e8;

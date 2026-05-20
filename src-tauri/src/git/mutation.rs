@@ -245,6 +245,20 @@ pub fn reset(repo_path: &Path, oid: &str, mode: &str) -> Result<(), GitError> {
     Ok(())
 }
 
+pub fn squash(repo_path: &Path, oids: &[String], message: &str) -> Result<(), GitError> {
+    if oids.len() < 2 {
+        return Err(GitError::CommandFailed { message: "Need at least 2 commits to squash".into(), hint: None });
+    }
+    let oldest = oids.last().unwrap();
+    // resolve parent of the oldest commit
+    use super::query::run_git;
+    let parent_raw = run_git(repo_path, &["rev-parse", &format!("{}^", oldest)])?;
+    let parent = parent_raw.trim();
+    run_git_mut(repo_path, &["reset", "--soft", parent])?;
+    run_git_mut(repo_path, &["commit", "-m", message])?;
+    Ok(())
+}
+
 pub fn revert(repo_path: &Path, oid: &str, no_commit: bool) -> Result<(), GitError> {
     let mut args: Vec<&str> = vec!["revert", "--no-edit"];
     if no_commit {
