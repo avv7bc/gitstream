@@ -140,8 +140,15 @@ pub fn get_diff_file(repo_path: String, file: String, staged: bool) -> Result<Fi
 }
 
 #[tauri::command]
-pub fn get_diff_commit(repo_path: String, oid: String) -> Result<Vec<FileDiff>, String> {
-    query::diff_commit(Path::new(&repo_path), &oid).map_err(|e| e.to_string())
+pub async fn get_diff_commit(repo_path: String, oid: String) -> Result<Vec<FileDiff>, String> {
+    // Sync-команда блокировала бы главный поток Tauri: при удержании стрелки
+    // в CommitGraph каждый шаг ждёт `git diff` целого коммита, и UI замирает.
+    let path = std::path::PathBuf::from(repo_path);
+    tokio::task::spawn_blocking(move || {
+        query::diff_commit(&path, &oid).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
