@@ -726,7 +726,7 @@ function selectItem(key: string) {
   margin-left: auto;
   padding: 2px 6px;
   font-size: var(--font-size-xs);
-  border-color: color-mix(in srgb, var(--border-subtle) 45%, transparent);
+  border-color: var(--border);
 }
 
 .sections {
