@@ -45,8 +45,11 @@ jobs:
 
       - name: Upload Linux artifacts
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           draft: true
+          fail_on_unmatched_files: false
           files: |
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/rpm/*.rpm
@@ -74,8 +77,11 @@ jobs:
 
       - name: Upload macOS artifacts
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           draft: true
+          fail_on_unmatched_files: false
           files: |
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/macos/*.tar.gz
@@ -102,8 +108,11 @@ jobs:
 
       - name: Upload Windows artifacts
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           draft: true
+          fail_on_unmatched_files: false
           files: |
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
