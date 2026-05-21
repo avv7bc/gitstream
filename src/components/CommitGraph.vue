@@ -133,7 +133,7 @@ function ctxAction(action: "commit" | "discard") {
 function emitAddTag(oid: string | null) {
   if (!oid || oid === "__worktree__") return;
   const c = commits.value.find((x) => x.oid === oid);
-  emit("createTag", { oid, subject: c?.message ?? "" });
+  emit("createTag", { oid, subject: (c?.message ?? "").split('\n')[0] });
 }
 
 function ctxCreateTag() {
@@ -445,7 +445,7 @@ function formatDate(iso: string): string {
             <RefIcon :kind="r.kind" />
             <span v-html="highlight(r.name, graphFilter)" />
           </span>
-          <span class="commit-message" v-html="highlight(commit.message, graphFilter)" />
+          <span class="commit-message" v-html="highlight(commit.message.split('\n')[0], graphFilter)" />
         </div>
 
         <span class="author-col" v-html="highlight(commit.author, graphFilter)" />

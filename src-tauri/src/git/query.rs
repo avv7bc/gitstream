@@ -81,20 +81,22 @@ pub fn status(repo_path: &Path) -> Result<Vec<FileStatus>, GitError> {
 }
 
 pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> {
-    let format = "%H%x00%h%x00%s%x00%an%x00%ae%x00%aI%x00%P%x00%D";
+    // \x1e separates commit records; %B is the full message (may contain newlines)
+    let format = "%x1e%H%x00%h%x00%an%x00%ae%x00%aI%x00%P%x00%D%x00%B";
     let limit_str = format!("-{}", limit);
     let output = run_git(repo_path, &["log", &format!("--format={}", format), &limit_str])?;
     let mut commits = Vec::new();
-    for line in output.lines() {
-        if line.is_empty() { continue; }
-        let parts: Vec<&str> = line.splitn(8, '\0').collect();
+    for record in output.split('\x1e') {
+        if record.is_empty() { continue; }
+        let parts: Vec<&str> = record.splitn(8, '\0').collect();
         if parts.len() < 8 { continue; }
-        let refs = parse_ref_labels(parts[7]);
-        let parents: Vec<String> = parts[6].split_whitespace().map(|s| s.to_string()).collect();
+        let refs = parse_ref_labels(parts[6]);
+        let parents: Vec<String> = parts[5].split_whitespace().map(|s| s.to_string()).collect();
+        let message = parts[7].trim_end_matches('\n').to_string();
         commits.push(CommitInfo {
             oid: parts[0].to_string(), short_oid: parts[1].to_string(),
-            message: parts[2].to_string(), author: parts[3].to_string(),
-            author_email: parts[4].to_string(), date: parts[5].to_string(),
+            message, author: parts[2].to_string(),
+            author_email: parts[3].to_string(), date: parts[4].to_string(),
             parents, refs,
             column: 0,
             lines: Vec::new(),
