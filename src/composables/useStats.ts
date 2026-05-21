@@ -17,7 +17,7 @@ export function useStats() {
   const loading = ref(true);
   const stats = ref<RepoStats | null>(null);
   const error = ref<string | null>(null);
-  const period = ref<StatsPeriod>("7d");
+  const period = ref<StatsPeriod>("30d");
   const progress = ref(0);
 
   let progressTimer: ReturnType<typeof setInterval> | null = null;
