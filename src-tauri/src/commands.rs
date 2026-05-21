@@ -485,6 +485,62 @@ pub fn check_repo_path(path: String) -> Result<RepoPathCheck, String> {
     Ok(RepoPathCheck { exists: true, is_git_repo: is_git, display_name })
 }
 
+#[tauri::command]
+pub async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .user_agent("gitstream-app")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let resp = match client
+        .get("https://api.github.com/repos/avv7bc/gitstream/releases/latest")
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(_) => return Ok(None),
+    };
+
+    let json: serde_json::Value = match resp.json().await {
+        Ok(j) => j,
+        Err(_) => return Ok(None),
+    };
+
+    let tag_name = match json["tag_name"].as_str() {
+        Some(t) => t.to_string(),
+        None => return Ok(None),
+    };
+
+    let html_url = json["html_url"].as_str().unwrap_or("").to_string();
+    let current = app.package_info().version.to_string();
+
+    if version_gt(&tag_name, &current) {
+        Ok(Some(UpdateInfo {
+            version: tag_name.trim_start_matches('v').to_string(),
+            release_url: html_url.clone(),
+            changelog_url: html_url,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    open_in_browser(&url).map_err(|e| e.to_string())
+}
+
+fn open_in_browser(url: &str) -> std::io::Result<()> {
+    #[cfg(target_os = "linux")]
+    std::process::Command::new("xdg-open").arg(url).spawn()?;
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open").arg(url).spawn()?;
+    #[cfg(target_os = "windows")]
+    std::process::Command::new("cmd").args(["/c", "start", "", url]).spawn()?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod network_timeout_tests {
     use super::*;
