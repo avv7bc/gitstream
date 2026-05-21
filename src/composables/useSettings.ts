@@ -43,8 +43,8 @@ function applyCssFonts() {
   root.setProperty("--font-sans", workbenchFontFamily.value || DEFAULT_WB_FONT_FAMILY);
   const n = workbenchFontSize.value;
   root.setProperty("--font-size", `${n}px`);
-  root.setProperty("--font-size-sm", `${n - 2}px`);
-  root.setProperty("--font-size-xs", `${n - 3}px`);
+  root.setProperty("--font-size-sm", `${Math.max(n - 2, 11)}px`);
+  root.setProperty("--font-size-xs", `${Math.max(n - 3, 10)}px`);
   root.setProperty("--font-mono", editorFontFamily.value || DEFAULT_ED_FONT_FAMILY);
   root.setProperty("--font-size-diff", `${editorFontSize.value}px`);
 }

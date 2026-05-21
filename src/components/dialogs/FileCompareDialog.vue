@@ -431,8 +431,8 @@ function curvePath(g: ChangeGroup): string {
   flex: 1;
   overflow: auto;
   background: var(--bg-primary);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-diff);
 }
 .fc-status-msg {
   padding: 24px;
