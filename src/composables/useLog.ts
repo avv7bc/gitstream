@@ -58,6 +58,11 @@ export function useLog() {
     await invoke("do_squash", { repoPath: repoPath.value, oids, message });
   }
 
+  async function rewordCommit(oid: string, message: string) {
+    if (!repoPath.value) return;
+    await invoke("do_reword_commit", { repoPath: repoPath.value, oid, message });
+  }
+
   function clear() {
     commits.value = [];
     selectedCommit.value = null;
@@ -72,5 +77,6 @@ export function useLog() {
     revertCommit,
     cherryPick,
     squashCommits,
+    rewordCommit,
   };
 }

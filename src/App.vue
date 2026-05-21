@@ -20,6 +20,7 @@ import DiscardDialog from "./components/dialogs/DiscardDialog.vue";
 import SettingsDialog from "./components/dialogs/SettingsDialog.vue";
 import StatsDialog from "./components/dialogs/StatsDialog.vue";
 import SquashDialog from "./components/dialogs/SquashDialog.vue";
+import RewordDialog from "./components/dialogs/RewordDialog.vue";
 import FileCompareDialog from "./components/dialogs/FileCompareDialog.vue";
 import AddTagDialog from "./components/dialogs/AddTagDialog.vue";
 import type { CommitInfo } from "@/types";
@@ -35,7 +36,7 @@ import { useConflicts } from "@/composables/useConflicts";
 const { repoPath, onRepoOpened, restoreLastRepo } = useRepo();
 const { refresh: refreshFiles, selectedFile } = useFiles();
 const { refresh: refreshBranches, createTag } = useBranches();
-const { refresh: refreshLog, selectedCommit, commits, squashCommits } = useLog();
+const { refresh: refreshLog, selectedCommit, commits, squashCommits, rewordCommit } = useLog();
 const { clearDiff } = useDiff();
 const { pull, push } = useRemote();
 const { target: compareTarget } = useFileCompare();
@@ -80,12 +81,29 @@ const showStatsDialog = ref(false);
 const showAddTagDialog = ref(false);
 const addTagTarget = ref<{ oid: string; subject: string } | null>(null);
 const squashPayload = ref<{ oids: string[]; commits: CommitInfo[] } | null>(null);
+const rewordPayload = ref<{ oid: string; message: string; isHead: boolean } | null>(null);
 
 function onSquash(payload: { oids: string[] }) {
   const squashCommitsList = payload.oids
     .map(oid => commits.value.find(c => c.oid === oid))
     .filter(Boolean) as CommitInfo[];
   squashPayload.value = { oids: payload.oids, commits: squashCommitsList };
+}
+
+function onReword(payload: { oid: string; message: string; isHead: boolean }) {
+  rewordPayload.value = payload;
+}
+
+async function doReword(message: string) {
+  if (!rewordPayload.value) return;
+  const { oid } = rewordPayload.value;
+  rewordPayload.value = null;
+  try {
+    await rewordCommit(oid, message);
+    await refreshAll();
+  } catch (e) {
+    showError(String(e));
+  }
 }
 
 async function doSquash(message: string) {
@@ -371,6 +389,7 @@ function onMouseUp() {
               @create-tag="openAddTag($event)"
               @changed="refreshAll()"
               @squash="onSquash($event)"
+              @reword="onReword($event)"
             />
           </div>
 
@@ -435,6 +454,14 @@ function onMouseUp() {
       :commits="squashPayload.commits"
       @confirm="doSquash($event)"
       @close="squashPayload = null"
+    />
+    <RewordDialog
+      v-if="rewordPayload"
+      :oid="rewordPayload.oid"
+      :message="rewordPayload.message"
+      :is-head="rewordPayload.isHead"
+      @confirm="doReword($event)"
+      @close="rewordPayload = null"
     />
     <FileCompareDialog v-if="compareTarget" />
     <ConfirmDialog

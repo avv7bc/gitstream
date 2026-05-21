@@ -301,6 +301,62 @@ pub fn squash(repo_path: &Path, oids: &[String], message: &str) -> Result<(), Gi
     Ok(())
 }
 
+pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<(), GitError> {
+    use super::query::run_git;
+    use std::os::unix::fs::PermissionsExt;
+
+    let head_raw = run_git(repo_path, &["rev-parse", "HEAD"])?;
+    let head = head_raw.trim();
+    let is_head = head.starts_with(oid) || oid.starts_with(head);
+
+    if is_head {
+        run_git_mut(repo_path, &["commit", "--amend", "-m", new_message])?;
+        return Ok(());
+    }
+
+    let tmp = std::env::temp_dir();
+    let pid = std::process::id();
+
+    let msg_path = tmp.join(format!("gs_msg_{}.txt", pid));
+    std::fs::write(&msg_path, new_message).map_err(|e| GitError::CommandFailed {
+        message: format!("write temp file: {}", e), hint: None,
+    })?;
+
+    // Sequence editor: change first "pick" line to "reword"
+    let seq_path = tmp.join(format!("gs_seq_{}.sh", pid));
+    std::fs::write(&seq_path, b"#!/bin/sh\nsed -i '1s/^pick/reword/' \"$1\"\n")
+        .map_err(|e| GitError::CommandFailed { message: format!("write seq script: {}", e), hint: None })?;
+    std::fs::set_permissions(&seq_path, std::fs::Permissions::from_mode(0o755))
+        .map_err(|e| GitError::CommandFailed { message: format!("chmod seq: {}", e), hint: None })?;
+
+    // Editor: copy the pre-written message into the file git passes
+    let ed_path = tmp.join(format!("gs_ed_{}.sh", pid));
+    let ed_content = format!("#!/bin/sh\ncp '{}' \"$1\"\n", msg_path.display());
+    std::fs::write(&ed_path, ed_content.as_bytes())
+        .map_err(|e| GitError::CommandFailed { message: format!("write editor script: {}", e), hint: None })?;
+    std::fs::set_permissions(&ed_path, std::fs::Permissions::from_mode(0o755))
+        .map_err(|e| GitError::CommandFailed { message: format!("chmod editor: {}", e), hint: None })?;
+
+    let parent_arg = format!("{}^", oid);
+    let out = Command::new("git")
+        .current_dir(repo_path)
+        .env("GIT_SEQUENCE_EDITOR", &seq_path)
+        .env("GIT_EDITOR", &ed_path)
+        .args(["rebase", "-i", &parent_arg])
+        .output()
+        .map_err(|e| GitError::CommandFailed { message: format!("Failed to run git: {}", e), hint: None })?;
+
+    let _ = std::fs::remove_file(&msg_path);
+    let _ = std::fs::remove_file(&seq_path);
+    let _ = std::fs::remove_file(&ed_path);
+
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+        return Err(classify_git_error(&stderr));
+    }
+    Ok(())
+}
+
 pub fn revert(repo_path: &Path, oid: &str, no_commit: bool) -> Result<(), GitError> {
     let mut args: Vec<&str> = vec!["revert", "--no-edit"];
     if no_commit {

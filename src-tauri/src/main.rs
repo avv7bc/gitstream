@@ -44,6 +44,7 @@ fn main() {
             commands::do_revert,
             commands::do_cherry_pick,
             commands::do_squash,
+            commands::do_reword_commit,
             commands::do_accept_ours,
             commands::do_accept_theirs,
             commands::do_op_abort,

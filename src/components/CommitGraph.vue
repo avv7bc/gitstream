@@ -14,6 +14,7 @@ const emit = defineEmits<{
   createTag: [target: { oid: string; subject: string }];
   changed: [];
   squash: [payload: { oids: string[] }];
+  reword: [payload: { oid: string; message: string; isHead: boolean }];
 }>();
 
 const { commits, selectedCommit, resetTo, revertCommit, cherryPick } = useLog();
@@ -197,6 +198,24 @@ function ctxSquash() {
   emit("squash", { oids });
 }
 
+function ctxReword() {
+  const oid = ctxCommitOid.value;
+  closeCtxMenu();
+  if (!oid || oid === "__worktree__") return;
+  const c = commits.value.find((x) => x.oid === oid);
+  if (!c) return;
+  const isHead = commits.value[0]?.oid === oid;
+  emit("reword", { oid, message: c.message, isHead });
+}
+
+function triggerReword(oid: string | null) {
+  if (!oid || oid === "__worktree__") return;
+  const c = commits.value.find((x) => x.oid === oid);
+  if (!c) return;
+  const isHead = commits.value[0]?.oid === oid;
+  emit("reword", { oid, message: c.message, isHead });
+}
+
 const ctxIsWorkingTree = computed(() => ctxCommitOid.value === "__worktree__");
 const canSquash = computed(() =>
   selectedOids.value.length >= 2 && rangeIncludesHead.value
@@ -251,6 +270,11 @@ function navigateCommits(direction: 'up' | 'down'): void {
 }
 
 function handleKeyDown(e: KeyboardEvent): void {
+  if (e.key === 'F2') {
+    e.preventDefault();
+    triggerReword(selectedCommit.value);
+    return;
+  }
   if (e.shiftKey && e.key === 'F7') {
     e.preventDefault();
     emitAddTag(selectedCommit.value);
@@ -492,6 +516,10 @@ function formatDate(iso: string): string {
           <span class="ctx-label">Reset (hard)</span>
         </button>
         <div class="ctx-separator" />
+        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxReword">
+          <span class="ctx-label">Edit Message…</span>
+          <span class="ctx-shortcut">F2</span>
+        </button>
         <button class="ctx-item" :disabled="!canSquash" @click="ctxSquash">
           <span class="ctx-label">Squash…</span>
         </button>
