@@ -3,7 +3,10 @@ use serde::Serialize;
 #[derive(Debug, thiserror::Error)]
 pub enum GitError {
     #[error("{message}")]
-    CommandFailed { message: String, hint: Option<String> },
+    CommandFailed {
+        message: String,
+        hint: Option<String>,
+    },
     #[error("Authentication failed: {0}")]
     AuthenticationFailed(String),
     #[error("Merge conflict")]

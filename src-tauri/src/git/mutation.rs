@@ -82,10 +82,13 @@ fn apply_patch(repo_path: &Path, patch: &str, reverse: bool, cached: bool) -> Re
         })?;
 
     {
-        let stdin = child.stdin.as_mut().ok_or_else(|| GitError::CommandFailed {
-            message: "Failed to open git apply stdin".into(),
-            hint: None,
-        })?;
+        let stdin = child
+            .stdin
+            .as_mut()
+            .ok_or_else(|| GitError::CommandFailed {
+                message: "Failed to open git apply stdin".into(),
+                hint: None,
+            })?;
         let mut data = patch.to_string();
         if !data.ends_with('\n') {
             data.push('\n');
@@ -98,10 +101,12 @@ fn apply_patch(repo_path: &Path, patch: &str, reverse: bool, cached: bool) -> Re
             })?;
     }
 
-    let output = child.wait_with_output().map_err(|e| GitError::CommandFailed {
-        message: format!("git apply failed: {}", e),
-        hint: None,
-    })?;
+    let output = child
+        .wait_with_output()
+        .map_err(|e| GitError::CommandFailed {
+            message: format!("git apply failed: {}", e),
+            hint: None,
+        })?;
 
     if output.status.success() {
         Ok(())
@@ -156,7 +161,9 @@ pub fn discard(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
 /// удаляем файл с диска напрямую (untracked-случай). Tracked-файлы при этом
 /// остаются правильно застейджены через git rm, а не просто удалены с диска.
 pub fn remove(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
-    for f in files { validate_file_path(f)?; }
+    for f in files {
+        validate_file_path(f)?;
+    }
     let mut args = vec!["rm", "--"];
     let file_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
     args.extend(file_refs);
@@ -177,27 +184,32 @@ pub fn remove(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
 /// Удаляет файлы только с диска (git не трогаем — tracked станет
 /// "deleted, unstaged").
 pub fn delete(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
-    for f in files { validate_file_path(f)?; }
     for f in files {
-        std::fs::remove_file(repo_path.join(f))
-            .map_err(|e| GitError::CommandFailed {
-                message: format!("Failed to delete file {}: {}", f, e),
-                hint: None,
-            })?;
+        validate_file_path(f)?;
+    }
+    for f in files {
+        std::fs::remove_file(repo_path.join(f)).map_err(|e| GitError::CommandFailed {
+            message: format!("Failed to delete file {}: {}", f, e),
+            hint: None,
+        })?;
     }
     Ok(())
 }
 
 pub fn commit(repo_path: &Path, message: &str, amend: bool) -> Result<String, GitError> {
     let mut args = vec!["commit", "-m", message];
-    if amend { args.push("--amend"); }
+    if amend {
+        args.push("--amend");
+    }
     run_git_mut(repo_path, &args)
 }
 
 pub fn checkout(repo_path: &Path, branch: &str) -> Result<(), GitError> {
     validate_ref_name(branch)?;
     let result = run_git_mut(repo_path, &["switch", "--", branch]);
-    if result.is_ok() { return Ok(()); }
+    if result.is_ok() {
+        return Ok(());
+    }
     if let Some(local) = branch.split('/').last() {
         run_git_mut(repo_path, &["switch", "-c", local, branch])?;
         return Ok(());
@@ -205,12 +217,21 @@ pub fn checkout(repo_path: &Path, branch: &str) -> Result<(), GitError> {
     result.map(|_| ())
 }
 
-pub fn checkout_remote(repo_path: &Path, remote_branch: &str, local_name: Option<&str>) -> Result<(), GitError> {
+pub fn checkout_remote(
+    repo_path: &Path,
+    remote_branch: &str,
+    local_name: Option<&str>,
+) -> Result<(), GitError> {
     validate_ref_name(remote_branch)?;
-    if let Some(local) = local_name { validate_ref_name(local)?; }
+    if let Some(local) = local_name {
+        validate_ref_name(local)?;
+    }
     match local_name {
         Some(local) => {
-            run_git_mut(repo_path, &["switch", "-c", local, "--track", remote_branch])?;
+            run_git_mut(
+                repo_path,
+                &["switch", "-c", local, "--track", remote_branch],
+            )?;
         }
         None => {
             run_git_mut(repo_path, &["checkout", "--detach", remote_branch])?;
@@ -289,7 +310,10 @@ pub fn reset(repo_path: &Path, oid: &str, mode: &str) -> Result<(), GitError> {
 
 pub fn squash(repo_path: &Path, oids: &[String], message: &str) -> Result<(), GitError> {
     if oids.len() < 2 {
-        return Err(GitError::CommandFailed { message: "Need at least 2 commits to squash".into(), hint: None });
+        return Err(GitError::CommandFailed {
+            message: "Need at least 2 commits to squash".into(),
+            hint: None,
+        });
     }
     let oldest = oids.last().unwrap();
     // resolve parent of the oldest commit
@@ -324,20 +348,27 @@ pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<S
 
     let msg_path = tmp.join(format!("gs_msg_{}.txt", pid));
     std::fs::write(&msg_path, new_message).map_err(|e| GitError::CommandFailed {
-        message: format!("write temp file: {}", e), hint: None,
+        message: format!("write temp file: {}", e),
+        hint: None,
     })?;
 
     // Sequence editor: change first "pick" line to "reword"
     let seq_path = tmp.join(format!("gs_seq_{}.sh", pid));
-    std::fs::write(&seq_path, b"#!/bin/sh\nsed -i '1s/^pick/reword/' \"$1\"\n")
-        .map_err(|e| GitError::CommandFailed { message: format!("write seq script: {}", e), hint: None })?;
+    std::fs::write(&seq_path, b"#!/bin/sh\nsed -i '1s/^pick/reword/' \"$1\"\n").map_err(|e| {
+        GitError::CommandFailed {
+            message: format!("write seq script: {}", e),
+            hint: None,
+        }
+    })?;
     make_script_executable(&seq_path)?;
 
     // Editor: copy the pre-written message into the file git passes
     let ed_path = tmp.join(format!("gs_ed_{}.sh", pid));
     let ed_content = format!("#!/bin/sh\ncp '{}' \"$1\"\n", msg_path.display());
-    std::fs::write(&ed_path, ed_content.as_bytes())
-        .map_err(|e| GitError::CommandFailed { message: format!("write editor script: {}", e), hint: None })?;
+    std::fs::write(&ed_path, ed_content.as_bytes()).map_err(|e| GitError::CommandFailed {
+        message: format!("write editor script: {}", e),
+        hint: None,
+    })?;
     make_script_executable(&ed_path)?;
 
     let out = Command::new("git")
@@ -346,7 +377,10 @@ pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<S
         .env("GIT_EDITOR", &ed_path)
         .args(["rebase", "-i", &format!("{}^", oid)])
         .output()
-        .map_err(|e| GitError::CommandFailed { message: format!("Failed to run git: {}", e), hint: None })?;
+        .map_err(|e| GitError::CommandFailed {
+            message: format!("Failed to run git: {}", e),
+            hint: None,
+        })?;
 
     let _ = std::fs::remove_file(&msg_path);
     let _ = std::fs::remove_file(&seq_path);
@@ -359,7 +393,10 @@ pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<S
 
     // Find the rewrapped commit: oldest commit reachable from HEAD but not from parent_oid.
     let range = format!("{}..HEAD", parent_oid);
-    let log_raw = run_git(repo_path, &["log", "--format=%H", "--ancestry-path", &range])?;
+    let log_raw = run_git(
+        repo_path,
+        &["log", "--format=%H", "--ancestry-path", &range],
+    )?;
     let new_oid = log_raw.lines().last().unwrap_or("").trim().to_string();
     Ok(new_oid)
 }
@@ -367,8 +404,12 @@ pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<S
 #[cfg(unix)]
 fn make_script_executable(path: &std::path::Path) -> Result<(), GitError> {
     use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
-        .map_err(|e| GitError::CommandFailed { message: format!("chmod: {}", e), hint: None })
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).map_err(|e| {
+        GitError::CommandFailed {
+            message: format!("chmod: {}", e),
+            hint: None,
+        }
+    })
 }
 
 #[cfg(not(unix))]
@@ -436,7 +477,11 @@ pub fn create_branch(
     checkout: bool,
 ) -> Result<(), GitError> {
     validate_ref_name(name)?;
-    if let Some(sp) = start_point { if !sp.is_empty() { validate_ref_name(sp)?; } }
+    if let Some(sp) = start_point {
+        if !sp.is_empty() {
+            validate_ref_name(sp)?;
+        }
+    }
     let mut args: Vec<&str> = if checkout {
         vec!["switch", "-c", name]
     } else {
@@ -518,7 +563,12 @@ pub fn push_args(remote: &str, force: bool) -> Vec<String> {
 
 pub fn push_branch_args(remote: &str, branch: &str, force: bool) -> Vec<String> {
     if force {
-        vec!["push".into(), "--force".into(), remote.into(), branch.into()]
+        vec![
+            "push".into(),
+            "--force".into(),
+            remote.into(),
+            branch.into(),
+        ]
     } else {
         vec!["push".into(), remote.into(), branch.into()]
     }
@@ -703,7 +753,11 @@ mod tag_tests {
         ));
         fs::create_dir_all(&dir).unwrap();
         let run = |args: &[&str]| {
-            Command::new("git").current_dir(&dir).args(args).output().unwrap();
+            Command::new("git")
+                .current_dir(&dir)
+                .args(args)
+                .output()
+                .unwrap();
         };
         run(&["init", "-q"]);
         run(&["config", "user.email", "t@t.t"]);
@@ -826,7 +880,10 @@ mod tag_tests {
     #[test]
     fn pull_args_rebase_toggle() {
         assert_eq!(pull_args("origin", false), vec!["pull", "origin"]);
-        assert_eq!(pull_args("origin", true), vec!["pull", "--rebase", "origin"]);
+        assert_eq!(
+            pull_args("origin", true),
+            vec!["pull", "--rebase", "origin"]
+        );
     }
 
     #[test]
@@ -837,7 +894,10 @@ mod tag_tests {
 
     #[test]
     fn push_branch_args_force_toggle() {
-        assert_eq!(push_branch_args("origin", "main", false), vec!["push", "origin", "main"]);
+        assert_eq!(
+            push_branch_args("origin", "main", false),
+            vec!["push", "origin", "main"]
+        );
         assert_eq!(
             push_branch_args("origin", "main", true),
             vec!["push", "--force", "origin", "main"]
@@ -951,7 +1011,11 @@ mod partial_line_tests {
         ));
         fs::create_dir_all(&dir).unwrap();
         let run = |args: &[&str]| {
-            ProcCommand::new("git").current_dir(&dir).args(args).output().unwrap();
+            ProcCommand::new("git")
+                .current_dir(&dir)
+                .args(args)
+                .output()
+                .unwrap();
         };
         run(&["init", "-q"]);
         run(&["config", "user.email", "t@t.t"]);

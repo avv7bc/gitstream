@@ -47,10 +47,14 @@ pub fn status(repo_path: &Path) -> Result<Vec<FileStatus>, GitError> {
     for line in output.lines() {
         if line.starts_with('1') || line.starts_with('2') {
             let parts: Vec<&str> = line.splitn(9, ' ').collect();
-            if parts.len() < 9 { continue; }
+            if parts.len() < 9 {
+                continue;
+            }
             let xy = parts[1];
             let bytes = xy.as_bytes();
-            if bytes.len() < 2 { continue; }
+            if bytes.len() < 2 {
+                continue;
+            }
             let x = bytes[0] as char;
             let y = bytes[1] as char;
             let path = if line.starts_with('2') {
@@ -71,10 +75,18 @@ pub fn status(repo_path: &Path) -> Result<Vec<FileStatus>, GitError> {
                 _ if xy.contains('U') || xy == "AA" || xy == "DD" => ("conflicted", "unstaged"),
                 _ => ("modified", "unstaged"),
             };
-            files.push(FileStatus { path, state: state.to_string(), staged: staged.to_string() });
+            files.push(FileStatus {
+                path,
+                state: state.to_string(),
+                staged: staged.to_string(),
+            });
         } else if line.starts_with('?') {
             let path = line[2..].to_string();
-            files.push(FileStatus { path, state: "untracked".to_string(), staged: "unstaged".to_string() });
+            files.push(FileStatus {
+                path,
+                state: "untracked".to_string(),
+                staged: "unstaged".to_string(),
+            });
         }
     }
     Ok(files)
@@ -84,20 +96,31 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
     // \x1e separates commit records; %B is the full message (may contain newlines)
     let format = "%x1e%H%x00%h%x00%an%x00%ae%x00%aI%x00%P%x00%D%x00%B";
     let limit_str = format!("-{}", limit);
-    let output = run_git(repo_path, &["log", &format!("--format={}", format), &limit_str])?;
+    let output = run_git(
+        repo_path,
+        &["log", &format!("--format={}", format), &limit_str],
+    )?;
     let mut commits = Vec::new();
     for record in output.split('\x1e') {
-        if record.is_empty() { continue; }
+        if record.is_empty() {
+            continue;
+        }
         let parts: Vec<&str> = record.splitn(8, '\0').collect();
-        if parts.len() < 8 { continue; }
+        if parts.len() < 8 {
+            continue;
+        }
         let refs = parse_ref_labels(parts[6]);
         let parents: Vec<String> = parts[5].split_whitespace().map(|s| s.to_string()).collect();
         let message = parts[7].trim_end_matches('\n').to_string();
         commits.push(CommitInfo {
-            oid: parts[0].to_string(), short_oid: parts[1].to_string(),
-            message, author: parts[2].to_string(),
-            author_email: parts[3].to_string(), date: parts[4].to_string(),
-            parents, refs,
+            oid: parts[0].to_string(),
+            short_oid: parts[1].to_string(),
+            message,
+            author: parts[2].to_string(),
+            author_email: parts[3].to_string(),
+            date: parts[4].to_string(),
+            parents,
+            refs,
             column: 0,
             lines: Vec::new(),
         });
@@ -107,39 +130,82 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
 }
 
 fn parse_ref_labels(raw: &str) -> Vec<RefLabel> {
-    if raw.trim().is_empty() { return Vec::new(); }
-    raw.split(", ").filter_map(|r| {
-        let r = r.trim();
-        if r.is_empty() { return None; }
-        if r == "HEAD" { return Some(RefLabel { name: "HEAD".to_string(), kind: "head".to_string() }); }
-        if let Some(rest) = r.strip_prefix("HEAD -> ") {
-            return Some(RefLabel { name: rest.to_string(), kind: "current-branch".to_string() });
-        }
-        if let Some(t) = r.strip_prefix("tag: ") {
-            Some(RefLabel { name: t.to_string(), kind: "tag".to_string() })
-        } else if r.contains('/') {
-            Some(RefLabel { name: r.to_string(), kind: "remote-branch".to_string() })
-        } else {
-            Some(RefLabel { name: r.to_string(), kind: "local-branch".to_string() })
-        }
-    }).collect()
+    if raw.trim().is_empty() {
+        return Vec::new();
+    }
+    raw.split(", ")
+        .filter_map(|r| {
+            let r = r.trim();
+            if r.is_empty() {
+                return None;
+            }
+            if r == "HEAD" {
+                return Some(RefLabel {
+                    name: "HEAD".to_string(),
+                    kind: "head".to_string(),
+                });
+            }
+            if let Some(rest) = r.strip_prefix("HEAD -> ") {
+                return Some(RefLabel {
+                    name: rest.to_string(),
+                    kind: "current-branch".to_string(),
+                });
+            }
+            if let Some(t) = r.strip_prefix("tag: ") {
+                Some(RefLabel {
+                    name: t.to_string(),
+                    kind: "tag".to_string(),
+                })
+            } else if r.contains('/') {
+                Some(RefLabel {
+                    name: r.to_string(),
+                    kind: "remote-branch".to_string(),
+                })
+            } else {
+                Some(RefLabel {
+                    name: r.to_string(),
+                    kind: "local-branch".to_string(),
+                })
+            }
+        })
+        .collect()
 }
 
 pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
     let format = "%(refname:short)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)";
-    let output = run_git(repo_path, &["branch", "-a", &format!("--format={}", format)])?;
+    let output = run_git(
+        repo_path,
+        &["branch", "-a", &format!("--format={}", format)],
+    )?;
     let mut result = Vec::new();
     for line in output.lines() {
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
         let parts: Vec<&str> = line.splitn(4, '\0').collect();
-        if parts.len() < 4 { continue; }
+        if parts.len() < 4 {
+            continue;
+        }
         let name = parts[0].to_string();
-        if name.contains("HEAD") && name.contains("->") { continue; }
+        if name.contains("HEAD") && name.contains("->") {
+            continue;
+        }
         let is_remote = name.starts_with("origin/") || name.contains('/');
-        let upstream = if parts[1].is_empty() { None } else { Some(parts[1].to_string()) };
+        let upstream = if parts[1].is_empty() {
+            None
+        } else {
+            Some(parts[1].to_string())
+        };
         let (ahead, behind) = parse_track(parts[2]);
         let is_current = parts[3].trim() == "*";
-        result.push(BranchInfo { name, is_remote, upstream, ahead, behind, is_current });
+        result.push(BranchInfo {
+            name,
+            is_remote,
+            upstream,
+            ahead,
+            behind,
+            is_current,
+        });
     }
     Ok(result)
 }
@@ -149,8 +215,11 @@ fn parse_track(track: &str) -> (u32, u32) {
     let mut behind = 0u32;
     for part in track.split(", ") {
         let part = part.trim();
-        if part.starts_with("ahead ") { ahead = part[6..].parse().unwrap_or(0); }
-        else if part.starts_with("behind ") { behind = part[7..].parse().unwrap_or(0); }
+        if part.starts_with("ahead ") {
+            ahead = part[6..].parse().unwrap_or(0);
+        } else if part.starts_with("behind ") {
+            behind = part[7..].parse().unwrap_or(0);
+        }
     }
     (ahead, behind)
 }
@@ -160,11 +229,16 @@ pub fn tags(repo_path: &Path) -> Result<Vec<TagInfo>, GitError> {
     let output = run_git(repo_path, &["tag", "-l", &format!("--format={}", format)])?;
     let mut result = Vec::new();
     for line in output.lines() {
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
         let parts: Vec<&str> = line.splitn(3, '\0').collect();
         let name = parts.first().unwrap_or(&"").to_string();
         let oid = parts.get(1).unwrap_or(&"").to_string();
-        let message = parts.get(2).map(|s| s.to_string()).filter(|s| !s.is_empty());
+        let message = parts
+            .get(2)
+            .map(|s| s.to_string())
+            .filter(|s| !s.is_empty());
         result.push(TagInfo { name, oid, message });
     }
     Ok(result)
@@ -177,20 +251,34 @@ pub fn stashes(repo_path: &Path) -> Result<Vec<StashEntry>, GitError> {
     };
     let mut result = Vec::new();
     for line in output.lines() {
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
         let parts: Vec<&str> = line.splitn(3, '\0').collect();
         let index_str = parts.first().unwrap_or(&"");
-        let index = index_str.strip_prefix("stash@{").and_then(|s| s.strip_suffix('}')).and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
+        let index = index_str
+            .strip_prefix("stash@{")
+            .and_then(|s| s.strip_suffix('}'))
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
         let message = parts.get(1).unwrap_or(&"").to_string();
         let date = parts.get(2).unwrap_or(&"").to_string();
-        result.push(StashEntry { index, message, date });
+        result.push(StashEntry {
+            index,
+            message,
+            date,
+        });
     }
     Ok(result)
 }
 
 pub fn remotes(repo_path: &Path) -> Result<Vec<String>, GitError> {
     let output = run_git(repo_path, &["remote"])?;
-    Ok(output.lines().filter(|l| !l.is_empty()).map(|l| l.to_string()).collect())
+    Ok(output
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|l| l.to_string())
+        .collect())
 }
 
 /// Состояние репозитория: незавершённая merge/rebase/cherry-pick/revert.
@@ -276,7 +364,12 @@ fn parse_diff_single(diff_text: &str, fallback_path: &str) -> FileDiff {
         }
         if line.starts_with("@@ ") {
             if !current_header.is_empty() {
-                push_hunk(&mut hunks, &current_header, &mut current_lines, &mut current_raw);
+                push_hunk(
+                    &mut hunks,
+                    &current_header,
+                    &mut current_lines,
+                    &mut current_raw,
+                );
             }
             seen_hunk = true;
             current_header = line.to_string();
@@ -285,8 +378,18 @@ fn parse_diff_single(diff_text: &str, fallback_path: &str) -> FileDiff {
             if let Some(nums) = line.strip_prefix("@@ ") {
                 let parts: Vec<&str> = nums.split(' ').collect();
                 if parts.len() >= 2 {
-                    old_line = parts[0].trim_start_matches('-').split(',').next().and_then(|s| s.parse().ok()).unwrap_or(1);
-                    new_line = parts[1].trim_start_matches('+').split(',').next().and_then(|s| s.parse().ok()).unwrap_or(1);
+                    old_line = parts[0]
+                        .trim_start_matches('-')
+                        .split(',')
+                        .next()
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(1);
+                    new_line = parts[1]
+                        .trim_start_matches('+')
+                        .split(',')
+                        .next()
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(1);
                 }
             }
         } else if !seen_hunk {
@@ -294,18 +397,33 @@ fn parse_diff_single(diff_text: &str, fallback_path: &str) -> FileDiff {
             patch_header.push('\n');
         } else if line.starts_with('+') && !line.starts_with("+++") {
             insertions += 1;
-            current_lines.push(DiffLine { kind: "added".to_string(), old_lineno: None, new_lineno: Some(new_line), content: line[1..].to_string() });
+            current_lines.push(DiffLine {
+                kind: "added".to_string(),
+                old_lineno: None,
+                new_lineno: Some(new_line),
+                content: line[1..].to_string(),
+            });
             new_line += 1;
             current_raw.push_str(line);
             current_raw.push('\n');
         } else if line.starts_with('-') && !line.starts_with("---") {
             deletions += 1;
-            current_lines.push(DiffLine { kind: "removed".to_string(), old_lineno: Some(old_line), new_lineno: None, content: line[1..].to_string() });
+            current_lines.push(DiffLine {
+                kind: "removed".to_string(),
+                old_lineno: Some(old_line),
+                new_lineno: None,
+                content: line[1..].to_string(),
+            });
             old_line += 1;
             current_raw.push_str(line);
             current_raw.push('\n');
         } else if line.starts_with(' ') {
-            current_lines.push(DiffLine { kind: "context".to_string(), old_lineno: Some(old_line), new_lineno: Some(new_line), content: line[1..].to_string() });
+            current_lines.push(DiffLine {
+                kind: "context".to_string(),
+                old_lineno: Some(old_line),
+                new_lineno: Some(new_line),
+                content: line[1..].to_string(),
+            });
             old_line += 1;
             new_line += 1;
             current_raw.push_str(line);
@@ -317,9 +435,20 @@ fn parse_diff_single(diff_text: &str, fallback_path: &str) -> FileDiff {
         }
     }
     if !current_header.is_empty() {
-        push_hunk(&mut hunks, &current_header, &mut current_lines, &mut current_raw);
+        push_hunk(
+            &mut hunks,
+            &current_header,
+            &mut current_lines,
+            &mut current_raw,
+        );
     }
-    FileDiff { path, hunks, insertions, deletions, header: patch_header }
+    FileDiff {
+        path,
+        hunks,
+        insertions,
+        deletions,
+        header: patch_header,
+    }
 }
 
 fn parse_diff_multi(diff_text: &str) -> Vec<FileDiff> {
@@ -371,13 +500,17 @@ pub fn repo_stats(repo_path: &Path, since_days: Option<u32>) -> Result<RepoStats
     for line in output.lines() {
         if let Some(rest) = line.strip_prefix("COMMIT\x01") {
             let parts: Vec<&str> = rest.splitn(3, '\x01').collect();
-            if parts.len() < 3 { continue; }
+            if parts.len() < 3 {
+                continue;
+            }
             let email = parts[0];
             let name = parts[1];
             let date_str = parts[2]; // "YYYY-MM-DD HH W"
 
             let dparts: Vec<&str> = date_str.split(' ').collect();
-            if dparts.len() < 3 { continue; }
+            if dparts.len() < 3 {
+                continue;
+            }
             let ymd = dparts[0];
             let hour: usize = dparts[1].parse::<usize>().unwrap_or(0).min(23);
             let wday: usize = dparts[2].parse::<usize>().unwrap_or(0);
@@ -393,22 +526,31 @@ pub fn repo_stats(repo_path: &Path, since_days: Option<u32>) -> Result<RepoStats
             *day_counts.entry(ymd.to_string()).or_default() += 1;
 
             cur_email = email.to_string();
-            let entry = author_map.entry(email.to_string()).or_insert_with(|| AuthorStat {
-                name: name.to_string(),
-                email: email.to_string(),
-                commits: 0,
-                insertions: 0,
-                deletions: 0,
-                active_days: 0,
-                first_date: ymd.to_string(),
-                last_date: ymd.to_string(),
-            });
+            let entry = author_map
+                .entry(email.to_string())
+                .or_insert_with(|| AuthorStat {
+                    name: name.to_string(),
+                    email: email.to_string(),
+                    commits: 0,
+                    insertions: 0,
+                    deletions: 0,
+                    active_days: 0,
+                    first_date: ymd.to_string(),
+                    last_date: ymd.to_string(),
+                });
             entry.commits += 1;
             entry.name = name.to_string();
-            if ymd < entry.first_date.as_str() { entry.first_date = ymd.to_string(); }
-            if ymd > entry.last_date.as_str() { entry.last_date = ymd.to_string(); }
+            if ymd < entry.first_date.as_str() {
+                entry.first_date = ymd.to_string();
+            }
+            if ymd > entry.last_date.as_str() {
+                entry.last_date = ymd.to_string();
+            }
 
-            author_days.entry(email.to_string()).or_default().insert(ymd.to_string());
+            author_days
+                .entry(email.to_string())
+                .or_default()
+                .insert(ymd.to_string());
         } else {
             // numstat line: "<ins>\t<del>\t<file>", binary shows "-\t-\t..."
             let parts: Vec<&str> = line.splitn(3, '\t').collect();
@@ -432,12 +574,14 @@ pub fn repo_stats(repo_path: &Path, since_days: Option<u32>) -> Result<RepoStats
     let mut authors: Vec<AuthorStat> = author_map.into_values().collect();
     authors.sort_by(|a, b| b.commits.cmp(&a.commits));
 
-    let mut months: Vec<MonthEntry> = by_month.into_iter()
+    let mut months: Vec<MonthEntry> = by_month
+        .into_iter()
         .map(|(month, commits)| MonthEntry { month, commits })
         .collect();
     months.sort_by(|a, b| a.month.cmp(&b.month));
 
-    let mut by_day: Vec<DayEntry> = day_counts.into_iter()
+    let mut by_day: Vec<DayEntry> = day_counts
+        .into_iter()
         .map(|(date, count)| DayEntry { date, count })
         .collect();
     by_day.sort_by(|a, b| a.date.cmp(&b.date));
@@ -445,8 +589,18 @@ pub fn repo_stats(repo_path: &Path, since_days: Option<u32>) -> Result<RepoStats
     let total_commits: u32 = authors.iter().map(|a| a.commits).sum();
     let total_insertions: u32 = authors.iter().map(|a| a.insertions).sum();
     let total_deletions: u32 = authors.iter().map(|a| a.deletions).sum();
-    let first_commit_date = authors.iter().map(|a| a.first_date.as_str()).min().unwrap_or("").to_string();
-    let last_commit_date = authors.iter().map(|a| a.last_date.as_str()).max().unwrap_or("").to_string();
+    let first_commit_date = authors
+        .iter()
+        .map(|a| a.first_date.as_str())
+        .min()
+        .unwrap_or("")
+        .to_string();
+    let last_commit_date = authors
+        .iter()
+        .map(|a| a.last_date.as_str())
+        .max()
+        .unwrap_or("")
+        .to_string();
     let total_authors = authors.len() as u32;
 
     Ok(RepoStats {
@@ -494,9 +648,18 @@ mod ref_label_tests {
 
     #[test]
     fn tag_remote_local_kinds() {
-        assert_eq!(kinds("tag: v1.0"), vec![("v1.0".to_string(), "tag".to_string())]);
-        assert_eq!(kinds("origin/main"), vec![("origin/main".to_string(), "remote-branch".to_string())]);
-        assert_eq!(kinds("dev"), vec![("dev".to_string(), "local-branch".to_string())]);
+        assert_eq!(
+            kinds("tag: v1.0"),
+            vec![("v1.0".to_string(), "tag".to_string())]
+        );
+        assert_eq!(
+            kinds("origin/main"),
+            vec![("origin/main".to_string(), "remote-branch".to_string())]
+        );
+        assert_eq!(
+            kinds("dev"),
+            vec![("dev".to_string(), "local-branch".to_string())]
+        );
     }
 
     #[test]
@@ -518,7 +681,12 @@ mod diff_untracked_tests {
     use std::fs;
 
     fn git(dir: &Path, args: &[&str]) {
-        Command::new("git").arg("-C").arg(dir).args(args).output().unwrap();
+        Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args(args)
+            .output()
+            .unwrap();
     }
 
     #[test]

@@ -14,7 +14,10 @@ pub fn assign_lanes(commits: &mut [CommitInfo]) {
         let mut lines: Vec<GraphLine> = Vec::new();
 
         // 1. колонка узла
-        let col = match lanes.iter().position(|l| l.as_deref() == Some(oid.as_str())) {
+        let col = match lanes
+            .iter()
+            .position(|l| l.as_deref() == Some(oid.as_str()))
+        {
             Some(c) => c,
             None => match lanes.iter().position(|l| l.is_none()) {
                 Some(c) => c,
