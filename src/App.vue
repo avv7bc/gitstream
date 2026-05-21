@@ -23,6 +23,8 @@ import SquashDialog from "./components/dialogs/SquashDialog.vue";
 import RewordDialog from "./components/dialogs/RewordDialog.vue";
 import FileCompareDialog from "./components/dialogs/FileCompareDialog.vue";
 import AddTagDialog from "./components/dialogs/AddTagDialog.vue";
+import UpdateBanner from "./components/UpdateBanner.vue";
+import { useUpdate } from "@/composables/useUpdate";
 import type { CommitInfo } from "@/types";
 import { useFileCompare } from "@/composables/useFileCompare";
 import { useRepo } from "@/composables/useRepo";
@@ -41,6 +43,7 @@ const { clearDiff } = useDiff();
 const { pull, push } = useRemote();
 const { target: compareTarget } = useFileCompare();
 const { refresh: refreshConflicts } = useConflicts();
+const { updateInfo, checkForUpdate } = useUpdate();
 
 async function refreshAll() {
   await Promise.all([
@@ -248,6 +251,7 @@ onMounted(() => {
   window.addEventListener("contextmenu", onContextMenu);
   restoreLastRepo();
   pollTimer = setTimeout(pollTick, 1000);
+  checkForUpdate();
 });
 onUnmounted(() => {
   window.removeEventListener("keydown", onKeydown);
@@ -475,6 +479,11 @@ function onMouseUp() {
       confirm-label="OK"
       @close="showErrorDialog = false"
       @confirm="showErrorDialog = false"
+    />
+    <UpdateBanner
+      v-if="updateInfo"
+      :info="updateInfo"
+      @dismiss="updateInfo = null"
     />
   </div>
 </template>
