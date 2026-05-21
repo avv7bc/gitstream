@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from "vue";
+import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import { useLog } from "@/composables/useLog";
 import { useBranches } from "@/composables/useBranches";
 import RefIcon from "@/components/RefIcon.vue";
@@ -314,6 +314,12 @@ onUnmounted(() => window.removeEventListener("keydown", onGlobalKeyDown));
 
 const graphBodyRef = ref<HTMLElement | null>(null);
 defineExpose({ focus: () => graphBodyRef.value?.focus() });
+
+watch(selectedCommit, (oid) => {
+  if (!oid || oid === "__worktree__") return;
+  const el = graphBodyRef.value?.querySelector<HTMLElement>(".graph-row.selected");
+  el?.scrollIntoView({ block: "nearest" });
+}, { flush: "post" });
 
 const firstRemoteIdx = computed(() => {
   return filteredCommits.value.findIndex((c) =>

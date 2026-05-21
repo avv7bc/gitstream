@@ -36,6 +36,10 @@ export function useLog() {
     ) {
       selectedCommit.value = null;
     }
+    // При первом открытии / смене репозитория выбираем HEAD (первую строку).
+    if (!selectedCommit.value && data.length > 0) {
+      selectedCommit.value = data[0].oid;
+    }
   }
 
   async function resetTo(oid: string, mode: "soft" | "mixed" | "hard") {
