@@ -51,7 +51,7 @@ const panelRef = ref<HTMLDivElement | null>(null);
   flex: 1;
   overflow: auto;
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-diff);
 }
 
 .diff-hunk {

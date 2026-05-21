@@ -393,7 +393,7 @@ function scrollToHunk() {
   overflow-y: auto;
   overflow-x: auto;
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-diff);
 }
 
 .side-label {

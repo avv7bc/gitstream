@@ -64,7 +64,7 @@ function getLineClass(line?: DiffLineWithWordDiff): string {
   white-space: pre;
   min-height: 20px;
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-diff);
   line-height: 1.5;
 }
 
