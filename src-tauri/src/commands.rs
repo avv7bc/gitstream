@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
-use tauri::Manager;
+use tauri::Emitter;
 
 use crate::git::{query, mutation, types::*};
 
