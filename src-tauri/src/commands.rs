@@ -502,6 +502,10 @@ pub async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo
         Err(_) => return Ok(None),
     };
 
+    if !resp.status().is_success() {
+        return Ok(None);
+    }
+
     let json: serde_json::Value = match resp.json().await {
         Ok(j) => j,
         Err(_) => return Ok(None),
@@ -528,6 +532,9 @@ pub async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo
 
 #[tauri::command]
 pub fn open_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err(format!("Invalid URL scheme: {}", url));
+    }
     open_in_browser(&url).map_err(|e| e.to_string())
 }
 
