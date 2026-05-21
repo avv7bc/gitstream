@@ -593,8 +593,15 @@ const activeCategoryLabel = computed(
   outline: none;
   font-family: var(--font-sans);
   text-align: center;
+  appearance: textfield;
+  -webkit-appearance: textfield;
+  -moz-appearance: textfield;
 }
 .vs-number:focus {
   border-color: var(--accent);
+}
+.vs-number::-webkit-inner-spin-button,
+.vs-number::-webkit-outer-spin-button {
+  display: none;
 }
 </style>
