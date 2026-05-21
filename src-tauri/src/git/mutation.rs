@@ -304,7 +304,6 @@ pub fn squash(repo_path: &Path, oids: &[String], message: &str) -> Result<(), Gi
 /// Returns the new commit oid (amend/rebase creates a new hash).
 pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<String, GitError> {
     use super::query::run_git;
-    use std::os::unix::fs::PermissionsExt;
 
     let head_raw = run_git(repo_path, &["rev-parse", "HEAD"])?;
     let head = head_raw.trim();
@@ -332,16 +331,14 @@ pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<S
     let seq_path = tmp.join(format!("gs_seq_{}.sh", pid));
     std::fs::write(&seq_path, b"#!/bin/sh\nsed -i '1s/^pick/reword/' \"$1\"\n")
         .map_err(|e| GitError::CommandFailed { message: format!("write seq script: {}", e), hint: None })?;
-    std::fs::set_permissions(&seq_path, std::fs::Permissions::from_mode(0o755))
-        .map_err(|e| GitError::CommandFailed { message: format!("chmod seq: {}", e), hint: None })?;
+    make_script_executable(&seq_path)?;
 
     // Editor: copy the pre-written message into the file git passes
     let ed_path = tmp.join(format!("gs_ed_{}.sh", pid));
     let ed_content = format!("#!/bin/sh\ncp '{}' \"$1\"\n", msg_path.display());
     std::fs::write(&ed_path, ed_content.as_bytes())
         .map_err(|e| GitError::CommandFailed { message: format!("write editor script: {}", e), hint: None })?;
-    std::fs::set_permissions(&ed_path, std::fs::Permissions::from_mode(0o755))
-        .map_err(|e| GitError::CommandFailed { message: format!("chmod editor: {}", e), hint: None })?;
+    make_script_executable(&ed_path)?;
 
     let out = Command::new("git")
         .current_dir(repo_path)
@@ -365,6 +362,18 @@ pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<S
     let log_raw = run_git(repo_path, &["log", "--format=%H", "--ancestry-path", &range])?;
     let new_oid = log_raw.lines().last().unwrap_or("").trim().to_string();
     Ok(new_oid)
+}
+
+#[cfg(unix)]
+fn make_script_executable(path: &std::path::Path) -> Result<(), GitError> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
+        .map_err(|e| GitError::CommandFailed { message: format!("chmod: {}", e), hint: None })
+}
+
+#[cfg(not(unix))]
+fn make_script_executable(_path: &std::path::Path) -> Result<(), GitError> {
+    Ok(()) // Windows doesn't use executable bits; Git for Windows runs .sh via its bundled shell
 }
 
 pub fn revert(repo_path: &Path, oid: &str, no_commit: bool) -> Result<(), GitError> {
