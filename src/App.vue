@@ -82,6 +82,7 @@ const showAddTagDialog = ref(false);
 const addTagTarget = ref<{ oid: string; subject: string } | null>(null);
 const squashPayload = ref<{ oids: string[]; commits: CommitInfo[] } | null>(null);
 const rewordPayload = ref<{ oid: string; message: string; isHead: boolean } | null>(null);
+const graphRef = ref<InstanceType<typeof CommitGraph> | null>(null);
 
 function onSquash(payload: { oids: string[] }) {
   const squashCommitsList = payload.oids
@@ -99,10 +100,13 @@ async function doReword(message: string) {
   const { oid } = rewordPayload.value;
   rewordPayload.value = null;
   try {
-    await rewordCommit(oid, message);
+    const newOid = await rewordCommit(oid, message);
     await refreshAll();
+    if (newOid) selectedCommit.value = newOid;
   } catch (e) {
     showError(String(e));
+  } finally {
+    graphRef.value?.focus();
   }
 }
 
@@ -384,6 +388,7 @@ function onMouseUp() {
         >
           <div class="graph-pane">
             <CommitGraph
+              ref="graphRef"
               @commit="showCommitDialog = true"
               @discard="showDiscardDialog = true"
               @create-tag="openAddTag($event)"

@@ -58,9 +58,9 @@ export function useLog() {
     await invoke("do_squash", { repoPath: repoPath.value, oids, message });
   }
 
-  async function rewordCommit(oid: string, message: string) {
-    if (!repoPath.value) return;
-    await invoke("do_reword_commit", { repoPath: repoPath.value, oid, message });
+  async function rewordCommit(oid: string, message: string): Promise<string> {
+    if (!repoPath.value) return "";
+    return invoke<string>("do_reword_commit", { repoPath: repoPath.value, oid, message });
   }
 
   function clear() {

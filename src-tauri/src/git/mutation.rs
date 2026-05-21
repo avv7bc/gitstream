@@ -301,7 +301,8 @@ pub fn squash(repo_path: &Path, oids: &[String], message: &str) -> Result<(), Gi
     Ok(())
 }
 
-pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<(), GitError> {
+/// Returns the new commit oid (amend/rebase creates a new hash).
+pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<String, GitError> {
     use super::query::run_git;
     use std::os::unix::fs::PermissionsExt;
 
@@ -311,8 +312,13 @@ pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<(
 
     if is_head {
         run_git_mut(repo_path, &["commit", "--amend", "-m", new_message])?;
-        return Ok(());
+        let new_oid = run_git(repo_path, &["rev-parse", "HEAD"])?;
+        return Ok(new_oid.trim().to_string());
     }
+
+    // Resolve the parent oid (unchanged after rebase) so we can find the new commit later.
+    let parent_raw = run_git(repo_path, &["rev-parse", &format!("{}^", oid)])?;
+    let parent_oid = parent_raw.trim().to_string();
 
     let tmp = std::env::temp_dir();
     let pid = std::process::id();
@@ -337,12 +343,11 @@ pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<(
     std::fs::set_permissions(&ed_path, std::fs::Permissions::from_mode(0o755))
         .map_err(|e| GitError::CommandFailed { message: format!("chmod editor: {}", e), hint: None })?;
 
-    let parent_arg = format!("{}^", oid);
     let out = Command::new("git")
         .current_dir(repo_path)
         .env("GIT_SEQUENCE_EDITOR", &seq_path)
         .env("GIT_EDITOR", &ed_path)
-        .args(["rebase", "-i", &parent_arg])
+        .args(["rebase", "-i", &format!("{}^", oid)])
         .output()
         .map_err(|e| GitError::CommandFailed { message: format!("Failed to run git: {}", e), hint: None })?;
 
@@ -354,7 +359,12 @@ pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<(
         let stderr = String::from_utf8_lossy(&out.stderr).to_string();
         return Err(classify_git_error(&stderr));
     }
-    Ok(())
+
+    // Find the rewrapped commit: oldest commit reachable from HEAD but not from parent_oid.
+    let range = format!("{}..HEAD", parent_oid);
+    let log_raw = run_git(repo_path, &["log", "--format=%H", "--ancestry-path", &range])?;
+    let new_oid = log_raw.lines().last().unwrap_or("").trim().to_string();
+    Ok(new_oid)
 }
 
 pub fn revert(repo_path: &Path, oid: &str, no_commit: bool) -> Result<(), GitError> {

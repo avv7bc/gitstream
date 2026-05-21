@@ -312,6 +312,9 @@ function onGlobalKeyDown(e: KeyboardEvent): void {
 onMounted(() => window.addEventListener("keydown", onGlobalKeyDown));
 onUnmounted(() => window.removeEventListener("keydown", onGlobalKeyDown));
 
+const graphBodyRef = ref<HTMLElement | null>(null);
+defineExpose({ focus: () => graphBodyRef.value?.focus() });
+
 const firstRemoteIdx = computed(() => {
   return filteredCommits.value.findIndex((c) =>
     c.refs.some((r) => r.kind === "remote-branch")
@@ -374,7 +377,7 @@ function formatDate(iso: string): string {
     </div>
 
 
-    <div class="graph-body" tabindex="0" role="listbox" @keydown="handleKeyDown">
+    <div ref="graphBodyRef" class="graph-body" tabindex="0" role="listbox" @keydown="handleKeyDown">
       <!-- Working Tree / Index row -->
       <div
         class="graph-row wt-row"

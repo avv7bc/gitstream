@@ -442,7 +442,7 @@ pub async fn get_repo_stats(repo_path: String, since_days: Option<u32>) -> Resul
 }
 
 #[tauri::command]
-pub async fn do_reword_commit(repo_path: String, oid: String, message: String) -> Result<(), String> {
+pub async fn do_reword_commit(repo_path: String, oid: String, message: String) -> Result<String, String> {
     let path = std::path::PathBuf::from(repo_path);
     tokio::task::spawn_blocking(move || {
         mutation::reword_commit(&path, &oid, &message).map_err(|e| e.to_string())
