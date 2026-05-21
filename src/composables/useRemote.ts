@@ -23,6 +23,7 @@ export function useRemote() {
   }
 
   async function fetchRemote(remote: string) {
+    if (!repoPath.value) return;
     await wrapAsync(() =>
       invoke("do_fetch", {
         repoPath: repoPath.value!,
@@ -33,6 +34,7 @@ export function useRemote() {
   }
 
   async function pull(remote: string, rebase: boolean) {
+    if (!repoPath.value) return;
     await wrapAsync(() =>
       invoke("do_pull", {
         repoPath: repoPath.value!,
@@ -44,6 +46,7 @@ export function useRemote() {
   }
 
   async function push(remote: string, force: boolean) {
+    if (!repoPath.value) return;
     await wrapAsync(() =>
       invoke("do_push", {
         repoPath: repoPath.value!,

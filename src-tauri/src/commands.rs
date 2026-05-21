@@ -2,10 +2,17 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
+use tauri::Manager;
 
 use crate::git::{query, mutation, types::*};
+
+#[derive(serde::Serialize, Clone)]
+struct NetworkProgressEvent {
+    op: String,
+    line: String,
+}
 
 pub(crate) const DEFAULT_NETWORK_TIMEOUT_SECS: u64 = 10;
 pub(crate) const MAX_NETWORK_TIMEOUT_SECS: u64 = 600;
@@ -19,9 +26,10 @@ pub(crate) fn effective_timeout_secs(timeout_secs: Option<u64>) -> u64 {
         .unwrap_or(DEFAULT_NETWORK_TIMEOUT_SECS)
 }
 
-/// Запускает `git` для сетевой операции с таймаутом. По истечении таймаута
-/// процесс принудительно убивается. `repo_path = None` для `clone`.
+/// Запускает `git` для сетевой операции с таймаутом. Стримит stderr как
+/// события прогресса. `repo_path = None` для `clone`.
 async fn run_network_git(
+    app: &tauri::AppHandle,
     repo_path: Option<&Path>,
     args: &[String],
     timeout_secs: Option<u64>,
@@ -29,11 +37,17 @@ async fn run_network_git(
 ) -> Result<String, String> {
     let secs = effective_timeout_secs(timeout_secs);
 
+    // Вставляем --progress после subcommand чтобы git писал прогресс в pipe
+    let mut git_args = args.to_vec();
+    if !git_args.is_empty() {
+        git_args.insert(1, "--progress".into());
+    }
+
     let mut cmd = TokioCommand::new("git");
     if let Some(p) = repo_path {
         cmd.arg("-C").arg(p);
     }
-    cmd.args(args);
+    cmd.args(&git_args);
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
     cmd.kill_on_drop(true);
@@ -42,24 +56,48 @@ async fn run_network_git(
         format!("Failed to run git: {} (Is git installed and in PATH?)", e)
     })?;
 
+    // Стримим stderr построчно и эмитим события прогресса
+    let app_handle = app.clone();
+    let op = label.to_string();
+    let stderr_pipe = child.stderr.take();
+    let stderr_task: tokio::task::JoinHandle<String> = tokio::spawn(async move {
+        let mut collected = String::new();
+        if let Some(pipe) = stderr_pipe {
+            let mut reader = BufReader::new(pipe);
+            let mut line = String::new();
+            loop {
+                line.clear();
+                match reader.read_line(&mut line).await {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => {
+                        // git пишет прогресс с \r — обрезаем
+                        let trimmed = line.trim_end_matches(|c| c == '\r' || c == '\n').trim();
+                        if !trimmed.is_empty() {
+                            let _ = app_handle.emit("network_progress", NetworkProgressEvent {
+                                op: op.clone(),
+                                line: trimmed.to_string(),
+                            });
+                            collected.push_str(trimmed);
+                            collected.push('\n');
+                        }
+                    }
+                }
+            }
+        }
+        collected
+    });
+
     match tokio::time::timeout(Duration::from_secs(secs), child.wait()).await {
         Ok(Ok(status)) => {
-            // stdout/stderr are read after exit. Safe here: git suppresses
-            // progress output to non-TTY pipes, so network ops produce <1 KB.
-            // A pipe-buffer deadlock would need >64 KB before process exit,
-            // which does not occur for fetch/pull/push/clone with Stdio::piped().
+            let stderr_text = stderr_task.await.unwrap_or_default();
             let mut stdout = String::new();
-            let mut stderr = String::new();
             if let Some(mut o) = child.stdout.take() {
                 let _ = o.read_to_string(&mut stdout).await;
-            }
-            if let Some(mut e) = child.stderr.take() {
-                let _ = e.read_to_string(&mut stderr).await;
             }
             if status.success() {
                 Ok(stdout)
             } else {
-                Err(crate::git::error::classify_git_error(&stderr).to_string())
+                Err(crate::git::error::classify_git_error(&stderr_text).to_string())
             }
         }
         Ok(Err(e)) => Err(format!("git wait failed: {}", e)),
@@ -110,8 +148,13 @@ pub fn get_status(repo_path: String) -> Result<Vec<FileStatus>, String> {
 }
 
 #[tauri::command]
-pub fn get_log(repo_path: String, limit: Option<usize>) -> Result<Vec<CommitInfo>, String> {
-    query::log(Path::new(&repo_path), limit.unwrap_or(500)).map_err(|e| e.to_string())
+pub async fn get_log(repo_path: String, limit: Option<usize>) -> Result<Vec<CommitInfo>, String> {
+    let path = PathBuf::from(repo_path);
+    tokio::task::spawn_blocking(move || {
+        query::log(&path, limit.unwrap_or(500)).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -280,38 +323,42 @@ pub fn do_checkout_remote(repo_path: String, remote_branch: String, local_name: 
 
 #[tauri::command]
 pub async fn do_fetch(
+    app: tauri::AppHandle,
     repo_path: String,
     remote: String,
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let args = mutation::fetch_args(&remote);
-    run_network_git(Some(Path::new(&repo_path)), &args, timeout_secs, "fetch").await
+    run_network_git(&app, Some(Path::new(&repo_path)), &args, timeout_secs, "fetch").await
 }
 
 #[tauri::command]
 pub async fn do_pull(
+    app: tauri::AppHandle,
     repo_path: String,
     remote: String,
     rebase: bool,
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let args = mutation::pull_args(&remote, rebase);
-    run_network_git(Some(Path::new(&repo_path)), &args, timeout_secs, "pull").await
+    run_network_git(&app, Some(Path::new(&repo_path)), &args, timeout_secs, "pull").await
 }
 
 #[tauri::command]
 pub async fn do_push(
+    app: tauri::AppHandle,
     repo_path: String,
     remote: String,
     force: bool,
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let args = mutation::push_args(&remote, force);
-    run_network_git(Some(Path::new(&repo_path)), &args, timeout_secs, "push").await
+    run_network_git(&app, Some(Path::new(&repo_path)), &args, timeout_secs, "push").await
 }
 
 #[tauri::command]
 pub async fn do_push_branch(
+    app: tauri::AppHandle,
     repo_path: String,
     remote: String,
     branch: String,
@@ -319,11 +366,12 @@ pub async fn do_push_branch(
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let args = mutation::push_branch_args(&remote, &branch, force);
-    run_network_git(Some(Path::new(&repo_path)), &args, timeout_secs, "push").await
+    run_network_git(&app, Some(Path::new(&repo_path)), &args, timeout_secs, "push").await
 }
 
 #[tauri::command]
 pub async fn do_push_tag(
+    app: tauri::AppHandle,
     repo_path: String,
     remote: String,
     name: String,
@@ -331,17 +379,18 @@ pub async fn do_push_tag(
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let args = mutation::push_tag_args(&remote, &name, delete);
-    run_network_git(Some(Path::new(&repo_path)), &args, timeout_secs, "push").await
+    run_network_git(&app, Some(Path::new(&repo_path)), &args, timeout_secs, "push").await
 }
 
 #[tauri::command]
 pub async fn do_clone(
+    app: tauri::AppHandle,
     url: String,
     dest: String,
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let args = mutation::clone_args(&url, &dest);
-    run_network_git(None, &args, timeout_secs, "clone").await
+    run_network_git(&app, None, &args, timeout_secs, "clone").await
 }
 
 #[tauri::command]

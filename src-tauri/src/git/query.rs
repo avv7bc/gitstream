@@ -49,8 +49,10 @@ pub fn status(repo_path: &Path) -> Result<Vec<FileStatus>, GitError> {
             let parts: Vec<&str> = line.splitn(9, ' ').collect();
             if parts.len() < 9 { continue; }
             let xy = parts[1];
-            let x = xy.as_bytes()[0] as char;
-            let y = xy.as_bytes()[1] as char;
+            let bytes = xy.as_bytes();
+            if bytes.len() < 2 { continue; }
+            let x = bytes[0] as char;
+            let y = bytes[1] as char;
             let path = if line.starts_with('2') {
                 parts[8].split('\t').nth(1).unwrap_or(parts[8]).to_string()
             } else {

@@ -3,7 +3,14 @@ import { ref, computed, watch } from "vue";
 import { useDiff } from "@/composables/useDiff";
 import { useFiles } from "@/composables/useFiles";
 import { useSyncScroll } from "@/composables/useSyncScroll";
-import { useSideBySideDiff } from "@/composables/useSideBySideDiff";
+import { useSideBySideDiff, type DiffHunkWithWordDiff, type DiffLineWithWordDiff } from "@/composables/useSideBySideDiff";
+import { useVirtualList } from "@/composables/useVirtualList";
+
+const LINE_HEIGHT = 20;
+
+type FlatItem =
+  | { type: "hunk-header"; hunkIdx: number; hunk: DiffHunkWithWordDiff }
+  | { type: "line"; hunkIdx: number; lineIdx: number; line: DiffLineWithWordDiff };
 
 const { currentDiff, diffContext } = useDiff();
 const { selectedFile, stageHunk, unstageHunk, discardHunk, applyLines } = useFiles();
@@ -145,6 +152,19 @@ const enrichedHunks = computed(() => {
   return enrichAllHunks(currentDiff.value.hunks);
 });
 
+const flatItems = computed<FlatItem[]>(() => {
+  const result: FlatItem[] = [];
+  enrichedHunks.value.forEach((hunk, hunkIdx) => {
+    result.push({ type: "hunk-header", hunkIdx, hunk });
+    hunk.lines.forEach((line, lineIdx) => {
+      result.push({ type: "line", hunkIdx, lineIdx, line });
+    });
+  });
+  return result;
+});
+
+const { visibleItems, paddingTop, paddingBottom } = useVirtualList(flatItems, leftPanelRef);
+
 const currentHunkIndex = ref(0);
 
 const diffFileName = computed(() => currentDiff.value?.path ?? selectedFile.value ?? "");
@@ -166,12 +186,12 @@ function goToNextHunk() {
 }
 
 function scrollToHunk() {
-  setTimeout(() => {
-    const hunkElement = document.querySelector(`[data-hunk-idx="${currentHunkIndex.value}"]`);
-    if (hunkElement && leftPanelRef.value) {
-      hunkElement.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, 0);
+  const idx = flatItems.value.findIndex(
+    (item) => item.type === "hunk-header" && item.hunkIdx === currentHunkIndex.value,
+  );
+  if (idx !== -1 && leftPanelRef.value) {
+    leftPanelRef.value.scrollTop = idx * LINE_HEIGHT;
+  }
 }
 </script>
 
@@ -210,104 +230,89 @@ function scrollToHunk() {
     </div>
 
     <div class="diff-container">
+      <!-- LEFT: old version — placeholder for added lines -->
       <div ref="leftPanelRef" class="diff-side old">
         <div class="side-label">Old Version</div>
-        <div v-for="(hunk, hi) in enrichedHunks" :key="`${hunk.header}`" :data-hunk-idx="hi" class="hunk-section">
-          <div class="hunk-header">{{ hunk.header }}</div>
-          <div
-            v-for="(line, li) in hunk.lines"
-            :key="`${line.content}-${line.kind}-old`"
-            class="diff-line"
-            :class="[
-              line.kind,
-              {
-                hidden: line.kind === 'added',
-                'line-selected': selectedLines.has(`${hi}:${li}`),
-                selectable: isSelectable(line.kind),
-              },
-            ]"
-            @click="onLineClick(hi, li, line.kind, $event)"
-          >
-            <span class="line-no">{{ line.old_lineno ?? "" }}</span>
-            <span class="line-prefix">{{ line.kind === "removed" ? "-" : " " }}</span>
-            <span class="line-content">
-              <template v-if="line.wordDiffs">
-                <template v-for="span in line.wordDiffs" :key="`${span.text}-${span.kind}`">
-                  <span :class="['word-diff', span.kind]">{{ span.text }}</span>
-                </template>
-              </template>
-              <template v-else>
-                {{ line.content }}
-              </template>
-            </span>
+        <div :style="{ height: paddingTop + 'px' }" />
+        <template v-for="{ item, index } in visibleItems" :key="index">
+          <div v-if="item.type === 'hunk-header'" class="hunk-header">
+            {{ item.hunk.header }}
           </div>
-        </div>
+          <template v-else-if="item.type === 'line'">
+            <div v-if="item.line.kind === 'added'" class="diff-line placeholder-line" />
+            <div
+              v-else
+              class="diff-line"
+              :class="[
+                item.line.kind,
+                {
+                  'line-selected': selectedLines.has(`${item.hunkIdx}:${item.lineIdx}`),
+                  selectable: isSelectable(item.line.kind),
+                },
+              ]"
+              @click="onLineClick(item.hunkIdx, item.lineIdx, item.line.kind, $event)"
+            >
+              <span class="line-no">{{ item.line.old_lineno ?? "" }}</span>
+              <span class="line-prefix">{{ item.line.kind === "removed" ? "-" : " " }}</span>
+              <span class="line-content">
+                <template v-if="item.line.wordDiffs">
+                  <template v-for="span in item.line.wordDiffs" :key="`${span.text}-${span.kind}`">
+                    <span :class="['word-diff', span.kind]">{{ span.text }}</span>
+                  </template>
+                </template>
+                <template v-else>{{ item.line.content }}</template>
+              </span>
+            </div>
+          </template>
+        </template>
+        <div :style="{ height: paddingBottom + 'px' }" />
       </div>
 
       <div class="diff-divider" />
 
+      <!-- RIGHT: new version — placeholder for removed lines -->
       <div ref="rightPanelRef" class="diff-side new">
         <div class="side-label">New Version</div>
-        <div v-for="(hunk, hi) in enrichedHunks" :key="`${hunk.header}`" :data-hunk-idx="hi" class="hunk-section">
-          <div class="hunk-header hunk-header-actions">
-            <span class="hunk-header-text">{{ hunk.header }}</span>
+        <div :style="{ height: paddingTop + 'px' }" />
+        <template v-for="{ item, index } in visibleItems" :key="index">
+          <div v-if="item.type === 'hunk-header'" class="hunk-header hunk-header-actions">
+            <span class="hunk-header-text">{{ item.hunk.header }}</span>
             <span v-if="diffContext === 'unstaged'" class="hunk-btns">
-              <button
-                class="hunk-btn"
-                :disabled="busyHunk !== null"
-                @click="onStageBtn(hi)"
-                title="Добавить хунк в индекс"
-              >
-                Stage
-              </button>
-              <button
-                class="hunk-btn danger"
-                :disabled="busyHunk !== null"
-                @click="onDiscardBtn(hi)"
-                title="Отменить изменения хунка"
-              >
-                Discard
-              </button>
+              <button class="hunk-btn" :disabled="busyHunk !== null" @click="onStageBtn(item.hunkIdx)" title="Добавить хунк в индекс">Stage</button>
+              <button class="hunk-btn danger" :disabled="busyHunk !== null" @click="onDiscardBtn(item.hunkIdx)" title="Отменить изменения хунка">Discard</button>
             </span>
             <span v-else-if="diffContext === 'staged'" class="hunk-btns">
-              <button
-                class="hunk-btn"
-                :disabled="busyHunk !== null"
-                @click="onUnstageBtn(hi)"
-                title="Убрать хунк из индекса"
-              >
-                Unstage
-              </button>
+              <button class="hunk-btn" :disabled="busyHunk !== null" @click="onUnstageBtn(item.hunkIdx)" title="Убрать хунк из индекса">Unstage</button>
             </span>
           </div>
-          <div
-            v-for="(line, li) in hunk.lines"
-            :key="`${line.content}-${line.kind}-new`"
-            class="diff-line"
-            :class="[
-              line.kind,
-              {
-                hidden: line.kind === 'removed',
-                'line-selected': selectedLines.has(`${hi}:${li}`),
-                selectable: isSelectable(line.kind),
-              },
-            ]"
-            @click="onLineClick(hi, li, line.kind, $event)"
-          >
-            <span class="line-no">{{ line.new_lineno ?? "" }}</span>
-            <span class="line-prefix">{{ line.kind === "added" ? "+" : " " }}</span>
-            <span class="line-content">
-              <template v-if="line.wordDiffs">
-                <template v-for="span in line.wordDiffs" :key="`${span.text}-${span.kind}`">
-                  <span :class="['word-diff', span.kind]">{{ span.text }}</span>
+          <template v-else-if="item.type === 'line'">
+            <div v-if="item.line.kind === 'removed'" class="diff-line placeholder-line" />
+            <div
+              v-else
+              class="diff-line"
+              :class="[
+                item.line.kind,
+                {
+                  'line-selected': selectedLines.has(`${item.hunkIdx}:${item.lineIdx}`),
+                  selectable: isSelectable(item.line.kind),
+                },
+              ]"
+              @click="onLineClick(item.hunkIdx, item.lineIdx, item.line.kind, $event)"
+            >
+              <span class="line-no">{{ item.line.new_lineno ?? "" }}</span>
+              <span class="line-prefix">{{ item.line.kind === "added" ? "+" : " " }}</span>
+              <span class="line-content">
+                <template v-if="item.line.wordDiffs">
+                  <template v-for="span in item.line.wordDiffs" :key="`${span.text}-${span.kind}`">
+                    <span :class="['word-diff', span.kind]">{{ span.text }}</span>
+                  </template>
                 </template>
-              </template>
-              <template v-else>
-                {{ line.content }}
-              </template>
-            </span>
-          </div>
-        </div>
+                <template v-else>{{ item.line.content }}</template>
+              </span>
+            </div>
+          </template>
+        </template>
+        <div :style="{ height: paddingBottom + 'px' }" />
       </div>
     </div>
   </div>
@@ -482,8 +487,9 @@ function scrollToHunk() {
   background: var(--diff-removed-bg);
 }
 
-.diff-line.hidden {
-  display: none;
+.diff-line.placeholder-line {
+  min-height: 20px;
+  background: rgba(69, 71, 90, 0.15);
 }
 
 .line-no {

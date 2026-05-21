@@ -3,26 +3,26 @@ import { ref, onMounted, onBeforeUnmount } from "vue";
 export function useSyncScroll() {
   const leftPanelRef = ref<HTMLElement | null>(null);
   const rightPanelRef = ref<HTMLElement | null>(null);
-  const isSyncing = ref(false);
 
   function setupSync() {
     if (!leftPanelRef.value || !rightPanelRef.value) return;
 
     const leftPanel = leftPanelRef.value;
     const rightPanel = rightPanelRef.value;
+    let isSyncing = false;
 
     const handleLeftScroll = () => {
-      if (isSyncing.value) return;
-      isSyncing.value = true;
+      if (isSyncing) return;
+      isSyncing = true;
       rightPanel.scrollTop = leftPanel.scrollTop;
-      isSyncing.value = false;
+      requestAnimationFrame(() => { isSyncing = false; });
     };
 
     const handleRightScroll = () => {
-      if (isSyncing.value) return;
-      isSyncing.value = true;
+      if (isSyncing) return;
+      isSyncing = true;
       leftPanel.scrollTop = rightPanel.scrollTop;
-      isSyncing.value = false;
+      requestAnimationFrame(() => { isSyncing = false; });
     };
 
     leftPanel.addEventListener("scroll", handleLeftScroll);

@@ -14,11 +14,11 @@ const panelRef = ref<HTMLDivElement | null>(null);
 
 <template>
   <div ref="panelRef" class="diff-panel">
-    <div v-for="hunk in hunks" :key="`${hunk.header}`" class="diff-hunk">
+    <div v-for="(hunk, hunkIdx) in hunks" :key="hunkIdx" class="diff-hunk">
       <div class="hunk-header">{{ hunk.header }}</div>
       <div
-        v-for="line in hunk.lines"
-        :key="`${line.content}-${line.kind}`"
+        v-for="(line, lineIdx) in hunk.lines"
+        :key="`${hunkIdx}-${lineIdx}`"
         class="line-wrapper"
         :class="{
           'show-old': isOldVersion && (line.kind === 'removed' || line.kind === 'context'),

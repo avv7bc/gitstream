@@ -1,4 +1,5 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { computed, ref } from "vue";
 
 const THRESHOLD_MS = 100;
@@ -25,9 +26,19 @@ interface ActiveOp {
 const active = ref(new Map<number, ActiveOp>());
 let seq = 0;
 
+const networkProgressLine = ref("");
+let networkProgressTimer: ReturnType<typeof setTimeout> | null = null;
+
+listen<{ op: string; line: string }>("network_progress", (event) => {
+  networkProgressLine.value = event.payload.line;
+  if (networkProgressTimer) clearTimeout(networkProgressTimer);
+  networkProgressTimer = setTimeout(() => { networkProgressLine.value = ""; }, 3000);
+});
+
 export const isWorking = computed(() => active.value.size > 0);
 
 export const progressLabel = computed(() => {
+  if (networkProgressLine.value) return networkProgressLine.value;
   const size = active.value.size;
   if (size === 0) return "";
   if (size > 1) return `Операций: ${size}`;

@@ -22,6 +22,41 @@ fn run_git_mut(repo_path: &Path, args: &[&str]) -> Result<String, GitError> {
     super::query::run_git(repo_path, args)
 }
 
+fn validate_file_path(file: &str) -> Result<(), GitError> {
+    let path = std::path::Path::new(file);
+    if path.is_absolute() {
+        return Err(GitError::CommandFailed {
+            message: format!("Absolute path not allowed: '{}'", file),
+            hint: Some("Пути к файлам должны быть относительными".into()),
+        });
+    }
+    for component in path.components() {
+        if component == std::path::Component::ParentDir {
+            return Err(GitError::CommandFailed {
+                message: format!("Path traversal not allowed: '{}'", file),
+                hint: Some("Пути должны находиться внутри репозитория".into()),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_ref_name(name: &str) -> Result<(), GitError> {
+    if name.is_empty() {
+        return Err(GitError::CommandFailed {
+            message: "Ref name cannot be empty".into(),
+            hint: None,
+        });
+    }
+    if name.starts_with('-') {
+        return Err(GitError::CommandFailed {
+            message: format!("Invalid ref name: '{}'", name),
+            hint: Some("Имена веток и тегов не могут начинаться с '-'".into()),
+        });
+    }
+    Ok(())
+}
+
 /// Передаёт `patch` в stdin `git apply`. `reverse` — откат, `cached` — в индекс.
 fn apply_patch(repo_path: &Path, patch: &str, reverse: bool, cached: bool) -> Result<(), GitError> {
     let mut args: Vec<&str> = vec!["apply", "--recount", "--whitespace=nowarn"];
@@ -121,6 +156,7 @@ pub fn discard(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
 /// удаляем файл с диска напрямую (untracked-случай). Tracked-файлы при этом
 /// остаются правильно застейджены через git rm, а не просто удалены с диска.
 pub fn remove(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+    for f in files { validate_file_path(f)?; }
     let mut args = vec!["rm", "--"];
     let file_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
     args.extend(file_refs);
@@ -141,6 +177,7 @@ pub fn remove(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
 /// Удаляет файлы только с диска (git не трогаем — tracked станет
 /// "deleted, unstaged").
 pub fn delete(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+    for f in files { validate_file_path(f)?; }
     for f in files {
         std::fs::remove_file(repo_path.join(f))
             .map_err(|e| GitError::CommandFailed {
@@ -158,7 +195,8 @@ pub fn commit(repo_path: &Path, message: &str, amend: bool) -> Result<String, Gi
 }
 
 pub fn checkout(repo_path: &Path, branch: &str) -> Result<(), GitError> {
-    let result = run_git_mut(repo_path, &["switch", branch]);
+    validate_ref_name(branch)?;
+    let result = run_git_mut(repo_path, &["switch", "--", branch]);
     if result.is_ok() { return Ok(()); }
     if let Some(local) = branch.split('/').last() {
         run_git_mut(repo_path, &["switch", "-c", local, branch])?;
@@ -168,6 +206,8 @@ pub fn checkout(repo_path: &Path, branch: &str) -> Result<(), GitError> {
 }
 
 pub fn checkout_remote(repo_path: &Path, remote_branch: &str, local_name: Option<&str>) -> Result<(), GitError> {
+    validate_ref_name(remote_branch)?;
+    if let Some(local) = local_name { validate_ref_name(local)?; }
     match local_name {
         Some(local) => {
             run_git_mut(repo_path, &["switch", "-c", local, "--track", remote_branch])?;
@@ -180,11 +220,13 @@ pub fn checkout_remote(repo_path: &Path, remote_branch: &str, local_name: Option
 }
 
 pub fn merge(repo_path: &Path, branch: &str) -> Result<String, GitError> {
+    validate_ref_name(branch)?;
     run_git_mut(repo_path, &["merge", branch])
 }
 
 /// Перебазировать текущую ветку на `onto`. Конфликты разрешаются через ConflictBar.
 pub fn rebase(repo_path: &Path, onto: &str) -> Result<String, GitError> {
+    validate_ref_name(onto)?;
     run_git_mut(repo_path, &["-c", "core.editor=true", "rebase", onto])
 }
 
@@ -318,6 +360,8 @@ pub fn create_branch(
     start_point: Option<&str>,
     checkout: bool,
 ) -> Result<(), GitError> {
+    validate_ref_name(name)?;
+    if let Some(sp) = start_point { if !sp.is_empty() { validate_ref_name(sp)?; } }
     let mut args: Vec<&str> = if checkout {
         vec!["switch", "-c", name]
     } else {
@@ -333,11 +377,14 @@ pub fn create_branch(
 }
 
 pub fn rename_branch(repo_path: &Path, old_name: &str, new_name: &str) -> Result<(), GitError> {
+    validate_ref_name(old_name)?;
+    validate_ref_name(new_name)?;
     run_git_mut(repo_path, &["branch", "-m", old_name, new_name])?;
     Ok(())
 }
 
 pub fn delete_branch(repo_path: &Path, branch: &str, force: bool) -> Result<(), GitError> {
+    validate_ref_name(branch)?;
     let flag = if force { "-D" } else { "-d" };
     run_git_mut(repo_path, &["branch", flag, branch])?;
     Ok(())
@@ -350,6 +397,7 @@ pub fn create_tag(
     target: Option<&str>,
     force: bool,
 ) -> Result<(), GitError> {
+    validate_ref_name(name)?;
     let mut args: Vec<&str> = vec!["tag"];
     if force {
         args.push("-f");
@@ -368,6 +416,7 @@ pub fn create_tag(
 }
 
 pub fn delete_tag(repo_path: &Path, name: &str) -> Result<(), GitError> {
+    validate_ref_name(name)?;
     run_git_mut(repo_path, &["tag", "-d", name])?;
     Ok(())
 }

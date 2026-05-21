@@ -214,7 +214,7 @@ async function pollTick() {
     }
   }
   if (pollStopped) return;
-  pollTimer = setTimeout(pollTick, 2000);
+  pollTimer = setTimeout(pollTick, 1000);
 }
 
 function onContextMenu(e: MouseEvent) {
@@ -225,7 +225,7 @@ onMounted(() => {
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("contextmenu", onContextMenu);
   restoreLastRepo();
-  pollTimer = setTimeout(pollTick, 2000);
+  pollTimer = setTimeout(pollTick, 1000);
 });
 onUnmounted(() => {
   window.removeEventListener("keydown", onKeydown);
