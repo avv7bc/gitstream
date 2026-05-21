@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_NETWORK_TIMEOUT_SECS: u64 = 10;
-const DEFAULT_WORKBENCH_FONT_FAMILY: &str = "Ubuntu, -apple-system, BlinkMacSystemFont, sans-serif";
+const DEFAULT_WORKBENCH_FONT_FAMILY: &str = "Ubuntu";
 const DEFAULT_WORKBENCH_FONT_SIZE: u8 = 15;
-const DEFAULT_EDITOR_FONT_FAMILY: &str = "Ubuntu Mono, Courier New, monospace";
+const DEFAULT_EDITOR_FONT_FAMILY: &str = "Ubuntu Mono";
 const DEFAULT_EDITOR_FONT_SIZE: u8 = 13;
 
 fn default_network_timeout_secs() -> u64 {
@@ -155,12 +155,9 @@ mod tests {
     #[test]
     fn font_fields_default_correctly() {
         let s = AppSettings::default();
-        assert_eq!(
-            s.workbench_font_family,
-            "Ubuntu, -apple-system, BlinkMacSystemFont, sans-serif"
-        );
+        assert_eq!(s.workbench_font_family, "Ubuntu");
         assert_eq!(s.workbench_font_size, 15);
-        assert_eq!(s.editor_font_family, "Ubuntu Mono, Courier New, monospace");
+        assert_eq!(s.editor_font_family, "Ubuntu Mono");
         assert_eq!(s.editor_font_size, 13);
     }
 

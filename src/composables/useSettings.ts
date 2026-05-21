@@ -11,10 +11,15 @@ interface AppSettings {
 
 const TIMEOUT_OPTIONS = [5, 10, 30, 60];
 const DEFAULT_TIMEOUT = 10;
-const DEFAULT_WB_FONT_FAMILY = "Ubuntu, -apple-system, BlinkMacSystemFont, sans-serif";
+const DEFAULT_WB_FONT_FAMILY = "Ubuntu";
 const DEFAULT_WB_FONT_SIZE = 15;
-const DEFAULT_ED_FONT_FAMILY = "Ubuntu Mono, Courier New, monospace";
+const DEFAULT_ED_FONT_FAMILY = "Ubuntu Mono";
 const DEFAULT_ED_FONT_SIZE = 13;
+
+// Берём только первое имя из CSS font-family строки — для совпадения с именами в <select>
+function primaryFont(fontFamily: string): string {
+  return fontFamily.split(",")[0].trim().replace(/['"]/g, "") || fontFamily;
+}
 
 const networkTimeoutSecs = ref<number>(DEFAULT_TIMEOUT);
 const workbenchFontFamily = ref<string>(DEFAULT_WB_FONT_FAMILY);
@@ -40,12 +45,14 @@ function clampFontSize(v: number, min: number, max: number, def: number): number
 
 function applyCssFonts() {
   const root = document.documentElement.style;
-  root.setProperty("--font-sans", workbenchFontFamily.value || DEFAULT_WB_FONT_FAMILY);
+  const wb = workbenchFontFamily.value || DEFAULT_WB_FONT_FAMILY;
+  const ed = editorFontFamily.value || DEFAULT_ED_FONT_FAMILY;
+  root.setProperty("--font-sans", `${wb}, sans-serif`);
   const n = workbenchFontSize.value;
   root.setProperty("--font-size", `${n}px`);
   root.setProperty("--font-size-sm", `${Math.max(n - 2, 11)}px`);
   root.setProperty("--font-size-xs", `${Math.max(n - 3, 10)}px`);
-  root.setProperty("--font-mono", editorFontFamily.value || DEFAULT_ED_FONT_FAMILY);
+  root.setProperty("--font-mono", `${ed}, monospace`);
   root.setProperty("--font-size-diff", `${editorFontSize.value}px`);
 }
 
@@ -70,9 +77,9 @@ async function loadSettings() {
   try {
     const s = await invoke<AppSettings>("get_settings");
     networkTimeoutSecs.value = clampTimeout(s.network_timeout_secs);
-    workbenchFontFamily.value = s.workbench_font_family || DEFAULT_WB_FONT_FAMILY;
+    workbenchFontFamily.value = primaryFont(s.workbench_font_family || DEFAULT_WB_FONT_FAMILY);
     workbenchFontSize.value = clampFontSize(s.workbench_font_size, 11, 20, DEFAULT_WB_FONT_SIZE);
-    editorFontFamily.value = s.editor_font_family || DEFAULT_ED_FONT_FAMILY;
+    editorFontFamily.value = primaryFont(s.editor_font_family || DEFAULT_ED_FONT_FAMILY);
     editorFontSize.value = clampFontSize(s.editor_font_size, 10, 24, DEFAULT_ED_FONT_SIZE);
   } catch {
     // defaults already set
