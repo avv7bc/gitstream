@@ -4,17 +4,26 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_NETWORK_TIMEOUT_SECS: u64 = 10;
-const DEFAULT_WORKBENCH_FONT_FAMILY: &str =
-    "Ubuntu, -apple-system, BlinkMacSystemFont, sans-serif";
+const DEFAULT_WORKBENCH_FONT_FAMILY: &str = "Ubuntu, -apple-system, BlinkMacSystemFont, sans-serif";
 const DEFAULT_WORKBENCH_FONT_SIZE: u8 = 15;
 const DEFAULT_EDITOR_FONT_FAMILY: &str = "Ubuntu Mono, Courier New, monospace";
 const DEFAULT_EDITOR_FONT_SIZE: u8 = 13;
 
-fn default_network_timeout_secs() -> u64 { DEFAULT_NETWORK_TIMEOUT_SECS }
-fn default_workbench_font_family() -> String { DEFAULT_WORKBENCH_FONT_FAMILY.to_string() }
-fn default_workbench_font_size() -> u8 { DEFAULT_WORKBENCH_FONT_SIZE }
-fn default_editor_font_family() -> String { DEFAULT_EDITOR_FONT_FAMILY.to_string() }
-fn default_editor_font_size() -> u8 { DEFAULT_EDITOR_FONT_SIZE }
+fn default_network_timeout_secs() -> u64 {
+    DEFAULT_NETWORK_TIMEOUT_SECS
+}
+fn default_workbench_font_family() -> String {
+    DEFAULT_WORKBENCH_FONT_FAMILY.to_string()
+}
+fn default_workbench_font_size() -> u8 {
+    DEFAULT_WORKBENCH_FONT_SIZE
+}
+fn default_editor_font_family() -> String {
+    DEFAULT_EDITOR_FONT_FAMILY.to_string()
+}
+fn default_editor_font_size() -> u8 {
+    DEFAULT_EDITOR_FONT_SIZE
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct AppSettings {
@@ -146,7 +155,10 @@ mod tests {
     #[test]
     fn font_fields_default_correctly() {
         let s = AppSettings::default();
-        assert_eq!(s.workbench_font_family, "Ubuntu, -apple-system, BlinkMacSystemFont, sans-serif");
+        assert_eq!(
+            s.workbench_font_family,
+            "Ubuntu, -apple-system, BlinkMacSystemFont, sans-serif"
+        );
         assert_eq!(s.workbench_font_size, 15);
         assert_eq!(s.editor_font_family, "Ubuntu Mono, Courier New, monospace");
         assert_eq!(s.editor_font_size, 13);
