@@ -19,8 +19,7 @@ const message = ref("");
 const busy = ref(false);
 
 onMounted(() => {
-  // Pre-fill with all commit messages, newest first, separated by blank lines
-  message.value = props.commits.map(c => c.message.trim()).join("\n\n");
+  message.value = props.commits.map(c => c.message.trim()).join("\n");
 });
 
 const canConfirm = computed(() => !busy.value && message.value.trim().length > 0);
@@ -38,6 +37,12 @@ async function doSquash() {
 function onKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") emit("close");
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") doSquash();
+}
+
+function onTextareaKeydown(e: KeyboardEvent) {
+  if (e.key === "Escape") { emit("close"); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { doSquash(); return; }
+  e.stopPropagation();
 }
 </script>
 
@@ -68,7 +73,7 @@ function onKeydown(e: KeyboardEvent) {
           class="sq-textarea"
           placeholder="Enter commit message…"
           autofocus
-          @keydown.stop
+          @keydown="onTextareaKeydown"
         />
         <div class="sq-hint-small">Ctrl+Enter to confirm</div>
       </div>
