@@ -5,6 +5,7 @@ import { useFiles } from "@/composables/useFiles";
 import { useSyncScroll } from "@/composables/useSyncScroll";
 import { useSideBySideDiff, type DiffHunkWithWordDiff, type DiffLineWithWordDiff } from "@/composables/useSideBySideDiff";
 import { useVirtualList } from "@/composables/useVirtualList";
+import { useI18n } from "@/composables/useI18n";
 
 const LINE_HEIGHT = 20;
 
@@ -165,6 +166,8 @@ const flatItems = computed<FlatItem[]>(() => {
 
 const { visibleItems, paddingTop, paddingBottom } = useVirtualList(flatItems, leftPanelRef);
 
+const { i18n } = useI18n();
+
 const currentHunkIndex = ref(0);
 
 const diffFileName = computed(() => currentDiff.value?.path ?? selectedFile.value ?? "");
@@ -232,7 +235,7 @@ function scrollToHunk() {
     <div class="diff-container">
       <!-- LEFT: old version — placeholder for added lines -->
       <div ref="leftPanelRef" class="diff-side old">
-        <div class="side-label">Old Version</div>
+        <div class="side-label">{{ i18n.diff.oldVersion }}</div>
         <div :style="{ height: paddingTop + 'px' }" />
         <template v-for="{ item, index } in visibleItems" :key="index">
           <div v-if="item.type === 'hunk-header'" class="hunk-header">
@@ -272,17 +275,17 @@ function scrollToHunk() {
 
       <!-- RIGHT: new version — placeholder for removed lines -->
       <div ref="rightPanelRef" class="diff-side new">
-        <div class="side-label">New Version</div>
+        <div class="side-label">{{ i18n.diff.newVersion }}</div>
         <div :style="{ height: paddingTop + 'px' }" />
         <template v-for="{ item, index } in visibleItems" :key="index">
           <div v-if="item.type === 'hunk-header'" class="hunk-header hunk-header-actions">
             <span class="hunk-header-text">{{ item.hunk.header }}</span>
             <span v-if="diffContext === 'unstaged'" class="hunk-btns">
-              <button class="hunk-btn" :disabled="busyHunk !== null" @click="onStageBtn(item.hunkIdx)" title="Добавить хунк в индекс">Stage</button>
-              <button class="hunk-btn danger" :disabled="busyHunk !== null" @click="onDiscardBtn(item.hunkIdx)" title="Отменить изменения хунка">Discard</button>
+              <button class="hunk-btn" :disabled="busyHunk !== null" @click="onStageBtn(item.hunkIdx)" :title="i18n.diff.stageHunkTitle">{{ i18n.diff.stageHunk }}</button>
+              <button class="hunk-btn danger" :disabled="busyHunk !== null" @click="onDiscardBtn(item.hunkIdx)" :title="i18n.diff.discardHunkTitle">{{ i18n.diff.discardHunk }}</button>
             </span>
             <span v-else-if="diffContext === 'staged'" class="hunk-btns">
-              <button class="hunk-btn" :disabled="busyHunk !== null" @click="onUnstageBtn(item.hunkIdx)" title="Убрать хунк из индекса">Unstage</button>
+              <button class="hunk-btn" :disabled="busyHunk !== null" @click="onUnstageBtn(item.hunkIdx)" :title="i18n.diff.unstageHunkTitle">{{ i18n.diff.unstageHunk }}</button>
             </span>
           </div>
           <template v-else-if="item.type === 'line'">

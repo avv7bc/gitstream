@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 
 const props = defineProps<{
   defaultStart: string | null;
@@ -16,6 +17,7 @@ const startPoint = ref(props.defaultStart ?? "");
 const checkout = ref(true);
 const inputRef = ref<HTMLInputElement | null>(null);
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 const INVALID = /[\s~^:?*[\\]/;
 const canCreate = computed(() => {
@@ -41,7 +43,7 @@ onMounted(() => {
   <div class="modal-overlay" @click.self="$emit('close')" @keydown.escape="$emit('close')" tabindex="-1">
     <div class="modal-dialog create-branch-dialog" :style="dragStyle">
       <div class="dialog-header" @mousedown="onDragStart">
-        <h3>Create Branch</h3>
+        <h3>{{ i18n.dialog.createBranch.title }}</h3>
         <button class="close-btn" @click="$emit('close')">
           <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
@@ -49,7 +51,7 @@ onMounted(() => {
 
       <div class="dialog-body">
         <div class="form-group">
-          <label class="form-label" for="cb-name">Branch Name:</label>
+          <label class="form-label" for="cb-name">{{ i18n.dialog.createBranch.nameLabel }}</label>
           <input
             id="cb-name"
             ref="inputRef"
@@ -63,7 +65,7 @@ onMounted(() => {
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="cb-start">Start Point (empty = HEAD):</label>
+          <label class="form-label" for="cb-start">{{ i18n.dialog.createBranch.startLabel }}</label>
           <input
             id="cb-start"
             v-model="startPoint"
@@ -77,14 +79,14 @@ onMounted(() => {
 
         <label class="cb-opt">
           <input type="checkbox" v-model="checkout" />
-          Check out new branch
+          {{ i18n.dialog.createBranch.checkoutAfter }}
         </label>
       </div>
 
       <div class="dialog-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">Cancel</button>
+        <button class="btn btn-secondary" @click="$emit('close')">{{ i18n.dialog.createBranch.cancel }}</button>
         <button class="btn btn-primary" :disabled="!canCreate" @click="submit">
-          Create
+          {{ i18n.dialog.createBranch.create }}
         </button>
       </div>
     </div>

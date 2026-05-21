@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from "vue";
 import { invoke } from "@/composables/useProgress";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 import type { RepoPathCheck } from "@/types";
 
 const emit = defineEmits<{
@@ -19,6 +20,7 @@ const inputRef = ref<HTMLInputElement | null>(null);
 let checkTimer: ReturnType<typeof setTimeout> | null = null;
 
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 const canAdd = computed(() => {
   return repoPath.value.trim().length > 0 && pathCheck.value?.exists === true;
@@ -26,9 +28,9 @@ const canAdd = computed(() => {
 
 const statusText = computed(() => {
   if (!repoPath.value.trim() || !pathCheck.value) return "";
-  if (!pathCheck.value.exists) return "Directory does not exist";
-  if (pathCheck.value.is_git_repo) return "Git repository found";
-  return "Not a Git repository — will be initialized";
+  if (!pathCheck.value.exists) return i18n.value.dialog.addRepo.dirNotExist;
+  if (pathCheck.value.is_git_repo) return i18n.value.dialog.addRepo.gitFound;
+  return i18n.value.dialog.addRepo.notGitWillInit;
 });
 
 const statusClass = computed(() => {
@@ -78,17 +80,17 @@ onMounted(() => {
   <div class="modal-overlay" @click.self="$emit('close')" @keydown.escape="$emit('close')" tabindex="-1" ref="overlayRef">
     <div class="modal-dialog add-repo-dialog" :style="dragStyle">
       <div class="dialog-header" @mousedown="onDragStart">
-        <h3>Add or Create Repository</h3>
+        <h3>{{ i18n.dialog.addRepo.title }}</h3>
         <button class="close-btn" @click="$emit('close')">
           <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
       </div>
 
       <div class="dialog-body">
-        <p class="dialog-hint">Add existing or create new repository</p>
-        <p class="dialog-subhint">Specify the local Git repository to open. To create a new repository, specify an empty directory.</p>
+        <p class="dialog-hint">{{ i18n.dialog.addRepo.hint }}</p>
+        <p class="dialog-subhint">{{ i18n.dialog.addRepo.subhint }}</p>
         <div class="form-group">
-          <label class="form-label" for="repo-path-input">Repository:</label>
+          <label class="form-label" for="repo-path-input">{{ i18n.dialog.addRepo.label }}</label>
           <div class="input-row">
             <input
               id="repo-path-input"
@@ -110,8 +112,8 @@ onMounted(() => {
       </div>
 
       <div class="dialog-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">Cancel</button>
-        <button class="btn btn-primary" :disabled="!canAdd" @click="submit">OK</button>
+        <button class="btn btn-secondary" @click="$emit('close')">{{ i18n.dialog.addRepo.cancel }}</button>
+        <button class="btn btn-primary" :disabled="!canAdd" @click="submit">{{ i18n.dialog.addRepo.ok }}</button>
       </div>
     </div>
   </div>

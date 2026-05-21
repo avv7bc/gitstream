@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, watch, computed } from "vue";
 import { useStats, type StatsPeriod } from "@/composables/useStats";
+import { useI18n } from "@/composables/useI18n";
 
 const emit = defineEmits<{ close: [] }>();
 
 const { loading, stats, error, period, progress, loadStats, abort } = useStats();
+const { i18n } = useI18n();
 
 // --- Persisted window geometry ---
 const GEOM_KEY = "gitstream-stats-geom";
@@ -227,7 +229,7 @@ const periods: { value: StatsPeriod; label: string }[] = [
 
       <!-- Title bar -->
       <div class="st-titlebar" @mousedown="onTitleMouseDown">
-        <span class="st-title">Repository Statistics</span>
+        <span class="st-title">{{ i18n.stats.title }}</span>
         <div class="st-period-tabs" @mousedown.stop>
           <button
             v-for="p in periods"
@@ -266,9 +268,9 @@ const periods: { value: StatsPeriod; label: string }[] = [
             <div class="st-section-title-row">
               <h2 class="st-section-title">Activity &mdash; {{ fmtNum(heatmap.total) }} коммитов</h2>
               <div class="st-hm-legend">
-                <span>Меньше</span>
+                <span>{{ i18n.stats.less }}</span>
                 <div v-for="l in [0,1,2,3,4]" :key="l" class="st-hm-cell" :class="`lv-${l}`" />
-                <span>Больше</span>
+                <span>{{ i18n.stats.more }}</span>
               </div>
             </div>
             <div class="st-heatmap-scroll">
@@ -305,7 +307,7 @@ const periods: { value: StatsPeriod; label: string }[] = [
 
           <!-- ── Contributors ───────────────────────── -->
           <section class="st-section">
-            <h2 class="st-section-title">Contributors</h2>
+            <h2 class="st-section-title">{{ i18n.stats.contributors }}</h2>
             <div class="st-table-wrapper">
               <table class="st-table">
                 <thead>
@@ -358,7 +360,7 @@ const periods: { value: StatsPeriod; label: string }[] = [
 
           <!-- ── By Weekday ─────────────────────────── -->
           <section class="st-section">
-            <h2 class="st-section-title">Commits by Day of Week</h2>
+            <h2 class="st-section-title">{{ i18n.stats.commitsByDow }}</h2>
             <div class="st-bars">
               <div
                 v-for="(count, i) in stats.by_weekday"
@@ -380,7 +382,7 @@ const periods: { value: StatsPeriod; label: string }[] = [
 
           <!-- ── By Hour ────────────────────────────── -->
           <section class="st-section">
-            <h2 class="st-section-title">Commits by Hour of Day</h2>
+            <h2 class="st-section-title">{{ i18n.stats.commitsByHour }}</h2>
             <div class="st-bars st-bars-hour">
               <template v-for="(count, h) in stats.by_hour" :key="h">
                 <div v-if="count > 0" class="st-bar-row">
@@ -399,8 +401,8 @@ const periods: { value: StatsPeriod; label: string }[] = [
 
           <!-- ── By Month ───────────────────────────── -->
           <section class="st-section">
-            <h2 class="st-section-title">Commits by Month</h2>
-            <div v-if="stats.by_month.length === 0" class="st-empty">No data</div>
+            <h2 class="st-section-title">{{ i18n.stats.commitsByMonth }}</h2>
+            <div v-if="stats.by_month.length === 0" class="st-empty">{{ i18n.stats.noData }}</div>
             <div v-else class="st-bars">
               <div
                 v-for="m in stats.by_month"
@@ -421,30 +423,30 @@ const periods: { value: StatsPeriod; label: string }[] = [
 
           <!-- ── Overview ─────────────────────────────── -->
           <section class="st-section">
-            <h2 class="st-section-title">Overview</h2>
+            <h2 class="st-section-title">{{ i18n.stats.overview }}</h2>
             <div class="st-overview-grid">
               <div class="st-kv">
-                <span class="st-kv-label">Всего коммитов</span>
+                <span class="st-kv-label">{{ i18n.stats.totalCommits }}</span>
                 <span class="st-kv-value">{{ fmtNum(stats.total_commits) }}</span>
               </div>
               <div class="st-kv">
-                <span class="st-kv-label">Авторов</span>
+                <span class="st-kv-label">{{ i18n.stats.authors }}</span>
                 <span class="st-kv-value">{{ stats.total_authors }}</span>
               </div>
               <div class="st-kv">
-                <span class="st-kv-label">Строк добавлено</span>
+                <span class="st-kv-label">{{ i18n.stats.linesAdded }}</span>
                 <span class="st-kv-value st-green">+{{ fmtNum(stats.total_insertions) }}</span>
               </div>
               <div class="st-kv">
-                <span class="st-kv-label">Строк удалено</span>
+                <span class="st-kv-label">{{ i18n.stats.linesRemoved }}</span>
                 <span class="st-kv-value st-red">−{{ fmtNum(stats.total_deletions) }}</span>
               </div>
               <div class="st-kv">
-                <span class="st-kv-label">Первый коммит</span>
+                <span class="st-kv-label">{{ i18n.stats.firstCommit }}</span>
                 <span class="st-kv-value">{{ stats.first_commit_date || '—' }}</span>
               </div>
               <div class="st-kv">
-                <span class="st-kv-label">Последний коммит</span>
+                <span class="st-kv-label">{{ i18n.stats.lastCommit }}</span>
                 <span class="st-kv-value">{{ stats.last_commit_date || '—' }}</span>
               </div>
             </div>
@@ -452,7 +454,7 @@ const periods: { value: StatsPeriod; label: string }[] = [
 
         </template>
 
-        <div v-if="!stats && !loading && !error" class="st-empty-center">No repository selected</div>
+        <div v-if="!stats && !loading && !error" class="st-empty-center">{{ i18n.stats.noRepoSelected }}</div>
       </div>
     </div>
   </div>

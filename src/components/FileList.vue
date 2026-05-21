@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { invoke } from "@/composables/useProgress";
 import { useFiles } from "@/composables/useFiles";
+import { useI18n } from "@/composables/useI18n";
 import { useLog } from "@/composables/useLog";
 import { useRepo } from "@/composables/useRepo";
 import { useDiff } from "@/composables/useDiff";
@@ -11,6 +12,7 @@ import { highlight } from "@/utils/highlight";
 
 const emit = defineEmits<{ commit: [] }>();
 
+const { i18n } = useI18n();
 const { files, selectedFile, stageFiles, unstageFiles, discardFiles, removeFiles, deleteFiles } = useFiles();
 const { selectedCommit } = useLog();
 const { repoPath } = useRepo();
@@ -224,14 +226,14 @@ function compareCommitFile(path: string) {
   <div class="file-list">
     <div class="file-list-header">
       <div class="header-left">
-        <span class="panel-title">Files</span>
+        <span class="panel-title">{{ i18n.files.title }}</span>
         <span class="files-hidden">{{ displayCount }} files</span>
       </div>
       <div class="header-right">
         <input
           v-model="fileFilter"
           type="text"
-          placeholder="Filter"
+          :placeholder="i18n.files.filter"
           class="file-filter-input"
         />
         <div class="filter-tabs">
@@ -274,12 +276,12 @@ function compareCommitFile(path: string) {
           <span
             v-if="file.staged === 'staged'"
             class="staged-dot"
-            title="Staged"
+            :title="i18n.files.staged"
           />
           <span
             v-else-if="file.staged === 'partial'"
             class="staged-dot partial"
-            title="Partially staged"
+            :title="i18n.files.partiallyStaged"
           />
 
           <span class="file-name" v-html="highlight(fileName(file.path), fileFilter)" />
@@ -323,7 +325,7 @@ function compareCommitFile(path: string) {
         </button>
         <div class="ctx-separator" />
         <button class="ctx-item" @click="ctxRun('commit')">
-          <span class="ctx-label">Commit…</span>
+          <span class="ctx-label">{{ i18n.files.commitCtx }}</span>
         </button>
         <div class="ctx-separator" />
         <button class="ctx-item ctx-danger" @click="ctxRun('discard')">

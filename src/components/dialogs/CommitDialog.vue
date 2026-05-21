@@ -5,6 +5,7 @@ import { useFiles } from "@/composables/useFiles";
 import { useRemote } from "@/composables/useRemote";
 import { useBranches } from "@/composables/useBranches";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 import type { FileStatus } from "@/types";
 
 const emit = defineEmits<{ close: [] }>();
@@ -19,6 +20,7 @@ const amend = ref(false);
 const busy = ref(false);
 
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 const changedFiles = computed(() => files.value);
 
@@ -96,15 +98,15 @@ async function handleCommit(alsoPush: boolean) {
   <div class="modal-overlay" @click.self="$emit('close')" @keydown.escape="$emit('close')" tabindex="-1">
     <div class="modal-dialog commit-dialog" :style="dragStyle">
       <div class="dialog-header" @mousedown="onDragStart">
-        <h3>Commit</h3>
+        <h3>{{ i18n.dialog.commit.title }}</h3>
         <button class="close-btn" @click="$emit('close')">
           <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
       </div>
 
       <div class="dialog-body">
-        <p class="dialog-hint">Commit local or staged changes</p>
-        <p class="dialog-subhint">Select the files to commit and provide a commit message.</p>
+        <p class="dialog-hint">{{ i18n.dialog.commit.hint }}</p>
+        <p class="dialog-subhint">{{ i18n.dialog.commit.subhint }}</p>
 
         <div class="file-table">
           <div class="file-table-header">
@@ -122,14 +124,14 @@ async function handleCommit(alsoPush: boolean) {
               <span class="col-name">{{ fileName(f.path) }}</span>
               <span class="col-dir">{{ fileDir(f.path) }}</span>
             </label>
-            <div v-if="changedFiles.length === 0" class="empty">No changes</div>
+            <div v-if="changedFiles.length === 0" class="empty">{{ i18n.files.noChanges }}</div>
           </div>
         </div>
 
         <div class="message-field">
           <textarea
             v-model="message"
-            placeholder="Commit message..."
+            :placeholder="i18n.dialog.commit.messagePlaceholder"
             rows="5"
             class="commit-message-input"
           />
@@ -141,21 +143,21 @@ async function handleCommit(alsoPush: boolean) {
         <div class="commit-options">
           <label class="checkbox-label">
             <input type="checkbox" v-model="amend" />
-            <span>Amend last commit</span>
+            <span>{{ i18n.dialog.commit.amend }}</span>
           </label>
-          <span class="selected-count">{{ selectedPaths.length }} selected</span>
+          <span class="selected-count">{{ selectedPaths.length }} {{ i18n.dialog.commit.selected }}</span>
         </div>
       </div>
 
       <div class="dialog-footer">
         <button class="btn btn-primary" :disabled="!canCommit" @click="handleCommit(false)">
-          Commit
+          {{ i18n.dialog.commit.commit }}
         </button>
         <button class="btn btn-accent" :disabled="!canCommit" @click="handleCommit(true)">
-          Commit &amp; Push
+          {{ i18n.dialog.commit.commitAndPush }}
         </button>
         <div class="footer-spacer"></div>
-        <button class="btn btn-secondary" :disabled="busy" @click="$emit('close')">Cancel</button>
+        <button class="btn btn-secondary" :disabled="busy" @click="$emit('close')">{{ i18n.dialog.commit.cancel }}</button>
       </div>
     </div>
   </div>

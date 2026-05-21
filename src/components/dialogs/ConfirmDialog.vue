@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 
 const props = defineProps<{
   message: string;
@@ -16,6 +17,7 @@ const emit = defineEmits<{
 
 const checked = ref(false);
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 function onConfirm() {
   emit("confirm", props.checkboxLabel ? checked.value : false);
@@ -26,7 +28,7 @@ function onConfirm() {
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-dialog confirm-dialog" :style="dragStyle">
       <div class="dialog-header" @mousedown="onDragStart">
-        <h3>Confirm</h3>
+        <h3>{{ i18n.dialog.confirm.title }}</h3>
         <button class="close-btn" @click="$emit('close')">
           <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
@@ -41,13 +43,13 @@ function onConfirm() {
       </div>
 
       <div class="dialog-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">Cancel</button>
+        <button class="btn btn-secondary" @click="$emit('close')">{{ i18n.dialog.confirm.cancel }}</button>
         <button
           class="btn"
           :class="danger ? 'btn-danger' : 'btn-primary'"
           @click="onConfirm"
         >
-          {{ confirmLabel || "Confirm" }}
+          {{ confirmLabel || i18n.dialog.confirm.ok }}
         </button>
       </div>
     </div>

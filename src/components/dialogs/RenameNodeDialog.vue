@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 
 interface Props {
   oldName: string;
@@ -17,6 +18,7 @@ defineEmits<{
 const newName = ref(props.oldName);
 const inputRef = ref<HTMLInputElement | null>(null);
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 const canRename = computed(() => {
   const trimmed = newName.value.trim();
@@ -24,7 +26,7 @@ const canRename = computed(() => {
 });
 
 const dialogTitle = computed(() => {
-  return props.nodeType === "repo" ? "Rename Repository" : "Rename Group";
+  return props.nodeType === "repo" ? i18n.value.dialog.renameNode.titleRepo : i18n.value.dialog.renameNode.titleGroup;
 });
 
 onMounted(() => {
@@ -45,13 +47,13 @@ onMounted(() => {
 
       <div class="dialog-body">
         <p class="dialog-subhint" v-if="nodeType === 'repo'">
-          Rename repository <b>{{ oldName }}</b>
+          {{ i18n.dialog.renameNode.subhintRepo }} <b>{{ oldName }}</b>
         </p>
         <p class="dialog-subhint" v-else>
-          Rename group <b>{{ oldName }}</b>
+          {{ i18n.dialog.renameNode.subhintGroup }} <b>{{ oldName }}</b>
         </p>
         <div class="form-group">
-          <label class="form-label" for="rename-input">New Name:</label>
+          <label class="form-label" for="rename-input">{{ i18n.dialog.renameNode.newNameLabel }}</label>
           <input
             id="rename-input"
             ref="inputRef"
@@ -65,13 +67,13 @@ onMounted(() => {
       </div>
 
       <div class="dialog-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">Cancel</button>
+        <button class="btn btn-secondary" @click="$emit('close')">{{ i18n.dialog.renameNode.cancel }}</button>
         <button
           class="btn btn-primary"
           :disabled="!canRename"
           @click="$emit('confirm', newName.trim())"
         >
-          Rename
+          {{ i18n.dialog.renameNode.rename }}
         </button>
       </div>
     </div>

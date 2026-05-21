@@ -8,6 +8,8 @@ import StashSaveDialog from "@/components/dialogs/StashSaveDialog.vue";
 import CreateBranchDialog from "@/components/dialogs/CreateBranchDialog.vue";
 import RefIcon from "@/components/RefIcon.vue";
 import type { BranchInfo, TagInfo, StashEntry } from "@/types";
+import { useI18n } from "@/composables/useI18n";
+const { i18n } = useI18n();
 
 const emit = defineEmits<{
   checkoutRemote: [remoteBranch: string];
@@ -394,11 +396,11 @@ function selectItem(key: string) {
 <template>
   <div class="branch-panel" @contextmenu.prevent>
     <div class="panel-title-bar">
-      <span class="panel-title">Branches</span>
+      <span class="panel-title">{{ i18n.branches.title }}</span>
       <input
         v-model="filter"
         type="text"
-        placeholder="Filter..."
+        :placeholder="i18n.branches.filter"
         class="filter-input"
       />
     </div>
@@ -414,11 +416,11 @@ function selectItem(key: string) {
           >
             <path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/>
           </svg>
-          <span class="section-title">Local Branches</span>
+          <span class="section-title">{{ i18n.branches.localBranches }}</span>
           <span class="section-count">{{ localBranches.length }}</span>
           <button
             class="section-action"
-            title="Create branch"
+            :title="i18n.branches.createBranch"
             @click.stop="openCreateBranch(null)"
           >+</button>
         </div>
@@ -454,7 +456,7 @@ function selectItem(key: string) {
           >
             <path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/>
           </svg>
-          <span class="section-title">Remote Branches</span>
+          <span class="section-title">{{ i18n.branches.remoteBranches }}</span>
           <span class="section-count">{{ remoteBranches.length }}</span>
         </div>
         <div v-if="expandedSections.remote && remoteBranches.length" class="section-items">
@@ -482,11 +484,11 @@ function selectItem(key: string) {
           >
             <path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/>
           </svg>
-          <span class="section-title">Tags</span>
+          <span class="section-title">{{ i18n.branches.tags }}</span>
           <span class="section-count">{{ filteredTags.length }}</span>
           <button
             class="section-add-btn"
-            title="Add tag (on HEAD)"
+            :title="i18n.branches.addTag"
             @click.stop="emit('createTag')"
           >+</button>
         </div>
@@ -515,11 +517,11 @@ function selectItem(key: string) {
           >
             <path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/>
           </svg>
-          <span class="section-title">Stashes</span>
+          <span class="section-title">{{ i18n.branches.stashes }}</span>
           <span class="section-count">{{ filteredStashes.length }}</span>
           <button
             class="section-action"
-            title="Stash changes"
+            :title="i18n.branches.stashChanges"
             @click.stop="showStashSaveDialog = true"
           >+</button>
         </div>
@@ -554,30 +556,30 @@ function selectItem(key: string) {
           class="ctx-item"
           :disabled="ctxBranch?.is_current"
           @click="handleCheckoutCtx"
-        >Check out</button>
+        >{{ i18n.branches.checkout }}</button>
         <div class="ctx-separator" />
         <button
           class="ctx-item"
           :disabled="ctxBranch?.is_current"
           @click="handleMergeCtx"
-        >Merge</button>
+        >{{ i18n.branches.merge }}</button>
         <button
           class="ctx-item"
           :disabled="ctxBranch?.is_current"
           @click="handleRebaseCtx"
-        >Rebase current onto this</button>
-        <button class="ctx-item" @click="handlePushCtx">Push</button>
+        >{{ i18n.branches.rebaseOnto }}</button>
+        <button class="ctx-item" @click="handlePushCtx">{{ i18n.branches.push }}</button>
         <div class="ctx-separator" />
         <button
           class="ctx-item"
           @click="handleCreateBranchCtx"
-        >Create branch from here…</button>
-        <button class="ctx-item" @click="handleRenameCtx">Rename</button>
+        >{{ i18n.branches.createFrom }}</button>
+        <button class="ctx-item" @click="handleRenameCtx">{{ i18n.branches.rename }}</button>
         <button
           class="ctx-item ctx-danger"
           :disabled="ctxBranch?.is_current"
           @click="handleDeleteCtx"
-        >Delete</button>
+        >{{ i18n.branches.delete }}</button>
       </div>
       <div
         v-if="ctxMenu"
@@ -629,12 +631,12 @@ function selectItem(key: string) {
           class="ctx-item"
           :disabled="!hasRemote"
           @click="handlePushTagCtx"
-        >Push Tag</button>
+        >{{ i18n.branches.pushTag }}</button>
         <div class="ctx-separator" />
         <button
           class="ctx-item ctx-danger"
           @click="handleDeleteTagCtx"
-        >Delete Tag</button>
+        >{{ i18n.branches.deleteTag }}</button>
       </div>
       <div
         v-if="tagCtxMenu"
@@ -659,10 +661,10 @@ function selectItem(key: string) {
         :style="{ left: stashCtxMenu.x + 'px', top: stashCtxMenu.y + 'px' }"
         @click.stop
       >
-        <button class="ctx-item" @click="handleStashApplyCtx">Apply</button>
-        <button class="ctx-item" @click="handleStashPopCtx">Pop</button>
+        <button class="ctx-item" @click="handleStashApplyCtx">{{ i18n.branches.apply }}</button>
+        <button class="ctx-item" @click="handleStashPopCtx">{{ i18n.branches.pop }}</button>
         <div class="ctx-separator" />
-        <button class="ctx-item ctx-danger" @click="handleStashDropCtx">Drop</button>
+        <button class="ctx-item ctx-danger" @click="handleStashDropCtx">{{ i18n.branches.drop }}</button>
       </div>
       <div
         v-if="stashCtxMenu"

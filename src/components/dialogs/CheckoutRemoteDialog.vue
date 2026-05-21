@@ -2,12 +2,14 @@
 import { ref, computed, onMounted, nextTick, useTemplateRef } from "vue";
 import { useBranches } from "@/composables/useBranches";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 
 const props = defineProps<{ remoteBranch: string }>();
 const emit = defineEmits<{ close: [] }>();
 
 const { checkoutRemote } = useBranches();
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 // Default local name = part after the first "/" (strip "origin/")
 const defaultLocal = computed(() => {
@@ -55,24 +57,24 @@ async function handleCheckout() {
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-dialog checkout-remote-dialog" :style="dragStyle" @keydown.enter="handleCheckout">
       <div class="dialog-header" @mousedown="onDragStart">
-        <h3>Check Out</h3>
+        <h3>{{ i18n.dialog.checkoutRemote.title }}</h3>
         <button class="close-btn" @click="$emit('close')">
           <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
       </div>
 
       <div class="dialog-body">
-        <div class="title">Check out remote branch</div>
-        <div class="subtitle">Create and checkout a new local branch for the selected commit</div>
+        <div class="title">{{ i18n.dialog.checkoutRemote.subtitle }}</div>
+        <div class="subtitle">{{ i18n.dialog.checkoutRemote.subtext }}</div>
 
         <div class="remote-info">
-          <span class="label">Remote:</span>
+          <span class="label">{{ i18n.dialog.checkoutRemote.remote }}</span>
           <span class="remote-name">{{ remoteBranch }}</span>
         </div>
 
         <label class="option-row">
           <input type="radio" value="create" v-model="mode" />
-          <span class="option-label">Create local branch:</span>
+          <span class="option-label">{{ i18n.dialog.checkoutRemote.createLocal }}</span>
           <input
             ref="inputRef"
             v-model="localName"
@@ -86,26 +88,26 @@ async function handleCheckout() {
         <div class="suboption">
           <label class="track-row">
             <input type="checkbox" checked disabled />
-            <span>Track remote branch</span>
+            <span>{{ i18n.dialog.checkoutRemote.trackRemote }}</span>
           </label>
         </div>
 
         <label class="option-row">
           <input type="radio" value="detach" v-model="mode" />
-          <span class="option-label">Don't create local branch (just work read-only)</span>
+          <span class="option-label">{{ i18n.dialog.checkoutRemote.readOnly }}</span>
         </label>
 
         <div v-if="error" class="error">{{ error }}</div>
       </div>
 
       <div class="dialog-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">Cancel</button>
+        <button class="btn btn-secondary" @click="$emit('close')">{{ i18n.dialog.checkoutRemote.cancel }}</button>
         <button
           class="btn btn-primary"
           :disabled="!canCheckout || busy"
           @click="handleCheckout"
         >
-          Checkout
+          {{ i18n.dialog.checkoutRemote.checkout }}
         </button>
       </div>
     </div>

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { invoke } from "@tauri-apps/api/core";
 import type { UpdateInfo } from "@/types";
+import { useI18n } from "@/composables/useI18n";
 
 const props = defineProps<{ info: UpdateInfo }>();
 const emit = defineEmits<{ dismiss: [] }>();
+const { i18n } = useI18n();
 
 async function openUrl(url: string) {
   try {
@@ -32,7 +34,7 @@ async function download() {
       </button>
     </div>
     <div class="update-actions">
-      <button class="btn btn-primary" @click="download">Загрузить</button>
+      <button class="btn btn-primary" @click="download">{{ i18n.update.download }}</button>
       <button class="btn btn-secondary" @click="emit('dismiss')">
         Отменить
       </button>

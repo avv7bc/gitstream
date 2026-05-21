@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from "vue";
 import { useBranches } from "@/composables/useBranches";
 import { useRepo } from "@/composables/useRepo";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 
 const emit = defineEmits<{
   close: [];
@@ -21,6 +22,7 @@ const behindCount = computed(() => currentBranchInfo.value?.behind ?? 0);
 
 const dialogRef = ref<HTMLElement | null>(null);
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 function handlePull() {
   emit("pull", selectedRemote.value, pullMode.value === "rebase");
@@ -35,7 +37,7 @@ onMounted(() => {
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-dialog pull-dialog" :style="dragStyle" @keydown.enter.prevent="handlePull" @keydown.escape="$emit('close')" tabindex="-1" ref="dialogRef">
       <div class="dialog-header" @mousedown="onDragStart">
-        <h3>Pull</h3>
+        <h3>{{ i18n.dialog.pull.title }}</h3>
         <button class="close-btn" @click="$emit('close')">
           <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
@@ -43,22 +45,22 @@ onMounted(() => {
 
       <div class="dialog-body">
         <div class="form-group">
-          <label class="form-label">Remote</label>
+          <label class="form-label">{{ i18n.dialog.pull.remote }}</label>
           <select v-model="selectedRemote" class="form-select">
             <option v-for="r in remotes" :key="r" :value="r">{{ r }}</option>
           </select>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Mode</label>
+          <label class="form-label">{{ i18n.dialog.pull.mode }}</label>
           <div class="radio-group">
             <label class="radio-label">
               <input type="radio" v-model="pullMode" value="merge" />
-              <span>Merge</span>
+              <span>{{ i18n.dialog.pull.merge }}</span>
             </label>
             <label class="radio-label">
               <input type="radio" v-model="pullMode" value="rebase" />
-              <span>Rebase</span>
+              <span>{{ i18n.dialog.pull.rebase }}</span>
             </label>
           </div>
         </div>
@@ -70,8 +72,8 @@ onMounted(() => {
       </div>
 
       <div class="dialog-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">Cancel</button>
-        <button class="btn btn-primary" @click="handlePull">Pull</button>
+        <button class="btn btn-secondary" @click="$emit('close')">{{ i18n.dialog.pull.cancel }}</button>
+        <button class="btn btn-primary" @click="handlePull">{{ i18n.dialog.pull.pull }}</button>
       </div>
     </div>
   </div>

@@ -3,12 +3,14 @@ import { ref, computed } from "vue";
 import { useRemote } from "@/composables/useRemote";
 import { useRepo } from "@/composables/useRepo";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 
 const emit = defineEmits<{ close: [] }>();
 
 const { cloneRepo, isBusy } = useRemote();
 const { openRepo } = useRepo();
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 const url = ref("");
 const directory = ref("");
@@ -38,7 +40,7 @@ async function handleClone() {
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-dialog clone-dialog" :style="dragStyle">
       <div class="dialog-header" @mousedown="onDragStart">
-        <h3>Clone Repository</h3>
+        <h3>{{ i18n.dialog.clone.title }}</h3>
         <button class="close-btn" @click="$emit('close')">
           <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
@@ -46,25 +48,25 @@ async function handleClone() {
 
       <div class="dialog-body">
         <div class="form-group">
-          <label class="form-label">Repository URL</label>
+          <label class="form-label">{{ i18n.dialog.clone.urlLabel }}</label>
           <input
             v-model="url"
             type="text"
-            placeholder="https://github.com/user/repo.git or git@..."
+            :placeholder="i18n.dialog.clone.urlPlaceholder"
             class="form-input"
           />
         </div>
 
         <div class="form-group">
-          <label class="form-label">Directory</label>
+          <label class="form-label">{{ i18n.dialog.clone.directoryLabel }}</label>
           <div class="input-with-btn">
             <input
               v-model="directory"
               type="text"
-              :placeholder="autoName || 'Select directory...'"
+              :placeholder="autoName || i18n.dialog.clone.directoryPlaceholder"
               class="form-input"
             />
-            <button class="btn btn-secondary browse-btn">Browse</button>
+            <button class="btn btn-secondary browse-btn">{{ i18n.dialog.clone.browse }}</button>
           </div>
         </div>
 
@@ -72,8 +74,8 @@ async function handleClone() {
       </div>
 
       <div class="dialog-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">Cancel</button>
-        <button class="btn btn-primary" :disabled="!canClone" @click="handleClone">Clone</button>
+        <button class="btn btn-secondary" @click="$emit('close')">{{ i18n.dialog.clone.cancel }}</button>
+        <button class="btn btn-primary" :disabled="!canClone" @click="handleClone">{{ i18n.dialog.clone.clone }}</button>
       </div>
     </div>
   </div>

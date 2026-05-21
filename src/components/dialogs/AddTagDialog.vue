@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 
 const props = defineProps<{
   target: { oid: string; subject: string } | null;
@@ -16,6 +17,7 @@ const message = ref("");
 const force = ref(false);
 const inputRef = ref<HTMLInputElement | null>(null);
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 // git ref name rules (subset): non-empty, no whitespace or ~^:?*[\, no leading '-'
 const INVALID = /[\s~^:?*[\\]/;
@@ -48,17 +50,17 @@ onMounted(() => {
   <div class="modal-overlay" @click.self="$emit('close')" @keydown.escape="$emit('close')" tabindex="-1">
     <div class="modal-dialog add-tag-dialog" :style="dragStyle">
       <div class="dialog-header" @mousedown="onDragStart">
-        <h3>Add Tag</h3>
+        <h3>{{ i18n.dialog.addTag.title }}</h3>
         <button class="close-btn" @click="$emit('close')">
           <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
       </div>
 
       <div class="dialog-body">
-        <p class="dialog-subhint">Tag will point to: <b>{{ targetLabel }}</b></p>
+        <p class="dialog-subhint">{{ i18n.dialog.addTag.pointsTo }} <b>{{ targetLabel }}</b></p>
 
         <div class="form-group">
-          <label class="form-label" for="add-tag-name">Tag Name:</label>
+          <label class="form-label" for="add-tag-name">{{ i18n.dialog.addTag.nameLabel }}</label>
           <input
             id="add-tag-name"
             ref="inputRef"
@@ -72,7 +74,7 @@ onMounted(() => {
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="add-tag-msg">Message (empty = lightweight):</label>
+          <label class="form-label" for="add-tag-msg">{{ i18n.dialog.addTag.msgLabel }}</label>
           <textarea
             id="add-tag-msg"
             v-model="message"
@@ -89,9 +91,9 @@ onMounted(() => {
       </div>
 
       <div class="dialog-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">Cancel</button>
+        <button class="btn btn-secondary" @click="$emit('close')">{{ i18n.dialog.addTag.cancel }}</button>
         <button class="btn btn-primary" :disabled="!canCreate" @click="submit">
-          Create Tag
+          {{ i18n.dialog.addTag.add }}
         </button>
       </div>
     </div>

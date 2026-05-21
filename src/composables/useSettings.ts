@@ -1,5 +1,6 @@
 import { ref, watch } from "vue";
 import { invoke } from "@/composables/useProgress";
+import { useI18n, type Lang } from "@/composables/useI18n";
 
 interface AppSettings {
   network_timeout_secs: number;
@@ -7,6 +8,7 @@ interface AppSettings {
   workbench_font_size: number;
   editor_font_family: string;
   editor_font_size: number;
+  language: string;
 }
 
 const TIMEOUT_OPTIONS = [5, 10, 30, 60];
@@ -57,6 +59,7 @@ function applyCssFonts() {
 }
 
 function scheduleSave() {
+  const { locale } = useI18n();
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
     invoke("set_settings", {
@@ -66,6 +69,7 @@ function scheduleSave() {
         workbench_font_size: workbenchFontSize.value,
         editor_font_family: editorFontFamily.value,
         editor_font_size: editorFontSize.value,
+        language: locale.value,
       },
     }).catch(() => {});
   }, 400);
@@ -74,6 +78,7 @@ function scheduleSave() {
 async function loadSettings() {
   if (loaded) return;
   loaded = true;
+  const { setLocale } = useI18n();
   try {
     const s = await invoke<AppSettings>("get_settings");
     networkTimeoutSecs.value = clampTimeout(s.network_timeout_secs);
@@ -81,6 +86,9 @@ async function loadSettings() {
     workbenchFontSize.value = clampFontSize(s.workbench_font_size, 11, 20, DEFAULT_WB_FONT_SIZE);
     editorFontFamily.value = primaryFont(s.editor_font_family || DEFAULT_ED_FONT_FAMILY);
     editorFontSize.value = clampFontSize(s.editor_font_size, 10, 24, DEFAULT_ED_FONT_SIZE);
+    if (s.language === "ru" || s.language === "en") {
+      setLocale(s.language as Lang);
+    }
   } catch {
     // defaults already set
   }
@@ -115,5 +123,6 @@ export function useSettings() {
     workbenchFontSize,
     editorFontFamily,
     editorFontSize,
+    scheduleSave,
   };
 }

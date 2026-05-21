@@ -2,11 +2,13 @@
 import { computed, ref } from "vue";
 import { useConflicts } from "@/composables/useConflicts";
 import { useFiles } from "@/composables/useFiles";
+import { useI18n } from "@/composables/useI18n";
 
 const emit = defineEmits<{ changed: [] }>();
 
 const { repoState, acceptOurs, acceptTheirs, abort, cont } = useConflicts();
 const { files } = useFiles();
+const { i18n } = useI18n();
 
 const busy = ref(false);
 
@@ -50,22 +52,22 @@ const onContinue = () => run(cont);
       <span v-if="conflicted.length" class="conflict-count">
         {{ conflicted.length }} conflicted file(s)
       </span>
-      <span v-else class="conflict-ok">No conflicts — ready to continue</span>
+      <span v-else class="conflict-ok">{{ i18n.conflict.noConflicts }}</span>
       <div class="conflict-actions">
-        <button class="cb-btn" :disabled="busy" @click="onAbort">Abort</button>
+        <button class="cb-btn" :disabled="busy" @click="onAbort">{{ i18n.conflict.abort }}</button>
         <button
           class="cb-btn primary"
           :disabled="busy || conflicted.length > 0"
           @click="onContinue"
-        >Continue</button>
+        >{{ i18n.conflict.continue }}</button>
       </div>
     </div>
     <div v-if="conflicted.length" class="conflict-files">
       <div v-for="path in conflicted" :key="path" class="conflict-file">
         <span class="cf-path" :title="path">{{ path }}</span>
         <span class="cf-btns">
-          <button class="cb-btn" :disabled="busy" @click="resolveOurs(path)">Use ours</button>
-          <button class="cb-btn" :disabled="busy" @click="resolveTheirs(path)">Use theirs</button>
+          <button class="cb-btn" :disabled="busy" @click="resolveOurs(path)">{{ i18n.conflict.useOurs }}</button>
+          <button class="cb-btn" :disabled="busy" @click="resolveTheirs(path)">{{ i18n.conflict.useTheirs }}</button>
         </span>
       </div>
     </div>

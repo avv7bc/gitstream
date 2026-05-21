@@ -2,10 +2,13 @@
 import { ref, watch, onMounted } from "vue";
 import { invoke } from "@/composables/useProgress";
 import { useRepo } from "@/composables/useRepo";
+import { useI18n } from "@/composables/useI18n";
 import type { RepoInfo } from "@/types";
 import AddGroupDialog from "@/components/dialogs/AddGroupDialog.vue";
 import AddRepositoryDialog from "@/components/dialogs/AddRepositoryDialog.vue";
 import RenameNodeDialog from "@/components/dialogs/RenameNodeDialog.vue";
+
+const { i18n } = useI18n();
 
 // --- Tree node types ---
 interface RepoNode {
@@ -417,7 +420,7 @@ defineExpose({
 <template>
   <div class="repos-panel" @click="closeCtxMenu">
     <div class="panel-title-bar">
-      <span class="panel-title">Repositories</span>
+      <span class="panel-title">{{ i18n.repos.title }}</span>
     </div>
     <div
       class="repos-tree"
@@ -546,11 +549,11 @@ defineExpose({
         :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }"
         @click.stop
       >
-        <button class="ctx-item" @click="addRepository">Add Repository</button>
-        <button class="ctx-item" @click="addGroup">Add Group</button>
-        <button v-if="ctxTargetId" class="ctx-item" @click="renameNode">Rename</button>
+        <button class="ctx-item" @click="addRepository">{{ i18n.repos.addRepository }}</button>
+        <button class="ctx-item" @click="addGroup">{{ i18n.repos.addGroup }}</button>
+        <button v-if="ctxTargetId" class="ctx-item" @click="renameNode">{{ i18n.repos.rename }}</button>
         <div v-if="ctxTargetId" class="ctx-separator" />
-        <button v-if="ctxTargetId" class="ctx-item ctx-danger" @click="deleteNode">Delete</button>
+        <button v-if="ctxTargetId" class="ctx-item ctx-danger" @click="deleteNode">{{ i18n.repos.delete }}</button>
       </div>
       <div v-if="ctxMenu" class="ctx-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu" />
 

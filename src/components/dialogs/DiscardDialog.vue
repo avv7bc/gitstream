@@ -2,11 +2,13 @@
 import { ref, computed, onMounted } from "vue";
 import { useFiles } from "@/composables/useFiles";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 
 const emit = defineEmits<{ close: [] }>();
 
 const { files, discardFiles, unstageFiles, refresh } = useFiles();
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 const revertTo = ref<"head" | "index">("head");
 
@@ -58,33 +60,33 @@ async function handleDiscard() {
   <div class="modal-overlay" @click.self="$emit('close')" @keydown.escape="$emit('close')" tabindex="-1">
     <div class="modal-dialog discard-dialog" :style="dragStyle">
       <div class="dialog-header" @mousedown="onDragStart">
-        <h3>Discard</h3>
+        <h3>{{ i18n.dialog.discard.title }}</h3>
         <button class="close-btn" @click="$emit('close')">
           <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
       </div>
 
       <div class="dialog-body">
-        <p class="dialog-hint">Discard local or staged changes</p>
-        <p class="dialog-subhint">Select the files for which changes should be discarded and whether to set them back to Index or HEAD state.</p>
+        <p class="dialog-hint">{{ i18n.dialog.discard.hint }}</p>
+        <p class="dialog-subhint">{{ i18n.dialog.discard.subhint }}</p>
 
         <div class="revert-to">
-          <span class="revert-label">Revert to:</span>
+          <span class="revert-label">{{ i18n.dialog.discard.revertTo }}</span>
           <label class="radio-label">
             <input type="radio" v-model="revertTo" value="head" />
-            <span>HEAD</span>
+            <span>{{ i18n.dialog.discard.head }}</span>
           </label>
           <label class="radio-label">
             <input type="radio" v-model="revertTo" value="index" />
-            <span>Index</span>
+            <span>{{ i18n.dialog.discard.index }}</span>
           </label>
         </div>
 
         <div class="file-table">
           <div class="file-table-header">
             <span class="col-check"></span>
-            <span class="col-name">Name</span>
-            <span class="col-dir">Directory</span>
+            <span class="col-name">{{ i18n.dialog.discard.name }}</span>
+            <span class="col-dir">{{ i18n.dialog.discard.directory }}</span>
           </div>
           <div class="file-table-body">
             <label
@@ -101,9 +103,9 @@ async function handleDiscard() {
       </div>
 
       <div class="dialog-footer">
-        <button class="btn btn-danger" :disabled="!canDiscard" @click="handleDiscard">Discard</button>
+        <button class="btn btn-danger" :disabled="!canDiscard" @click="handleDiscard">{{ i18n.dialog.discard.discard }}</button>
         <div class="footer-spacer"></div>
-        <button class="btn btn-secondary" @click="$emit('close')">Cancel</button>
+        <button class="btn btn-secondary" @click="$emit('close')">{{ i18n.dialog.discard.cancel }}</button>
       </div>
     </div>
   </div>

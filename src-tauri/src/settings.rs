@@ -8,6 +8,7 @@ const DEFAULT_WORKBENCH_FONT_FAMILY: &str = "Ubuntu";
 const DEFAULT_WORKBENCH_FONT_SIZE: u8 = 15;
 const DEFAULT_EDITOR_FONT_FAMILY: &str = "Ubuntu Mono";
 const DEFAULT_EDITOR_FONT_SIZE: u8 = 13;
+const DEFAULT_LANGUAGE: &str = "ru";
 
 fn default_network_timeout_secs() -> u64 {
     DEFAULT_NETWORK_TIMEOUT_SECS
@@ -24,6 +25,9 @@ fn default_editor_font_family() -> String {
 fn default_editor_font_size() -> u8 {
     DEFAULT_EDITOR_FONT_SIZE
 }
+fn default_language() -> String {
+    DEFAULT_LANGUAGE.to_string()
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct AppSettings {
@@ -37,6 +41,8 @@ pub struct AppSettings {
     pub editor_font_family: String,
     #[serde(default = "default_editor_font_size")]
     pub editor_font_size: u8,
+    #[serde(default = "default_language")]
+    pub language: String,
 }
 
 impl Default for AppSettings {
@@ -47,6 +53,7 @@ impl Default for AppSettings {
             workbench_font_size: DEFAULT_WORKBENCH_FONT_SIZE,
             editor_font_family: DEFAULT_EDITOR_FONT_FAMILY.to_string(),
             editor_font_size: DEFAULT_EDITOR_FONT_SIZE,
+            language: DEFAULT_LANGUAGE.to_string(),
         }
     }
 }
@@ -133,6 +140,7 @@ mod tests {
             workbench_font_size: DEFAULT_WORKBENCH_FONT_SIZE,
             editor_font_family: DEFAULT_EDITOR_FONT_FAMILY.to_string(),
             editor_font_size: DEFAULT_EDITOR_FONT_SIZE,
+            language: DEFAULT_LANGUAGE.to_string(),
         };
         write_settings_at(&p, &s).unwrap();
         let back = read_settings_at(&p);
@@ -182,6 +190,7 @@ mod tests {
             workbench_font_size: 14,
             editor_font_family: "Fira Code, monospace".to_string(),
             editor_font_size: 16,
+            language: DEFAULT_LANGUAGE.to_string(),
         };
         write_settings_at(&p, &s).unwrap();
         let back = read_settings_at(&p);

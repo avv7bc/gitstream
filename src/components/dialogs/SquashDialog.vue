@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 import type { CommitInfo } from "@/types";
 
 const props = defineProps<{
@@ -14,6 +15,7 @@ const emit = defineEmits<{
 }>();
 
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 const message = ref("");
 const busy = ref(false);
@@ -59,7 +61,7 @@ function onTextareaKeydown(e: KeyboardEvent) {
       </div>
 
       <div class="sq-body">
-        <div class="sq-hint">Commits being squashed (newest → oldest):</div>
+        <div class="sq-hint">{{ i18n.dialog.squash.hint }}</div>
         <div class="sq-commit-list">
           <div v-for="c in commits" :key="c.oid" class="sq-commit-item">
             <span class="sq-hash">{{ c.short_oid }}</span>
@@ -67,7 +69,7 @@ function onTextareaKeydown(e: KeyboardEvent) {
           </div>
         </div>
 
-        <label class="sq-label">Combined commit message</label>
+        <label class="sq-label">{{ i18n.dialog.squash.msgLabel }}</label>
         <textarea
           v-model="message"
           class="sq-textarea"
@@ -75,13 +77,13 @@ function onTextareaKeydown(e: KeyboardEvent) {
           autofocus
           @keydown="onTextareaKeydown"
         />
-        <div class="sq-hint-small">Ctrl+Enter to confirm</div>
+        <div class="sq-hint-small">{{ i18n.dialog.squash.ctrlEnter }}</div>
       </div>
 
       <div class="sq-footer">
-        <button class="sq-btn-cancel" @click="emit('close')">Cancel</button>
+        <button class="sq-btn-cancel" @click="emit('close')">{{ i18n.dialog.squash.cancel }}</button>
         <button class="sq-btn-confirm" :disabled="!canConfirm" @click="doSquash">
-          {{ busy ? 'Squashing…' : 'Squash' }}
+          {{ busy ? i18n.dialog.squash.squash + '…' : i18n.dialog.squash.squash }}
         </button>
       </div>
     </div>

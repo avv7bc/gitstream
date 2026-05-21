@@ -2,12 +2,14 @@
 import { ref, computed } from "vue";
 import { useBranches } from "@/composables/useBranches";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 import { highlight } from "@/utils/highlight";
 
 const emit = defineEmits<{ close: [] }>();
 
 const { branches, checkout } = useBranches();
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 const search = ref("");
 const selectedBranch = ref<string | null>(null);
@@ -32,7 +34,7 @@ async function handleCheckout() {
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-dialog checkout-dialog" :style="dragStyle">
       <div class="dialog-header" @mousedown="onDragStart">
-        <h3>Checkout Branch</h3>
+        <h3>{{ i18n.dialog.checkout.title }}</h3>
         <button class="close-btn" @click="$emit('close')">
           <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
@@ -42,7 +44,7 @@ async function handleCheckout() {
         <input
           v-model="search"
           type="text"
-          placeholder="Search branches..."
+          :placeholder="i18n.dialog.checkout.searchPlaceholder"
           class="form-input search-input"
         />
 
@@ -59,19 +61,19 @@ async function handleCheckout() {
           >
             <span class="branch-option-name" v-html="highlight(branch.name, search)" />
             <span v-if="branch.is_current" class="current-badge">(current)</span>
-            <span v-if="branch.is_remote" class="remote-hint">will create local branch</span>
+            <span v-if="branch.is_remote" class="remote-hint">{{ i18n.dialog.checkout.willCreateLocal }}</span>
           </div>
         </div>
       </div>
 
       <div class="dialog-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">Cancel</button>
+        <button class="btn btn-secondary" @click="$emit('close')">{{ i18n.dialog.checkout.cancel }}</button>
         <button
           class="btn btn-primary"
           :disabled="!selectedBranch || branches.find(b => b.name === selectedBranch)?.is_current"
           @click="handleCheckout"
         >
-          Checkout
+          {{ i18n.dialog.checkout.checkout }}
         </button>
       </div>
     </div>

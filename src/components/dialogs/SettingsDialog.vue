@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
-import { useTheme, type ThemeMode } from "@/composables/useTheme";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { useTheme } from "@/composables/useTheme";
 import { useSettings } from "@/composables/useSettings";
+import { useI18n } from "@/composables/useI18n";
 import { invoke } from "@/composables/useProgress";
 
 const emit = defineEmits<{ close: [] }>();
@@ -122,7 +123,8 @@ onUnmounted(() => {
 });
 
 const { mode } = useTheme();
-const { networkTimeoutSecs, workbenchFontFamily, workbenchFontSize, editorFontFamily, editorFontSize } = useSettings();
+const { networkTimeoutSecs, workbenchFontFamily, workbenchFontSize, editorFontFamily, editorFontSize, scheduleSave } = useSettings();
+const { i18n, locale, setLocale } = useI18n();
 
 const systemFonts = ref<string[]>([]);
 
@@ -130,25 +132,25 @@ const timeoutOptions = [5, 10, 30, 60];
 const wbFontSizes = Array.from({ length: 10 }, (_, i) => i + 11); // 11..20
 const edFontSizes = Array.from({ length: 15 }, (_, i) => i + 10); // 10..24
 
-const themes: { value: ThemeMode; label: string }[] = [
-  { value: "system", label: "System (как в ОС)" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark+ (VSCode)" },
-  { value: "material", label: "Material" },
-  { value: "smartgit", label: "SmartGit" },
-  { value: "catppuccin", label: "Catppuccin Mocha" },
-  { value: "dracula", label: "Dracula" },
-  { value: "sublime", label: "Sublime Text 4 (Monokai Pro)" },
-  { value: "github", label: "GitHub Dark" },
-];
+const themes = computed(() => [
+  { value: "system" as const, label: i18n.value.settings.themeSystem },
+  { value: "light" as const, label: i18n.value.settings.themeLight },
+  { value: "dark" as const, label: i18n.value.settings.themeDark },
+  { value: "material" as const, label: i18n.value.settings.themeMaterial },
+  { value: "smartgit" as const, label: i18n.value.settings.themeSmartgit },
+  { value: "catppuccin" as const, label: i18n.value.settings.themeCatppuccin },
+  { value: "dracula" as const, label: i18n.value.settings.themeDracula },
+  { value: "sublime" as const, label: i18n.value.settings.themeSublime },
+  { value: "github" as const, label: i18n.value.settings.themeGithub },
+]);
 
 const activeCategory = ref("appearance");
 const search = ref("");
 
-const categories = [
-  { id: "appearance", label: "Внешний вид" },
-  { id: "network", label: "Сеть" },
-];
+const categories = computed(() => [
+  { id: "appearance", label: i18n.value.settings.catAppearance },
+  { id: "network", label: i18n.value.settings.catNetwork },
+]);
 
 interface SettingItem {
   id: string;
@@ -157,49 +159,54 @@ interface SettingItem {
   description: string;
 }
 
-const settings: SettingItem[] = [
+const settingItems = computed((): SettingItem[] => [
+  {
+    id: "language",
+    category: "appearance",
+    label: i18n.value.settings.language,
+    description: i18n.value.settings.languageDesc,
+  },
   {
     id: "color-theme",
     category: "appearance",
-    label: "Workbench: Color Theme",
-    description: "Задаёт цветовую тему интерфейса. Тема «System» подстраивается под настройки операционной системы.",
+    label: i18n.value.settings.colorThemeLabel,
+    description: i18n.value.settings.colorThemeDesc,
   },
   {
     id: "workbench-font-family",
     category: "appearance",
-    label: "Workbench: Font Family",
-    description: "Шрифт интерфейса: панели, тулбар, диалоги. Задаётся как CSS font-family. Пример: «Segoe UI, sans-serif».",
+    label: i18n.value.settings.wbFontFamilyLabel,
+    description: i18n.value.settings.wbFontFamilyDesc,
   },
   {
     id: "workbench-font-size",
     category: "appearance",
-    label: "Workbench: Font Size",
-    description: "Базовый размер шрифта интерфейса в пикселях (11–20). Пропорционально масштабирует все уровни шрифта UI.",
+    label: i18n.value.settings.wbFontSizeLabel,
+    description: i18n.value.settings.wbFontSizeDesc,
   },
   {
     id: "editor-font-family",
     category: "appearance",
-    label: "Editor: Font Family",
-    description: "Шрифт diff-вьюера. Рекомендуется моноширинный. Пример: «Fira Code, monospace».",
+    label: i18n.value.settings.edFontFamilyLabel,
+    description: i18n.value.settings.edFontFamilyDesc,
   },
   {
     id: "editor-font-size",
     category: "appearance",
-    label: "Editor: Font Size",
-    description: "Размер шрифта diff-вьюера в пикселях (10–24).",
+    label: i18n.value.settings.edFontSizeLabel,
+    description: i18n.value.settings.edFontSizeDesc,
   },
   {
     id: "network-timeout",
     category: "network",
-    label: "Network: Timeout (сек)",
-    description:
-      "Максимальное время сетевой git-операции (fetch, pull, push, clone). По истечении операция прерывается, а зависший процесс git принудительно завершается.",
+    label: i18n.value.settings.netTimeoutLabel,
+    description: i18n.value.settings.netTimeoutDesc,
   },
-];
+]);
 
 const filteredSettings = computed(() => {
   const q = search.value.trim().toLowerCase();
-  return settings.filter((s) => {
+  return settingItems.value.filter((s) => {
     if (s.category !== activeCategory.value && q === "") return s.category === activeCategory.value;
     if (q) {
       const hay = `${s.label} ${s.description}`.toLowerCase();
@@ -210,8 +217,10 @@ const filteredSettings = computed(() => {
 });
 
 const activeCategoryLabel = computed(
-  () => categories.find((c) => c.id === activeCategory.value)?.label ?? ""
+  () => categories.value.find((c) => c.id === activeCategory.value)?.label ?? ""
 );
+
+watch(locale, () => scheduleSave());
 </script>
 
 <template>
@@ -239,7 +248,7 @@ const activeCategoryLabel = computed(
       <!-- Title bar -->
       <div class="vs-titlebar" @mousedown="onTitleMouseDown">
         <div class="vs-title">
-          <span>Параметры</span>
+          <span>{{ i18n.settings.title }}</span>
         </div>
         <div class="vs-title-actions">
           <button class="vs-icon-btn close" @click="emit('close')" title="Close">
@@ -254,13 +263,13 @@ const activeCategoryLabel = computed(
           <input
             v-model="search"
             type="text"
-            placeholder="Параметры поиска"
+            :placeholder="i18n.settings.searchPlaceholder"
           />
           <div class="vs-search-actions">
-            <button class="vs-icon-btn sm" tabindex="-1" title="Clear filter">
+            <button class="vs-icon-btn sm" tabindex="-1" :title="i18n.settings.clearFilter">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 3l10 10M13 3L3 13"/></svg>
             </button>
-            <button class="vs-icon-btn sm" tabindex="-1" title="Filter">
+            <button class="vs-icon-btn sm" tabindex="-1" :title="i18n.settings.filter">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 3h12l-5 6v5l-2-1V9z"/></svg>
             </button>
           </div>
@@ -288,7 +297,7 @@ const activeCategoryLabel = computed(
           <h2 class="vs-section-title">{{ activeCategoryLabel }}</h2>
 
           <div v-if="filteredSettings.length === 0" class="vs-empty">
-            Параметры в этой категории отсутствуют.
+            {{ i18n.settings.emptyCategory }}
           </div>
 
           <div
@@ -301,6 +310,16 @@ const activeCategoryLabel = computed(
             </div>
             <div class="vs-setting-desc">{{ s.description }}</div>
 
+            <div v-if="s.id === 'language'" class="vs-setting-control">
+              <select
+                :value="locale"
+                @change="setLocale(($event.target as HTMLSelectElement).value as 'ru' | 'en')"
+                class="vs-select"
+              >
+                <option value="ru">{{ i18n.settings.langRu }}</option>
+                <option value="en">{{ i18n.settings.langEn }}</option>
+              </select>
+            </div>
             <div v-if="s.id === 'color-theme'" class="vs-setting-control">
               <select v-model="mode" class="vs-select">
                 <option v-for="t in themes" :key="t.value" :value="t.value">{{ t.label }}</option>
@@ -313,7 +332,7 @@ const activeCategoryLabel = computed(
             </div>
             <div v-if="s.id === 'workbench-font-size'" class="vs-setting-control">
               <select v-model.number="workbenchFontSize" class="vs-select vs-select-narrow">
-                <option v-for="n in wbFontSizes" :key="n" :value="n">{{ n }} px</option>
+                <option v-for="n in wbFontSizes" :key="n" :value="n">{{ n }} {{ i18n.settings.px }}</option>
               </select>
             </div>
             <div v-if="s.id === 'editor-font-family'" class="vs-setting-control">
@@ -323,12 +342,12 @@ const activeCategoryLabel = computed(
             </div>
             <div v-if="s.id === 'editor-font-size'" class="vs-setting-control">
               <select v-model.number="editorFontSize" class="vs-select vs-select-narrow">
-                <option v-for="n in edFontSizes" :key="n" :value="n">{{ n }} px</option>
+                <option v-for="n in edFontSizes" :key="n" :value="n">{{ n }} {{ i18n.settings.px }}</option>
               </select>
             </div>
             <div v-if="s.id === 'network-timeout'" class="vs-setting-control">
               <select v-model.number="networkTimeoutSecs" class="vs-select">
-                <option v-for="t in timeoutOptions" :key="t" :value="t">{{ t }} сек</option>
+                <option v-for="t in timeoutOptions" :key="t" :value="t">{{ t }} {{ i18n.settings.sec }}</option>
               </select>
             </div>
           </div>

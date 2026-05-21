@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 
 const props = defineProps<{
   oid: string;
@@ -14,6 +15,7 @@ const emit = defineEmits<{
 }>();
 
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 const text = ref("");
 const busy = ref(false);
@@ -52,7 +54,7 @@ function onTextareaKeydown(e: KeyboardEvent) {
       </div>
 
       <div class="rw-body">
-        <label class="rw-label">Commit message</label>
+        <label class="rw-label">{{ i18n.dialog.reword.msgLabel }}</label>
         <textarea
           v-model="text"
           class="rw-textarea"
@@ -64,9 +66,9 @@ function onTextareaKeydown(e: KeyboardEvent) {
       </div>
 
       <div class="rw-footer">
-        <button class="rw-btn-cancel" @click="emit('close')">Cancel</button>
+        <button class="rw-btn-cancel" @click="emit('close')">{{ i18n.dialog.reword.cancel }}</button>
         <button class="rw-btn-confirm" :disabled="busy || !text.trim()" @click="doConfirm">
-          {{ busy ? 'Saving…' : 'Save' }}
+          {{ busy ? i18n.dialog.reword.save + '…' : i18n.dialog.reword.save }}
         </button>
       </div>
     </div>

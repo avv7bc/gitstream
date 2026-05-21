@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useLog } from "@/composables/useLog";
+import { useI18n } from "@/composables/useI18n";
 
 const { commits, selectedCommit } = useLog();
+const { i18n } = useI18n();
 
 const commit = computed(() => {
   if (!selectedCommit.value || selectedCommit.value === "__worktree__") return null;
@@ -29,7 +31,7 @@ const formattedDate = computed(() => {
 <template>
   <div class="commit-details" @contextmenu.prevent>
     <div class="panel-title-bar">
-      <span class="panel-title">Commit</span>
+      <span class="panel-title">{{ i18n.commitDetails.title }}</span>
       <span v-if="commit" class="panel-title-date">{{ formattedDate }}</span>
     </div>
 
@@ -37,15 +39,15 @@ const formattedDate = computed(() => {
       <div class="details-top">
         <div class="details-info">
           <div class="detail-row">
-            <span class="detail-label">Commit</span>
+            <span class="detail-label">{{ i18n.commitDetails.commit }}</span>
             <span class="detail-value hash">{{ commit.short_oid }}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">by</span>
+            <span class="detail-label">{{ i18n.commitDetails.by }}</span>
             <span class="detail-value author">{{ commit.author }}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">parent</span>
+            <span class="detail-label">{{ i18n.commitDetails.parent }}</span>
             <span class="detail-value hash link">{{ commit.parents[0].slice(0, 8) }}</span>
           </div>
         </div>

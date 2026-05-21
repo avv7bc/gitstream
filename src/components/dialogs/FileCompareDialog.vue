@@ -4,11 +4,13 @@ import { invoke } from "@/composables/useProgress";
 import { useFileCompare } from "@/composables/useFileCompare";
 import { useRepo } from "@/composables/useRepo";
 import { useDraggable } from "@/composables/useDraggable";
+import { useI18n } from "@/composables/useI18n";
 import type { FileDiff, DiffHunk } from "@/types";
 
 const { target, close } = useFileCompare();
 const { repoPath } = useRepo();
 const { dragStyle, onDragStart } = useDraggable();
+const { i18n } = useI18n();
 
 const diff = ref<FileDiff | null>(null);
 const loading = ref(false);
@@ -208,35 +210,35 @@ function curvePath(g: ChangeGroup): string {
 
       <!-- Toolbar -->
       <div class="fc-toolbar">
-        <button class="fc-tb" @click="prevChange" title="Previous Change">
+        <button class="fc-tb" @click="prevChange" :title="i18n.dialog.fileCompare.prevChange">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 19V5"/>
             <path d="M5 12l7-7 7 7"/>
           </svg>
-          <span>Prev. Change</span>
+          <span>{{ i18n.dialog.fileCompare.prevChange }}</span>
         </button>
-        <button class="fc-tb active" @click="nextChange" title="Next Change">
+        <button class="fc-tb active" @click="nextChange" :title="i18n.dialog.fileCompare.nextChange">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 5v14"/>
             <path d="M5 12l7 7 7-7"/>
           </svg>
-          <span>Next Change</span>
+          <span>{{ i18n.dialog.fileCompare.nextChange }}</span>
         </button>
-        <button class="fc-tb" disabled title="Take Left">
+        <button class="fc-tb" disabled :title="i18n.dialog.fileCompare.takeLeft">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="5" width="6" height="14" rx="1"/>
             <path d="M14 12h7"/>
             <path d="M17 9l-3 3 3 3"/>
           </svg>
-          <span>Take Left</span>
+          <span>{{ i18n.dialog.fileCompare.takeLeft }}</span>
         </button>
-        <button class="fc-tb" disabled title="Take Right">
+        <button class="fc-tb" disabled :title="i18n.dialog.fileCompare.takeRight">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <rect x="15" y="5" width="6" height="14" rx="1"/>
             <path d="M3 12h7"/>
             <path d="M7 9l3 3-3 3"/>
           </svg>
-          <span>Take Right</span>
+          <span>{{ i18n.dialog.fileCompare.takeRight }}</span>
         </button>
       </div>
 

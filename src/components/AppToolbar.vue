@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useFiles } from "@/composables/useFiles";
+import { useI18n } from "@/composables/useI18n";
+const { i18n } = useI18n();
 
 defineEmits<{
   commit: [];
@@ -55,11 +57,11 @@ function closeMenu() {
   <div class="toolbar">
     <div class="toolbar-group">
       <div class="menu-button-wrapper">
-        <button class="toolbar-btn" @click="toggleRepoMenu" title="Repository menu">
+        <button class="toolbar-btn" @click="toggleRepoMenu" :title="i18n.toolbar.menu">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M3 5h10l-1.5-1H3V5zm0 3h10V7H3v1zm0 3h10v-1H3v1z" fill="none" stroke="currentColor" stroke-width="1.5"/>
           </svg>
-          <span>Menu</span>
+          <span>{{ i18n.toolbar.menu }}</span>
         </button>
 
         <div v-if="showRepoMenu" class="dropdown-menu" @click.stop>
@@ -67,93 +69,93 @@ function closeMenu() {
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M8 3v10M3 8h10"/>
             </svg>
-            Add Repository
+            {{ i18n.toolbar.addRepository }}
           </button>
           <button class="dropdown-item" @click="$emit('addGroup'); closeMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M8 3v10M3 8h10"/>
             </svg>
-            Add Group
+            {{ i18n.toolbar.addGroup }}
           </button>
         </div>
 
         <div v-if="showRepoMenu" class="menu-backdrop" @click="closeMenu" @contextmenu.prevent="closeMenu" />
       </div>
 
-      <button class="toolbar-btn" @click="$emit('pull')" title="Pull">
+      <button class="toolbar-btn" @click="$emit('pull')" :title="i18n.toolbar.pull">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
         </svg>
-        <span>Pull</span>
+        <span>{{ i18n.toolbar.pull }}</span>
       </button>
-      <button class="toolbar-btn" @click="$emit('push')" title="Push">
+      <button class="toolbar-btn" @click="$emit('push')" :title="i18n.toolbar.push">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 3l4 4H9.5v5h-3V7H4L8 3z"/>
         </svg>
-        <span>Push</span>
+        <span>{{ i18n.toolbar.push }}</span>
       </button>
-      <button class="toolbar-btn" title="Fetch" disabled>
+      <button class="toolbar-btn" :title="i18n.toolbar.fetch" disabled>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 13V5M5 9l3 4 3-4M3 3h10"/>
         </svg>
-        <span>Fetch</span>
+        <span>{{ i18n.toolbar.fetch }}</span>
       </button>
     </div>
 
     <div class="toolbar-separator" />
 
     <div class="toolbar-group">
-      <button class="toolbar-btn" @click="$emit('commit')" title="Commit">
+      <button class="toolbar-btn" @click="$emit('commit')" :title="i18n.toolbar.commit">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
           <path d="M8 1v4M8 11v4M1 8h4M11 8h4" stroke="currentColor" stroke-width="1.5"/>
         </svg>
-        <span>Commit</span>
+        <span>{{ i18n.toolbar.commit }}</span>
       </button>
-      <button class="toolbar-btn" @click="$emit('checkout')" title="Checkout">
+      <button class="toolbar-btn" @click="$emit('checkout')" :title="i18n.toolbar.checkout">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M4 4v8M4 8h5l3-3M12 5v3h-3" fill="none" stroke="currentColor" stroke-width="1.5"/>
         </svg>
-        <span>Checkout</span>
+        <span>{{ i18n.toolbar.checkout }}</span>
       </button>
     </div>
 
     <div class="toolbar-separator" />
 
     <div class="toolbar-group">
-      <button class="toolbar-btn" title="Stage" :disabled="!canStage" @click="doStage">
+      <button class="toolbar-btn" :title="i18n.toolbar.stage" :disabled="!canStage" @click="doStage">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M3 8l3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.5"/>
         </svg>
-        <span>Stage</span>
+        <span>{{ i18n.toolbar.stage }}</span>
       </button>
-      <button class="toolbar-btn" title="Unstage" :disabled="!canUnstage" @click="doUnstage">
+      <button class="toolbar-btn" :title="i18n.toolbar.unstage" :disabled="!canUnstage" @click="doUnstage">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5"/>
         </svg>
-        <span>Unstage</span>
+        <span>{{ i18n.toolbar.unstage }}</span>
       </button>
-      <button class="toolbar-btn" title="Discard" :disabled="!canDiscard" @click="$emit('discard')">
+      <button class="toolbar-btn" :title="i18n.toolbar.discard" :disabled="!canDiscard" @click="$emit('discard')">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M3 5h10l-1 9H4L3 5zM6 2h4M2 5h12" fill="none" stroke="currentColor" stroke-width="1.5"/>
         </svg>
-        <span>Discard</span>
+        <span>{{ i18n.toolbar.discard }}</span>
       </button>
     </div>
 
     <div class="toolbar-separator" />
 
     <div class="toolbar-group">
-      <button class="toolbar-btn" title="Merge" disabled>
+      <button class="toolbar-btn" :title="i18n.toolbar.merge" disabled>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <circle cx="4" cy="4" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
           <circle cx="12" cy="4" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
           <circle cx="8" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
           <path d="M4 6v2c0 2 4 4 4 4M12 6v2c0 2-4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/>
         </svg>
-        <span>Merge</span>
+        <span>{{ i18n.toolbar.merge }}</span>
       </button>
-      <button class="toolbar-btn" title="Rebase" disabled>
+      <button class="toolbar-btn" :title="i18n.toolbar.rebase" disabled>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <circle cx="4" cy="3" r="1.5" fill="currentColor"/>
           <circle cx="4" cy="8" r="1.5" fill="currentColor"/>
@@ -161,22 +163,22 @@ function closeMenu() {
           <path d="M6 3h4M6 8h4M6 13h4" stroke="currentColor" stroke-width="1.5"/>
           <path d="M10 3l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.5"/>
         </svg>
-        <span>Rebase</span>
+        <span>{{ i18n.toolbar.rebase }}</span>
       </button>
-      <button class="toolbar-btn" title="Stash" disabled>
+      <button class="toolbar-btn" :title="i18n.toolbar.stash" disabled>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <rect x="3" y="2" width="10" height="3" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/>
           <rect x="3" y="6.5" width="10" height="3" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/>
           <rect x="3" y="11" width="10" height="3" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/>
         </svg>
-        <span>Stash</span>
+        <span>{{ i18n.toolbar.stash }}</span>
       </button>
-      <button class="toolbar-btn" @click="$emit('clone')" title="Clone Repository">
+      <button class="toolbar-btn" @click="$emit('clone')" :title="i18n.toolbar.clone">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M10 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V5l-3-3z" fill="none" stroke="currentColor" stroke-width="1.2"/>
           <path d="M10 2v3h3" fill="none" stroke="currentColor" stroke-width="1.2"/>
         </svg>
-        <span>Clone</span>
+        <span>{{ i18n.toolbar.clone }}</span>
       </button>
     </div>
 

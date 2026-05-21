@@ -5,6 +5,14 @@ mod git;
 mod settings;
 
 fn main() {
+    #[cfg(target_os = "linux")]
+    {
+        // WebKitGTK 2.44+ DMA-buf renderer fails to init EGL via GBM on some systems
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            unsafe { std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1") };
+        }
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
