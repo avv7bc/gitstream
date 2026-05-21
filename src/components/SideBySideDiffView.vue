@@ -97,7 +97,7 @@ async function onSelectionAction(action: "stage" | "unstage" | "discard") {
   if (payload.length === 0) return;
   if (action === "discard") {
     const n = selectedLines.value.size;
-    if (!window.confirm(`Отменить изменения в выбранных строках (${n})? Это действие необратимо.`)) {
+    if (!window.confirm(`Discard changes in the selected lines (${n})? This action cannot be undone.`)) {
       return;
     }
   }
@@ -204,7 +204,7 @@ function scrollToHunk() {
       <span class="panel-title">Changes of {{ diffFileName }}</span>
       <div class="diff-actions">
         <span class="sel-counter" v-if="hasSelection">
-          выбрано {{ selectedLines.size }}
+          {{ selectedLines.size }} selected
         </span>
         <button
           class="diff-nav-btn"

@@ -8,15 +8,15 @@ const COMMAND_LABELS: Record<string, string> = {
   do_fetch: "Fetch…",
   do_pull: "Pull…",
   do_push: "Push…",
-  do_clone: "Клонирование…",
-  get_status: "Статус файлов…",
-  get_log: "Загрузка лога…",
+  do_clone: "Cloning…",
+  get_status: "File status…",
+  get_log: "Loading log…",
   stage_files: "Stage…",
   unstage_files: "Unstage…",
   discard_files: "Discard…",
 };
 
-const FALLBACK_LABEL = "Работаем…";
+const FALLBACK_LABEL = "Working…";
 
 interface ActiveOp {
   cmd: string;
@@ -41,7 +41,7 @@ export const progressLabel = computed(() => {
   if (networkProgressLine.value) return networkProgressLine.value;
   const size = active.value.size;
   if (size === 0) return "";
-  if (size > 1) return `Операций: ${size}`;
+  if (size > 1) return `Operations: ${size}`;
   const first = active.value.values().next().value as ActiveOp | undefined;
   return first?.label ?? FALLBACK_LABEL;
 });

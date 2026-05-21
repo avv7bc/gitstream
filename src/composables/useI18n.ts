@@ -6,7 +6,7 @@ import type { Translations } from "@/locales/ru";
 export type Lang = "ru" | "en";
 
 const locales: Record<Lang, Translations> = { ru, en };
-const locale = ref<Lang>("ru");
+const locale = ref<Lang>("en");
 
 function setLocale(lang: Lang): void {
   locale.value = lang;

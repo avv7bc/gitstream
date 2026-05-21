@@ -8,7 +8,7 @@ const DEFAULT_WORKBENCH_FONT_FAMILY: &str = "Ubuntu";
 const DEFAULT_WORKBENCH_FONT_SIZE: u8 = 15;
 const DEFAULT_EDITOR_FONT_FAMILY: &str = "Ubuntu Mono";
 const DEFAULT_EDITOR_FONT_SIZE: u8 = 13;
-const DEFAULT_LANGUAGE: &str = "ru";
+const DEFAULT_LANGUAGE: &str = "en";
 
 fn default_network_timeout_secs() -> u64 {
     DEFAULT_NETWORK_TIMEOUT_SECS

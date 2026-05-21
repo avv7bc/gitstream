@@ -127,7 +127,8 @@ const sortedAuthors = computed(() => {
 });
 
 // --- Helpers ---
-const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+// Локализованные дни недели для барчарта by_weekday и labels heatmap.
+const WEEKDAYS = computed(() => i18n.value.stats.weekdays);
 
 function maxVal(arr: number[]): number {
   return arr.reduce((m, v) => Math.max(m, v), 0) || 1;
@@ -142,7 +143,8 @@ function fmtNum(n: number): string {
 }
 
 // --- Heatmap ---
-const HM_MONTHS = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+// Месяцы тянем из i18n, чтобы лейблы heatmap'а переключались с языком.
+const HM_MONTHS = computed(() => i18n.value.stats.months);
 
 interface HmCell { date: string; count: number; future: boolean; }
 interface HmData {
@@ -178,7 +180,7 @@ const heatmap = computed((): HmData | null => {
 
   while (cur <= end) {
     const m = cur.getMonth();
-    if (m !== lastMonth) { monthLabels.push({ label: HM_MONTHS[m], wi: weeks.length }); lastMonth = m; }
+    if (m !== lastMonth) { monthLabels.push({ label: HM_MONTHS.value[m], wi: weeks.length }); lastMonth = m; }
     const week: HmCell[] = [];
     for (let i = 0; i < 7; i++) {
       const d = cur.toISOString().split('T')[0];
@@ -202,12 +204,12 @@ function cellLevel(count: number, maxCount: number): number {
   return 4;
 }
 
-const periods: { value: StatsPeriod; label: string }[] = [
-  { value: "7d",  label: "Неделя" },
-  { value: "30d", label: "Месяц" },
-  { value: "1y",  label: "Год" },
-  { value: "all", label: "Все время" },
-];
+const periods = computed<{ value: StatsPeriod; label: string }[]>(() => [
+  { value: "7d",  label: i18n.value.stats.periodWeek },
+  { value: "30d", label: i18n.value.stats.periodMonth },
+  { value: "1y",  label: i18n.value.stats.periodYear },
+  { value: "all", label: i18n.value.stats.periodAll },
+]);
 </script>
 
 <template>
@@ -266,7 +268,7 @@ const periods: { value: StatsPeriod; label: string }[] = [
           <!-- ── Activity Heatmap ──────────────────── -->
           <section v-if="heatmap" class="st-section">
             <div class="st-section-title-row">
-              <h2 class="st-section-title">Activity &mdash; {{ fmtNum(heatmap.total) }} коммитов</h2>
+              <h2 class="st-section-title">{{ i18n.stats.activity }} &mdash; {{ fmtNum(heatmap.total) }} {{ i18n.stats.commits }}</h2>
               <div class="st-hm-legend">
                 <span>{{ i18n.stats.less }}</span>
                 <div v-for="l in [0,1,2,3,4]" :key="l" class="st-hm-cell" :class="`lv-${l}`" />
@@ -288,7 +290,11 @@ const periods: { value: StatsPeriod; label: string }[] = [
               <!-- Day labels + cells -->
               <div class="st-hm-body">
                 <div class="st-hm-day-labels">
-                  <div v-for="d in ['Пн','','Ср','','Пт','','Вс']" :key="d" class="st-hm-day-label">{{ d }}</div>
+                  <div
+                    v-for="(label, di) in [i18n.stats.weekdays[0], '', i18n.stats.weekdays[2], '', i18n.stats.weekdays[4], '', i18n.stats.weekdays[6]]"
+                    :key="di"
+                    class="st-hm-day-label"
+                  >{{ label }}</div>
                 </div>
                 <div class="st-hm-cells">
                   <template v-for="(week, wi) in heatmap.weeks" :key="wi">
@@ -297,7 +303,7 @@ const periods: { value: StatsPeriod; label: string }[] = [
                       :key="di"
                       class="st-hm-cell"
                       :class="[`lv-${cellLevel(cell.count, heatmap.maxCount)}`, { future: cell.future }]"
-                      :title="cell.count > 0 ? `${cell.date}: ${cell.count} коммитов` : cell.date"
+                      :title="cell.count > 0 ? `${cell.date}: ${cell.count} ${i18n.stats.commits}` : cell.date"
                     />
                   </template>
                 </div>

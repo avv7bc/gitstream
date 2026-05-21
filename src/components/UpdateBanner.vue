@@ -27,16 +27,16 @@ async function download() {
     <div class="update-icon">↑</div>
     <div class="update-content">
       <div class="update-title">
-        Обновление GitStream доступно (v{{ info.version }})
+        GitStream update available (v{{ info.version }})
       </div>
       <button class="update-changelog" @click="openUrl(info.release_url)">
-        Список изменений ›
+        Changelog ›
       </button>
     </div>
     <div class="update-actions">
       <button class="btn btn-primary" @click="download">{{ i18n.update.download }}</button>
       <button class="btn btn-secondary" @click="emit('dismiss')">
-        Отменить
+        Dismiss
       </button>
     </div>
   </div>
