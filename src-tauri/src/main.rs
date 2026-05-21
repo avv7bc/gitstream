@@ -73,6 +73,7 @@ fn main() {
             commands::get_repo_stats,
             commands::check_for_update,
             commands::open_url,
+            commands::list_system_fonts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

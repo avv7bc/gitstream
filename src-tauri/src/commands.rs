@@ -2,11 +2,11 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
+use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
-use tauri::Emitter;
 
-use crate::git::{query, mutation, types::*};
+use crate::git::{mutation, query, types::*};
 
 #[derive(serde::Serialize, Clone)]
 struct NetworkProgressEvent {
@@ -63,9 +63,9 @@ async fn run_network_git(
     cmd.stderr(Stdio::piped());
     cmd.kill_on_drop(true);
 
-    let mut child = cmd.spawn().map_err(|e| {
-        format!("Failed to run git: {} (Is git installed and in PATH?)", e)
-    })?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to run git: {} (Is git installed and in PATH?)", e))?;
 
     // Стримим stderr построчно и эмитим события прогресса
     let app_handle = app.clone();
@@ -84,10 +84,13 @@ async fn run_network_git(
                         // git пишет прогресс с \r — обрезаем
                         let trimmed = line.trim_end_matches(|c| c == '\r' || c == '\n').trim();
                         if !trimmed.is_empty() {
-                            let _ = app_handle.emit("network_progress", NetworkProgressEvent {
-                                op: op.clone(),
-                                line: trimmed.to_string(),
-                            });
+                            let _ = app_handle.emit(
+                                "network_progress",
+                                NetworkProgressEvent {
+                                    op: op.clone(),
+                                    line: trimmed.to_string(),
+                                },
+                            );
                             collected.push_str(trimmed);
                             collected.push('\n');
                         }
@@ -115,10 +118,7 @@ async fn run_network_git(
         Err(_) => {
             let _ = child.start_kill();
             let _ = child.wait().await;
-            Err(format!(
-                "Network timeout: {} превысил {} сек",
-                label, secs
-            ))
+            Err(format!("Network timeout: {} превысил {} сек", label, secs))
         }
     }
 }
@@ -198,11 +198,9 @@ pub async fn get_diff_commit(repo_path: String, oid: String) -> Result<Vec<FileD
     // Sync-команда блокировала бы главный поток Tauri: при удержании стрелки
     // в CommitGraph каждый шаг ждёт `git diff` целого коммита, и UI замирает.
     let path = std::path::PathBuf::from(repo_path);
-    tokio::task::spawn_blocking(move || {
-        query::diff_commit(&path, &oid).map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    tokio::task::spawn_blocking(move || query::diff_commit(&path, &oid).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -328,8 +326,13 @@ pub fn do_checkout(repo_path: String, branch: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn do_checkout_remote(repo_path: String, remote_branch: String, local_name: Option<String>) -> Result<(), String> {
-    mutation::checkout_remote(Path::new(&repo_path), &remote_branch, local_name.as_deref()).map_err(|e| e.to_string())
+pub fn do_checkout_remote(
+    repo_path: String,
+    remote_branch: String,
+    local_name: Option<String>,
+) -> Result<(), String> {
+    mutation::checkout_remote(Path::new(&repo_path), &remote_branch, local_name.as_deref())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -340,7 +343,14 @@ pub async fn do_fetch(
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let args = mutation::fetch_args(&remote);
-    run_network_git(&app, Some(Path::new(&repo_path)), &args, timeout_secs, "fetch").await
+    run_network_git(
+        &app,
+        Some(Path::new(&repo_path)),
+        &args,
+        timeout_secs,
+        "fetch",
+    )
+    .await
 }
 
 #[tauri::command]
@@ -352,7 +362,14 @@ pub async fn do_pull(
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let args = mutation::pull_args(&remote, rebase);
-    run_network_git(&app, Some(Path::new(&repo_path)), &args, timeout_secs, "pull").await
+    run_network_git(
+        &app,
+        Some(Path::new(&repo_path)),
+        &args,
+        timeout_secs,
+        "pull",
+    )
+    .await
 }
 
 #[tauri::command]
@@ -364,7 +381,14 @@ pub async fn do_push(
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let args = mutation::push_args(&remote, force);
-    run_network_git(&app, Some(Path::new(&repo_path)), &args, timeout_secs, "push").await
+    run_network_git(
+        &app,
+        Some(Path::new(&repo_path)),
+        &args,
+        timeout_secs,
+        "push",
+    )
+    .await
 }
 
 #[tauri::command]
@@ -377,7 +401,14 @@ pub async fn do_push_branch(
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let args = mutation::push_branch_args(&remote, &branch, force);
-    run_network_git(&app, Some(Path::new(&repo_path)), &args, timeout_secs, "push").await
+    run_network_git(
+        &app,
+        Some(Path::new(&repo_path)),
+        &args,
+        timeout_secs,
+        "push",
+    )
+    .await
 }
 
 #[tauri::command]
@@ -390,7 +421,14 @@ pub async fn do_push_tag(
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let args = mutation::push_tag_args(&remote, &name, delete);
-    run_network_git(&app, Some(Path::new(&repo_path)), &args, timeout_secs, "push").await
+    run_network_git(
+        &app,
+        Some(Path::new(&repo_path)),
+        &args,
+        timeout_secs,
+        "push",
+    )
+    .await
 }
 
 #[tauri::command]
@@ -410,7 +448,11 @@ pub fn do_merge(repo_path: String, branch: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn do_rename_branch(repo_path: String, old_name: String, new_name: String) -> Result<(), String> {
+pub fn do_rename_branch(
+    repo_path: String,
+    old_name: String,
+    new_name: String,
+) -> Result<(), String> {
     mutation::rename_branch(Path::new(&repo_path), &old_name, &new_name).map_err(|e| e.to_string())
 }
 
@@ -443,7 +485,10 @@ pub fn do_delete_tag(repo_path: String, name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn get_repo_stats(repo_path: String, since_days: Option<u32>) -> Result<RepoStats, String> {
+pub async fn get_repo_stats(
+    repo_path: String,
+    since_days: Option<u32>,
+) -> Result<RepoStats, String> {
     let path = std::path::PathBuf::from(repo_path);
     tokio::task::spawn_blocking(move || {
         query::repo_stats(&path, since_days).map_err(|e| e.to_string())
@@ -453,7 +498,11 @@ pub async fn get_repo_stats(repo_path: String, since_days: Option<u32>) -> Resul
 }
 
 #[tauri::command]
-pub async fn do_reword_commit(repo_path: String, oid: String, message: String) -> Result<String, String> {
+pub async fn do_reword_commit(
+    repo_path: String,
+    oid: String,
+    message: String,
+) -> Result<String, String> {
     let path = std::path::PathBuf::from(repo_path);
     tokio::task::spawn_blocking(move || {
         mutation::reword_commit(&path, &oid, &message).map_err(|e| e.to_string())
@@ -463,7 +512,11 @@ pub async fn do_reword_commit(repo_path: String, oid: String, message: String) -
 }
 
 #[tauri::command]
-pub async fn do_squash(repo_path: String, oids: Vec<String>, message: String) -> Result<(), String> {
+pub async fn do_squash(
+    repo_path: String,
+    oids: Vec<String>,
+    message: String,
+) -> Result<(), String> {
     let path = std::path::PathBuf::from(repo_path);
     tokio::task::spawn_blocking(move || {
         mutation::squash(&path, &oids, &message).map_err(|e| e.to_string())
@@ -476,13 +529,22 @@ pub async fn do_squash(repo_path: String, oids: Vec<String>, message: String) ->
 pub fn check_repo_path(path: String) -> Result<RepoPathCheck, String> {
     let p = PathBuf::from(&path);
     if !p.exists() {
-        return Ok(RepoPathCheck { exists: false, is_git_repo: false, display_name: String::new() });
+        return Ok(RepoPathCheck {
+            exists: false,
+            is_git_repo: false,
+            display_name: String::new(),
+        });
     }
     let is_git = p.join(".git").exists() || p.join("HEAD").exists();
-    let display_name = p.file_name()
+    let display_name = p
+        .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
-    Ok(RepoPathCheck { exists: true, is_git_repo: is_git, display_name })
+    Ok(RepoPathCheck {
+        exists: true,
+        is_git_repo: is_git,
+        display_name,
+    })
 }
 
 #[tauri::command]
@@ -540,13 +602,35 @@ pub fn open_url(url: String) -> Result<(), String> {
     open_in_browser(&url).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn list_system_fonts() -> Vec<String> {
+    let Ok(output) = std::process::Command::new("fc-list")
+        .args([":", "family"])
+        .output()
+    else {
+        return Vec::new();
+    };
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut families: Vec<String> = stdout
+        .lines()
+        .flat_map(|line| line.split(','))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    families.sort_unstable_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+    families.dedup();
+    families
+}
+
 fn open_in_browser(url: &str) -> std::io::Result<()> {
     #[cfg(target_os = "linux")]
     std::process::Command::new("xdg-open").arg(url).spawn()?;
     #[cfg(target_os = "macos")]
     std::process::Command::new("open").arg(url).spawn()?;
     #[cfg(target_os = "windows")]
-    std::process::Command::new("cmd").args(["/c", "start", "", url]).spawn()?;
+    std::process::Command::new("cmd")
+        .args(["/c", "start", "", url])
+        .spawn()?;
     Ok(())
 }
 
@@ -567,7 +651,11 @@ mod network_timeout_tests {
         ));
         fs::create_dir_all(&dir).unwrap();
         let run = |args: &[&str]| {
-            StdCommand::new("git").current_dir(&dir).args(args).output().unwrap();
+            StdCommand::new("git")
+                .current_dir(&dir)
+                .args(args)
+                .output()
+                .unwrap();
         };
         run(&["init", "-q"]);
         run(&["remote", "add", "origin", "https://192.0.2.1/dead.git"]);
@@ -602,10 +690,16 @@ mod network_timeout_tests {
 
     #[tokio::test]
     async fn zero_timeout_falls_back_to_default() {
-        assert_eq!(effective_timeout_secs(Some(0)), DEFAULT_NETWORK_TIMEOUT_SECS);
+        assert_eq!(
+            effective_timeout_secs(Some(0)),
+            DEFAULT_NETWORK_TIMEOUT_SECS
+        );
         assert_eq!(effective_timeout_secs(None), DEFAULT_NETWORK_TIMEOUT_SECS);
         assert_eq!(effective_timeout_secs(Some(25)), 25);
-        assert_eq!(effective_timeout_secs(Some(99999)), MAX_NETWORK_TIMEOUT_SECS);
+        assert_eq!(
+            effective_timeout_secs(Some(99999)),
+            MAX_NETWORK_TIMEOUT_SECS
+        );
         assert_eq!(effective_timeout_secs(Some(600)), 600);
     }
 }

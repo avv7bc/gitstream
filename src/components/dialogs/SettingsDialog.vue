@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useTheme, type ThemeMode } from "@/composables/useTheme";
 import { useSettings } from "@/composables/useSettings";
+import { invoke } from "@/composables/useProgress";
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -108,7 +109,10 @@ function onResizeEnd() {
 function onWindowResize() {
   geom.value = clampGeom(geom.value);
 }
-onMounted(() => window.addEventListener("resize", onWindowResize));
+onMounted(() => {
+  window.addEventListener("resize", onWindowResize);
+  invoke<string[]>("list_system_fonts").then((fonts) => { systemFonts.value = fonts; }).catch(() => {});
+});
 onUnmounted(() => {
   window.removeEventListener("resize", onWindowResize);
   document.removeEventListener("mousemove", onDragMove);
@@ -120,7 +124,11 @@ onUnmounted(() => {
 const { mode } = useTheme();
 const { networkTimeoutSecs, workbenchFontFamily, workbenchFontSize, editorFontFamily, editorFontSize } = useSettings();
 
+const systemFonts = ref<string[]>([]);
+
 const timeoutOptions = [5, 10, 30, 60];
+const wbFontSizes = Array.from({ length: 10 }, (_, i) => i + 11); // 11..20
+const edFontSizes = Array.from({ length: 15 }, (_, i) => i + 10); // 10..24
 
 const themes: { value: ThemeMode; label: string }[] = [
   { value: "system", label: "System (как в ОС)" },
@@ -302,35 +310,37 @@ const activeCategoryLabel = computed(
               <input
                 v-model="workbenchFontFamily"
                 type="text"
+                list="wb-fonts-list"
                 class="vs-input"
                 placeholder="Ubuntu, -apple-system, sans-serif"
+                autocomplete="off"
               />
+              <datalist id="wb-fonts-list">
+                <option v-for="f in systemFonts" :key="f" :value="f" />
+              </datalist>
             </div>
             <div v-if="s.id === 'workbench-font-size'" class="vs-setting-control">
-              <input
-                v-model.number="workbenchFontSize"
-                type="number"
-                class="vs-number"
-                min="11"
-                max="20"
-              />
+              <select v-model.number="workbenchFontSize" class="vs-select vs-select-narrow">
+                <option v-for="n in wbFontSizes" :key="n" :value="n">{{ n }} px</option>
+              </select>
             </div>
             <div v-if="s.id === 'editor-font-family'" class="vs-setting-control">
               <input
                 v-model="editorFontFamily"
                 type="text"
+                list="ed-fonts-list"
                 class="vs-input"
                 placeholder="Ubuntu Mono, Courier New, monospace"
+                autocomplete="off"
               />
+              <datalist id="ed-fonts-list">
+                <option v-for="f in systemFonts" :key="f" :value="f" />
+              </datalist>
             </div>
             <div v-if="s.id === 'editor-font-size'" class="vs-setting-control">
-              <input
-                v-model.number="editorFontSize"
-                type="number"
-                class="vs-number"
-                min="10"
-                max="24"
-              />
+              <select v-model.number="editorFontSize" class="vs-select vs-select-narrow">
+                <option v-for="n in edFontSizes" :key="n" :value="n">{{ n }} px</option>
+              </select>
             </div>
             <div v-if="s.id === 'network-timeout'" class="vs-setting-control">
               <select v-model.number="networkTimeoutSecs" class="vs-select">
@@ -582,26 +592,7 @@ const activeCategoryLabel = computed(
   border-color: var(--accent);
 }
 
-.vs-number {
-  width: 100px;
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  padding: 6px 10px;
-  font-size: var(--font-size-sm);
-  border-radius: var(--radius);
-  outline: none;
-  font-family: var(--font-sans);
-  text-align: center;
-  appearance: textfield;
-  -webkit-appearance: textfield;
-  -moz-appearance: textfield;
-}
-.vs-number:focus {
-  border-color: var(--accent);
-}
-.vs-number::-webkit-inner-spin-button,
-.vs-number::-webkit-outer-spin-button {
-  display: none;
+.vs-select-narrow {
+  width: 120px;
 }
 </style>
