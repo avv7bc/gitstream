@@ -118,7 +118,7 @@ onUnmounted(() => {
 });
 
 const { mode } = useTheme();
-const { networkTimeoutSecs } = useSettings();
+const { networkTimeoutSecs, workbenchFontFamily, workbenchFontSize, editorFontFamily, editorFontSize } = useSettings();
 
 const timeoutOptions = [5, 10, 30, 60];
 
@@ -155,6 +155,30 @@ const settings: SettingItem[] = [
     category: "appearance",
     label: "Workbench: Color Theme",
     description: "Задаёт цветовую тему интерфейса. Тема «System» подстраивается под настройки операционной системы.",
+  },
+  {
+    id: "workbench-font-family",
+    category: "appearance",
+    label: "Workbench: Font Family",
+    description: "Шрифт интерфейса: панели, тулбар, диалоги. Задаётся как CSS font-family. Пример: «Segoe UI, sans-serif».",
+  },
+  {
+    id: "workbench-font-size",
+    category: "appearance",
+    label: "Workbench: Font Size",
+    description: "Базовый размер шрифта интерфейса в пикселях (11–20). Пропорционально масштабирует все уровни шрифта UI.",
+  },
+  {
+    id: "editor-font-family",
+    category: "appearance",
+    label: "Editor: Font Family",
+    description: "Шрифт diff-вьюера. Рекомендуется моноширинный. Пример: «Fira Code, monospace».",
+  },
+  {
+    id: "editor-font-size",
+    category: "appearance",
+    label: "Editor: Font Size",
+    description: "Размер шрифта diff-вьюера в пикселях (10–24).",
   },
   {
     id: "network-timeout",
@@ -273,6 +297,40 @@ const activeCategoryLabel = computed(
               <select v-model="mode" class="vs-select">
                 <option v-for="t in themes" :key="t.value" :value="t.value">{{ t.label }}</option>
               </select>
+            </div>
+            <div v-if="s.id === 'workbench-font-family'" class="vs-setting-control">
+              <input
+                v-model="workbenchFontFamily"
+                type="text"
+                class="vs-input"
+                placeholder="Ubuntu, -apple-system, sans-serif"
+              />
+            </div>
+            <div v-if="s.id === 'workbench-font-size'" class="vs-setting-control">
+              <input
+                v-model.number="workbenchFontSize"
+                type="number"
+                class="vs-number"
+                min="11"
+                max="20"
+              />
+            </div>
+            <div v-if="s.id === 'editor-font-family'" class="vs-setting-control">
+              <input
+                v-model="editorFontFamily"
+                type="text"
+                class="vs-input"
+                placeholder="Ubuntu Mono, Courier New, monospace"
+              />
+            </div>
+            <div v-if="s.id === 'editor-font-size'" class="vs-setting-control">
+              <input
+                v-model.number="editorFontSize"
+                type="number"
+                class="vs-number"
+                min="10"
+                max="24"
+              />
             </div>
             <div v-if="s.id === 'network-timeout'" class="vs-setting-control">
               <select v-model.number="networkTimeoutSecs" class="vs-select">
@@ -508,5 +566,35 @@ const activeCategoryLabel = computed(
 .vs-select option {
   background-color: var(--bg-tertiary);
   color: var(--text-primary);
+}
+.vs-input {
+  width: 320px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius);
+  outline: none;
+  font-family: var(--font-sans);
+}
+.vs-input:focus {
+  border-color: var(--accent);
+}
+
+.vs-number {
+  width: 100px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius);
+  outline: none;
+  font-family: var(--font-sans);
+  text-align: center;
+}
+.vs-number:focus {
+  border-color: var(--accent);
 }
 </style>
