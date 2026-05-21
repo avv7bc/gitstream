@@ -307,17 +307,9 @@ const activeCategoryLabel = computed(
               </select>
             </div>
             <div v-if="s.id === 'workbench-font-family'" class="vs-setting-control">
-              <input
-                v-model="workbenchFontFamily"
-                type="text"
-                list="wb-fonts-list"
-                class="vs-input"
-                placeholder="Ubuntu, -apple-system, sans-serif"
-                autocomplete="off"
-              />
-              <datalist id="wb-fonts-list">
-                <option v-for="f in systemFonts" :key="f" :value="f" />
-              </datalist>
+              <select v-model="workbenchFontFamily" class="vs-select">
+                <option v-for="f in systemFonts" :key="f" :value="f">{{ f }}</option>
+              </select>
             </div>
             <div v-if="s.id === 'workbench-font-size'" class="vs-setting-control">
               <select v-model.number="workbenchFontSize" class="vs-select vs-select-narrow">
@@ -325,17 +317,9 @@ const activeCategoryLabel = computed(
               </select>
             </div>
             <div v-if="s.id === 'editor-font-family'" class="vs-setting-control">
-              <input
-                v-model="editorFontFamily"
-                type="text"
-                list="ed-fonts-list"
-                class="vs-input"
-                placeholder="Ubuntu Mono, Courier New, monospace"
-                autocomplete="off"
-              />
-              <datalist id="ed-fonts-list">
-                <option v-for="f in systemFonts" :key="f" :value="f" />
-              </datalist>
+              <select v-model="editorFontFamily" class="vs-select">
+                <option v-for="f in systemFonts" :key="f" :value="f">{{ f }}</option>
+              </select>
             </div>
             <div v-if="s.id === 'editor-font-size'" class="vs-setting-control">
               <select v-model.number="editorFontSize" class="vs-select vs-select-narrow">
@@ -576,20 +560,6 @@ const activeCategoryLabel = computed(
 .vs-select option {
   background-color: var(--bg-tertiary);
   color: var(--text-primary);
-}
-.vs-input {
-  width: 320px;
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  padding: 6px 10px;
-  font-size: var(--font-size-sm);
-  border-radius: var(--radius);
-  outline: none;
-  font-family: var(--font-sans);
-}
-.vs-input:focus {
-  border-color: var(--accent);
 }
 
 .vs-select-narrow {
