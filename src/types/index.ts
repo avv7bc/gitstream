@@ -137,3 +137,9 @@ export interface RepoStats {
   by_month: MonthEntry[];
   by_day: DayEntry[];
 }
+
+export interface UpdateInfo {
+  version: string;
+  release_url: string;
+  changelog_url: string;
+}
