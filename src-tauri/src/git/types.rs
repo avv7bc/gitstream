@@ -139,3 +139,10 @@ pub struct RepoStats {
     pub by_month: Vec<MonthEntry>,
     pub by_day: Vec<DayEntry>,
 }
+
+#[derive(Debug, serde::Serialize, Clone)]
+pub struct UpdateInfo {
+    pub version: String,
+    pub release_url: String,
+    pub changelog_url: String,
+}
