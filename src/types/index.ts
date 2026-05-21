@@ -141,5 +141,4 @@ export interface RepoStats {
 export interface UpdateInfo {
   version: string;
   release_url: string;
-  changelog_url: string;
 }

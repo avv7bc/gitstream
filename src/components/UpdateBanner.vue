@@ -14,8 +14,8 @@ async function openUrl(url: string) {
   }
 }
 
-function download() {
-  openUrl(props.info.release_url);
+async function download() {
+  await openUrl(props.info.release_url);
   emit("dismiss");
 }
 </script>
@@ -27,7 +27,7 @@ function download() {
       <div class="update-title">
         Обновление GitStream доступно (v{{ info.version }})
       </div>
-      <button class="update-changelog" @click="openUrl(info.changelog_url)">
+      <button class="update-changelog" @click="openUrl(info.release_url)">
         Список изменений ›
       </button>
     </div>

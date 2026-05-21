@@ -144,5 +144,4 @@ pub struct RepoStats {
 pub struct UpdateInfo {
     pub version: String,
     pub release_url: String,
-    pub changelog_url: String,
 }

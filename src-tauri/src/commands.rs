@@ -516,14 +516,16 @@ pub async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo
         None => return Ok(None),
     };
 
-    let html_url = json["html_url"].as_str().unwrap_or("").to_string();
+    let html_url = match json["html_url"].as_str().filter(|s| !s.is_empty()) {
+        Some(u) => u.to_string(),
+        None => return Ok(None),
+    };
     let current = app.package_info().version.to_string();
 
     if version_gt(&tag_name, &current) {
         Ok(Some(UpdateInfo {
             version: tag_name.trim_start_matches('v').to_string(),
-            release_url: html_url.clone(),
-            changelog_url: html_url,
+            release_url: html_url,
         }))
     } else {
         Ok(None)
