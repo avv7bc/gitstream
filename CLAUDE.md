@@ -42,23 +42,23 @@ src/                          # Vue.js frontend
 │   ├── CommitGraph.vue       # Лог коммитов
 │   ├── CommitDetails.vue     # Детали выбранного коммита
 │   ├── FileList.vue          # Список файлов со статусами
-│   ├── DiffView.vue          # Unified/Side-by-side diff
+│   ├── DiffPanel.vue         # Unified diff
+│   ├── SideBySideDiffView.vue # Side-by-side diff + выбор строк
+│   ├── ConflictBar.vue       # Управление merge/rebase/cherry-pick/revert
 │   ├── StatusBar.vue         # Строка состояния
-│   └── dialogs/              # Модальные диалоги
-│       ├── CommitDialog.vue
-│       ├── CloneDialog.vue
-│       ├── PushDialog.vue
-│       ├── PullDialog.vue
-│       ├── CheckoutDialog.vue
-│       └── ConfirmDialog.vue
+│   └── dialogs/              # Модальные диалоги (см. ниже)
 ├── composables/              # State management
 │   ├── useRepo.ts            # Текущий репозиторий
-│   ├── useFiles.ts           # Статус файлов, stage/unstage/discard
+│   ├── useFiles.ts           # Статус файлов, stage/unstage/discard, частичный stage
 │   ├── useBranches.ts        # Ветки, теги, stashes, remotes
-│   ├── useLog.ts             # Лог коммитов
+│   ├── useLog.ts             # Лог коммитов, reset/revert/cherry-pick
 │   ├── useDiff.ts            # Diff файлов и коммитов
-│   ├── useCommit.ts          # Создание коммитов
-│   └── useRemote.ts          # Fetch, pull, push, clone
+│   ├── useCommit.ts          # Создание коммитов, squash, reword
+│   ├── useRemote.ts          # Fetch, pull, push, clone
+│   ├── useConflicts.ts       # Состояние merge/rebase + accept ours/theirs
+│   ├── useI18n.ts            # Локализация RU/EN
+│   ├── useSettings.ts        # Настройки приложения
+│   └── ...                   # useDraggable, useTheme, useUpdate, useVirtualList и др.
 ├── types/index.ts            # TypeScript-типы (snake_case, как в Rust JSON)
 └── styles/                   # CSS (тёмная тема, Catppuccin-inspired)
 
@@ -102,70 +102,80 @@ src-tauri/src/                # Rust backend
 
 ### Операции
 - Stage / Unstage / Discard файлов
-- Commit (с amend)
+- **Частичный stage** — выбор строк/хунков в Side-by-side diff, stage/unstage/discard выбранного (`git apply --cached`)
+- `git rm` для tracked / disk-delete для untracked
+- Commit (с amend), Reword (HEAD — amend; не-HEAD — rebase -i со сценарным редактором)
+- Squash нескольких коммитов в один
 - Push / Pull / Fetch (с диалогами выбора remote, таймаут сетевых операций)
 - Clone репозитория
 - Checkout branch (локальная + remote-ветка с созданием локальной)
 - Merge ветки
-- Ветки: rename, delete (с force)
+- Rebase ветки на ветку (с continue/abort через ConflictBar)
+- Ветки: create (от HEAD / коммита / другой ветки), rename, delete (с force)
 - Теги: create (lightweight/annotated), delete, push tag
-- Settings dialog (тема, таймаут сети)
+- Stash: save (с сообщением, `--include-untracked`), apply, pop, drop
+- Reset (soft / mixed / hard), Revert, Cherry-pick — из контекстного меню CommitGraph
+- Разрешение конфликтов: accept ours/theirs, abort/continue для merge/rebase/cherry-pick/revert
+- Settings dialog (тема, шрифты, таймаут сети, язык RU/EN)
 
 ### Просмотр
-- Unified + Side-by-side diff с переключателем
-- Лог коммитов с деталями
-- Список веток / тегов / stash
+- Unified + Side-by-side diff с переключателем, синхронным скроллом, виртуальным списком
+- Лог коммитов с деталями (виртуальный список)
+- Список веток / тегов / stash с поиском
 - Панель файлов со статусами
-- File compare диалог
+- File compare диалог (произвольные ревизии)
+- Stats — статистика репозитория
+- i18n (русский / английский)
+- Авто-обновление приложения
 
 ### Repositories (treeview)
 - Drag-and-drop: репозитории в папки, папки в папки, на верхний уровень
 - Двойной клик — переключение на репозиторий
 - Контекстное меню: Add Repository, Add Group, Delete
 
-### Диалоги MVP
-- **Commit Dialog** — сообщение, amend, индикатор длины строки, Commit & Push
-- **Clone Dialog** — URL + путь, автоимя папки из URL
-- **Push Dialog** — выбор remote, force push с предупреждением
-- **Pull Dialog** — выбор remote, merge/rebase, behind-счётчик
-- **Checkout Branch Dialog** — поиск и фильтрация веток
-- **Confirm Dialog** — универсальный диалог подтверждения
-- Все диалоги закрываются по Esc
+### Диалоги
+- **Commit** — сообщение, amend, индикатор длины строки, Commit & Push
+- **Clone** — URL + путь, автоимя папки из URL
+- **Push / Pull** — выбор remote, force/rebase, behind-счётчик
+- **Checkout** (локальная) и **Checkout Remote** (с созданием локальной)
+- **Create Branch** — имя, start point, опц. checkout
+- **Rename Branch** — переименование локальной ветки
+- **Add Tag** — lightweight / annotated, target, force
+- **Stash Save** — сообщение, include-untracked
+- **Squash / Reword** — операции над коммитами
+- **Discard** — подтверждение с выбором файлов
+- **File Compare** — diff между двумя ревизиями файла
+- **Stats** — статистика репозитория
+- **Settings** — тема, шрифты, таймаут сети, язык
+- **Add Repository / Add Group / Rename Node** — управление treeview
+- **Confirm** — универсальный диалог подтверждения
+- Все диалоги draggable за header и закрываются по Esc
 
 ### Архитектура
 - **Tauri IPC** — `#[tauri::command]` endpoints (query + mutation)
 - **Git CLI** — парсинг `--porcelain=v2` (status), `--format` с NUL-разделителями (log, branches, tags), unified diff
 - **Composables** — реактивное состояние через Vue ref(), автообновление после мутаций
+- **ConflictBar** — реагирует на состояние репозитория (merge/rebase/cherry-pick/revert), accept ours/theirs, continue/abort
 - **Обработка ошибок** — classify_git_error: auth, network, conflict, hint-подсказки
 - **Сетевые операции** — async + spawn_blocking, настраиваемый таймаут (см. memory)
+- **i18n** — кастомный composable `useI18n`, словари RU/EN
 
 ---
 
-## Дорожная карта (в работе)
+## Дорожная карта
 
-Порядок реализации до «полноценного Git-клиента»:
+Базовая дорожная карта (частичный stage, stash, create branch, reset/revert/cherry-pick,
+разрешение конфликтов, rebase) закрыта. Следующий слой возможных направлений:
 
-1. **Частичный stage** — stage/unstage отдельных хунков и строк (`git apply --cached`)
-   прямо из DiffView
-2. **Stash-мутации** — save (с сообщением, `--include-untracked`), apply, pop, drop
-3. **Создание ветки** — от HEAD / выбранного коммита / другой ветки, опц. checkout
-4. **Reset / Revert / Cherry-pick** — из контекстного меню CommitGraph
-   (reset --soft/--mixed/--hard, revert, cherry-pick)
-5. **Разрешение конфликтов** — список конфликтных файлов, accept ours/theirs,
-   merge/rebase --abort/--continue
-6. **Rebase** — ветка на ветку, --abort/--continue (interactive — позже)
-
-## За пределами дорожной карты (будущее)
-
-- Interactive rebase UI, 3-way conflict resolver
-- Blame view, file history, reflog
-- Управление remote (add/remove/set-url, upstream-трекинг, prune)
-- Поиск/фильтрация в логе
-- git init / open локальной папки
-- Syntax highlighting в diff, word-level diff
-- Commit graph с визуальными линиями (lane allocation)
-- Сохранение дерева репозиториев в конфиг
-- Аутентификация (login/password, SSH passphrase)
-- GPG signing, Git-Flow, Submodules, LFS
-- Bisect, patches, bundles, archive
+- **Blame view** — авторы по строкам файла, переход к коммиту
+- **File history** — лог коммитов конкретного файла
+- **Reflog** — просмотр reflog с возможностью восстановления
+- **Управление remote** — add/remove/set-url, upstream-трекинг, prune
+- **Поиск/фильтрация в логе** — по сообщению, автору, файлу, хэшу
+- **git init / open** — инициализация репозитория, открытие локальной папки
+- **Syntax highlighting в diff**, word-level diff
+- **Commit graph с визуальными линиями** (lane allocation)
+- **Interactive rebase UI**, 3-way conflict resolver
+- **Аутентификация** — login/password, SSH passphrase, credentials cache
+- **Прочее** — GPG signing, Git-Flow, Submodules, LFS, bisect, patches, bundles, archive
 

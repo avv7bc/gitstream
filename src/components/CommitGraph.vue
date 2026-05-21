@@ -17,7 +17,7 @@ const emit = defineEmits<{
   reword: [payload: { oid: string; message: string; isHead: boolean }];
 }>();
 
-const { commits, selectedCommit, resetTo, revertCommit, cherryPick } = useLog();
+const { commits, selectedCommit, hasMore, isLoadingMore, loadMore, resetTo, revertCommit, cherryPick } = useLog();
 const { branches } = useBranches();
 const currentBranch = computed(() => branches.value.find((b) => b.is_current));
 function isCurrentBranchRow(c: { refs: { kind: string }[] }): boolean {
@@ -309,10 +309,60 @@ function onGlobalKeyDown(e: KeyboardEvent): void {
   }
 }
 
-onMounted(() => window.addEventListener("keydown", onGlobalKeyDown));
-onUnmounted(() => window.removeEventListener("keydown", onGlobalKeyDown));
-
 const graphBodyRef = ref<HTMLElement | null>(null);
+const loadMoreSentinelRef = ref<HTMLElement | null>(null);
+let infiniteIO: IntersectionObserver | null = null;
+
+// Догрузка истории при прокрутке: следим за sentinel-элементом в конце
+// списка и подтягиваем следующую страницу, когда он попадает в поле
+// зрения. Фильтр пропускаем — при пустом результате наблюдатель сорвался
+// бы в цикл «грузим всё подряд».
+function shouldAutoLoad(): boolean {
+  return hasMore.value && !isLoadingMore.value && !graphFilter.value;
+}
+
+async function onSentinelIntersect() {
+  if (!shouldAutoLoad()) return;
+  await loadMore();
+  // Если sentinel всё ещё в поле зрения (страница маленькая, окно
+  // высокое), IntersectionObserver не сработает повторно сам — нужен
+  // ре-observe.
+  if (shouldAutoLoad() && infiniteIO && loadMoreSentinelRef.value) {
+    infiniteIO.unobserve(loadMoreSentinelRef.value);
+    infiniteIO.observe(loadMoreSentinelRef.value);
+  }
+}
+
+function setupInfiniteScroll() {
+  if (infiniteIO) {
+    infiniteIO.disconnect();
+    infiniteIO = null;
+  }
+  if (!graphBodyRef.value || !loadMoreSentinelRef.value) return;
+  infiniteIO = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((e) => e.isIntersecting)) onSentinelIntersect();
+    },
+    { root: graphBodyRef.value, rootMargin: "300px 0px" },
+  );
+  infiniteIO.observe(loadMoreSentinelRef.value);
+}
+
+// Sentinel может скрываться/появляться (v-if по hasMore/фильтру) — на
+// каждое его пересоздание нужен новый observe, иначе старый DOM-узел
+// уйдёт в утиль и догрузка больше не сработает.
+watch(loadMoreSentinelRef, () => setupInfiniteScroll(), { flush: "post" });
+
+onMounted(() => {
+  window.addEventListener("keydown", onGlobalKeyDown);
+  setupInfiniteScroll();
+});
+onUnmounted(() => {
+  window.removeEventListener("keydown", onGlobalKeyDown);
+  infiniteIO?.disconnect();
+  infiniteIO = null;
+});
+
 defineExpose({ focus: () => graphBodyRef.value?.focus() });
 
 watch(selectedCommit, (oid) => {
@@ -483,6 +533,14 @@ function formatDate(iso: string): string {
 
         <span class="author-col" v-html="highlight(commit.author, graphFilter)" />
         <span class="date-col" v-html="highlight(formatDate(commit.date), graphFilter)" />
+      </div>
+
+      <div
+        v-if="hasMore && !graphFilter"
+        ref="loadMoreSentinelRef"
+        class="load-more-sentinel"
+      >
+        <span v-if="isLoadingMore">Loading more…</span>
       </div>
     </div>
 
@@ -688,6 +746,17 @@ function formatDate(iso: string): string {
   font-size: var(--font-size-xs);
   color: var(--text-muted);
   text-align: right;
+}
+
+/* Догрузка истории при прокрутке */
+.load-more-sentinel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
 }
 
 /* Working tree row */

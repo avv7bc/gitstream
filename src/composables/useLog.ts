@@ -3,29 +3,40 @@ import { invoke } from "@/composables/useProgress";
 import type { CommitInfo } from "@/types";
 import { useRepo } from "./useRepo";
 
+const PAGE_SIZE = 500;
+
 const commits = ref<CommitInfo[]>([]);
 const selectedCommit = ref<string | null>(null);
+const hasMore = ref(true);
+const isLoadingMore = ref(false);
 
 // Защита от гонки перекрывающихся refresh: применяем только самый свежий ответ.
+// loadMore тоже использует этот счётчик, чтобы откатывающийся refresh не
+// перезаписался устаревшим ответом догрузки.
 let refreshSeq = 0;
 
 export function useLog() {
   const { repoPath } = useRepo();
 
-  async function refresh(limit?: number) {
+  async function refresh() {
     if (!repoPath.value) {
       commits.value = [];
       selectedCommit.value = null;
+      hasMore.value = true;
       return;
     }
     const seq = ++refreshSeq;
+    // Сохраняем уже загруженный объём, чтобы прокрутка пользователя
+    // не «обрезалась» после очередной мутации/refresh.
+    const target = Math.max(commits.value.length, PAGE_SIZE);
     const data = await invoke<CommitInfo[]>("get_log", {
       repoPath: repoPath.value,
-      limit: limit ?? 500,
+      limit: target,
     });
     // Более новый refresh уже стартовал — отбрасываем устаревший ответ.
     if (seq !== refreshSeq) return;
     commits.value = data;
+    hasMore.value = data.length >= target;
     // Выделение указывает на коммит, которого больше нет в свежем логе
     // (смена репозитория, reset/rebase/удаление ветки) — сбрасываем его,
     // иначе панель Files показывает файлы чужого/исчезнувшего коммита.
@@ -39,6 +50,31 @@ export function useLog() {
     // При первом открытии / смене репозитория выбираем HEAD (первую строку).
     if (!selectedCommit.value && data.length > 0) {
       selectedCommit.value = data[0].oid;
+    }
+  }
+
+  async function loadMore() {
+    if (!repoPath.value || isLoadingMore.value || !hasMore.value) return;
+    if (commits.value.length === 0) return;
+    isLoadingMore.value = true;
+    const seq = refreshSeq;
+    const target = commits.value.length + PAGE_SIZE;
+    try {
+      const data = await invoke<CommitInfo[]>("get_log", {
+        repoPath: repoPath.value,
+        limit: target,
+      });
+      // Параллельный refresh уже применил свой результат — не затираем его.
+      if (seq !== refreshSeq) return;
+      // Бэк не вернул новых строк → история исчерпана.
+      if (data.length <= commits.value.length) {
+        hasMore.value = false;
+        return;
+      }
+      commits.value = data;
+      hasMore.value = data.length >= target;
+    } finally {
+      isLoadingMore.value = false;
     }
   }
 
@@ -70,12 +106,16 @@ export function useLog() {
   function clear() {
     commits.value = [];
     selectedCommit.value = null;
+    hasMore.value = true;
   }
 
   return {
     commits,
     selectedCommit,
+    hasMore,
+    isLoadingMore,
     refresh,
+    loadMore,
     clear,
     resetTo,
     revertCommit,
