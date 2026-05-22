@@ -79,6 +79,10 @@ export interface FileDiff {
   insertions: number;
   deletions: number;
   header: string;
+  binary: boolean;
+  old_image: string | null;
+  new_image: string | null;
+  byte_size: number | null;
 }
 
 export type LineOp = "stage" | "unstage" | "discard";

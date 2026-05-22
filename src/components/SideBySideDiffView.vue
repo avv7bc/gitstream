@@ -174,6 +174,31 @@ const diffFileName = computed(() => currentDiff.value?.path ?? selectedFile.valu
 
 const hasHunks = computed(() => enrichedHunks.value.length > 0);
 
+// --- Бинарные файлы: превью изображений / уведомление ---
+const IMG_MIME: Record<string, string> = {
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif",
+  webp: "image/webp", bmp: "image/bmp", ico: "image/x-icon", avif: "image/avif",
+};
+
+const isBinary = computed(() => !!currentDiff.value?.binary);
+
+function dataUrl(b64: string | null | undefined): string | null {
+  if (!b64) return null;
+  const ext = (currentDiff.value?.path.split(".").pop() ?? "").toLowerCase();
+  return `data:${IMG_MIME[ext] ?? "image/png"};base64,${b64}`;
+}
+const oldImage = computed(() => dataUrl(currentDiff.value?.old_image));
+const newImage = computed(() => dataUrl(currentDiff.value?.new_image));
+const hasImagePreview = computed(() => !!(oldImage.value || newImage.value));
+
+const binarySize = computed(() => {
+  const n = currentDiff.value?.byte_size;
+  if (n == null) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+});
+
 function goToPreviousHunk() {
   if (currentHunkIndex.value > 0) {
     currentHunkIndex.value--;
@@ -233,6 +258,39 @@ function scrollToHunk() {
     </div>
 
     <div class="diff-container">
+      <!-- Бинарный файл: превью изображений (старая/новая версия) либо
+           уведомление с размером для прочих бинарных файлов. -->
+      <div v-if="isBinary" class="binary-view">
+        <template v-if="hasImagePreview">
+          <div class="binary-pane">
+            <div class="side-label">{{ i18n.diff.oldVersion }}</div>
+            <div class="binary-stage">
+              <img v-if="oldImage" :src="oldImage" class="binary-img" alt="" />
+              <span v-else class="binary-note">{{ i18n.diff.binaryAbsent }}</span>
+            </div>
+          </div>
+          <div class="diff-divider" />
+          <div class="binary-pane">
+            <div class="side-label">{{ i18n.diff.newVersion }}</div>
+            <div class="binary-stage">
+              <img v-if="newImage" :src="newImage" class="binary-img" alt="" />
+              <span v-else class="binary-note">{{ i18n.diff.binaryAbsent }}</span>
+            </div>
+          </div>
+        </template>
+        <div v-else class="binary-message">
+          <span class="binary-title">{{ i18n.diff.binaryFile }}</span>
+          <span v-if="binarySize" class="binary-sub">{{ binarySize }}</span>
+        </div>
+      </div>
+
+      <!-- Файл без текстовых хунков (пустой, смена режима) — пояснение вместо
+           пустой панели. Rename-файлы сюда не попадают: их содержимое
+           догружается отдельным запросом в useDiff. -->
+      <div v-else-if="currentDiff && !hasHunks" class="diff-empty">
+        {{ i18n.diff.emptyDiff }}
+      </div>
+
       <!-- LEFT: old version — placeholder for added lines -->
       <div ref="leftPanelRef" class="diff-side old">
         <div class="side-label">{{ i18n.diff.oldVersion }}</div>
@@ -389,6 +447,77 @@ function scrollToHunk() {
   flex: 1;
   display: flex;
   overflow: hidden;
+  position: relative;
+}
+
+.diff-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Бинарный файл рисуется поверх (пустых) текстовых панелей: их refs
+   нужны useSyncScroll/useVirtualList, поэтому панели не размонтируем. */
+.binary-view {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  background: var(--bg-primary);
+}
+
+.binary-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  min-width: 0;
+}
+
+.binary-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.binary-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.binary-note {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.binary-message {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.binary-title {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.binary-sub {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
 }
 
 .diff-side {

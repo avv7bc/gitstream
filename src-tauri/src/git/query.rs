@@ -2,6 +2,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 
+use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+
 use super::error::{classify_git_error, GitError};
 use super::types::*;
 
@@ -36,9 +38,80 @@ fn run_git_lenient(repo_path: &Path, args: &[&str]) -> String {
         .unwrap_or_default()
 }
 
+/// Запускает git, возвращая «сырые» байты stdout без потерь UTF-8.
+/// Нужно для бинарных blob'ов (`git show <rev>:<path>`).
+fn run_git_bytes(repo_path: &Path, args: &[&str]) -> Result<Vec<u8>, GitError> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repo_path)
+        .args(args)
+        .output()
+        .map_err(|e| GitError::CommandFailed {
+            message: format!("Failed to run git: {}", e),
+            hint: Some("Is git installed and in PATH?".into()),
+        })?;
+    if output.status.success() {
+        Ok(output.stdout)
+    } else {
+        Err(classify_git_error(&String::from_utf8_lossy(&output.stderr)))
+    }
+}
+
 /// Файл не отслеживается git (нет ни в индексе, ни в HEAD).
 fn is_untracked(repo_path: &Path, file: &str) -> bool {
     run_git(repo_path, &["ls-files", "--error-unmatch", "--", file]).is_err()
+}
+
+/// Источник содержимого файла для предпросмотра бинарных файлов.
+enum BlobSrc<'a> {
+    /// Файл в рабочем дереве (читается с диска).
+    Disk,
+    /// git-ревизия: `Rev("HEAD")` → `HEAD:path`, `Rev("")` → `:path` (индекс).
+    Rev(&'a str),
+}
+
+/// Расширение пути — растровое изображение, показываемое в `<img>`.
+fn is_image_path(path: &str) -> bool {
+    matches!(
+        path.rsplit('.').next().map(str::to_ascii_lowercase).as_deref(),
+        Some("png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" | "avif")
+    )
+}
+
+/// base64 содержимого файла из указанного источника (None — источника нет).
+fn image_of(repo_path: &Path, src: &BlobSrc, path: &str) -> Option<String> {
+    let bytes = match src {
+        BlobSrc::Disk => std::fs::read(repo_path.join(path)).ok()?,
+        BlobSrc::Rev(rev) => {
+            run_git_bytes(repo_path, &["show", &format!("{}:{}", rev, path)]).ok()?
+        }
+    };
+    Some(B64.encode(bytes))
+}
+
+/// Размер файла в байтах из указанного источника.
+fn size_of(repo_path: &Path, src: &BlobSrc, path: &str) -> Option<u64> {
+    match src {
+        BlobSrc::Disk => std::fs::metadata(repo_path.join(path)).ok().map(|m| m.len()),
+        BlobSrc::Rev(rev) => run_git(repo_path, &["cat-file", "-s", &format!("{}:{}", rev, path)])
+            .ok()
+            .and_then(|s| s.trim().parse().ok()),
+    }
+}
+
+/// Дополняет дифф бинарного файла размером и (для изображений) base64
+/// старой/новой версии — иначе панель Changes для бинарного файла пуста.
+fn fill_binary(repo_path: &Path, diff: &mut FileDiff, old: Option<BlobSrc>, new: BlobSrc) {
+    if !diff.binary {
+        return;
+    }
+    let path = diff.path.clone();
+    diff.byte_size = size_of(repo_path, &new, &path)
+        .or_else(|| old.as_ref().and_then(|s| size_of(repo_path, s, &path)));
+    if is_image_path(&path) {
+        diff.new_image = image_of(repo_path, &new, &path);
+        diff.old_image = old.as_ref().and_then(|s| image_of(repo_path, s, &path));
+    }
 }
 
 pub fn status(repo_path: &Path) -> Result<Vec<FileStatus>, GitError> {
@@ -318,22 +391,66 @@ pub fn diff_file(repo_path: &Path, file: &str, staged: bool) -> Result<FileDiff,
     // Untracked-файл отсутствует в индексе/HEAD — обычный `git diff` пуст.
     // Синтезируем дифф «всё добавлено» сравнением с /dev/null.
     if !staged && is_untracked(repo_path, file) {
-        let output = run_git_lenient(repo_path, &["diff", "--no-index", "--", "/dev/null", file]);
-        return Ok(parse_diff_single(&output, file));
+        let output = run_git_lenient(
+            repo_path,
+            &["-c", "core.quotepath=false", "diff", "--no-index", "--", "/dev/null", file],
+        );
+        let mut diff = parse_diff_single(&output, file);
+        fill_binary(repo_path, &mut diff, None, BlobSrc::Disk);
+        return Ok(diff);
     }
     let args = if staged {
-        vec!["diff", "--cached", "--", file]
+        vec!["-c", "core.quotepath=false", "diff", "--cached", "--", file]
     } else {
-        vec!["diff", "--", file]
+        vec!["-c", "core.quotepath=false", "diff", "--", file]
     };
     let output = run_git(repo_path, &args).unwrap_or_default();
-    Ok(parse_diff_single(&output, file))
+    let mut diff = parse_diff_single(&output, file);
+    // staged: новая версия — индекс (`:path`); unstaged — рабочее дерево.
+    let new = if staged { BlobSrc::Rev("") } else { BlobSrc::Disk };
+    fill_binary(repo_path, &mut diff, Some(BlobSrc::Rev("HEAD")), new);
+    Ok(diff)
 }
 
 pub fn diff_commit(repo_path: &Path, oid: &str) -> Result<Vec<FileDiff>, GitError> {
     let range = format!("{}^..{}", oid, oid);
-    let output = run_git(repo_path, &["diff", &range])?;
+    let output = run_git(repo_path, &["-c", "core.quotepath=false", "diff", &range])?;
     Ok(parse_diff_multi(&output))
+}
+
+/// Дифф одного файла внутри коммита (`git show <oid> -- <file>`).
+///
+/// Запрашивается на каждый клик по файлу коммита — это дешевле, чем парсить
+/// дифф всего коммита.
+///
+/// Пайспек `-- <file>` ограничивает вывод одним файлом, поэтому git не видит
+/// парный (удалённый) путь переименования — определение rename не срабатывает,
+/// и файл всегда показывается как добавление с полным содержимым. Это ровно
+/// то, что нужно для просмотра: панель не остаётся пустой на rename-файле.
+/// `git show` (в отличие от `oid^..oid`) корректно работает и для корневого
+/// коммита.
+pub fn diff_commit_file(repo_path: &Path, oid: &str, file: &str) -> Result<FileDiff, GitError> {
+    let output = run_git(
+        repo_path,
+        &[
+            "-c",
+            "core.quotepath=false",
+            "show",
+            oid,
+            "--format=",
+            "--",
+            file,
+        ],
+    )?;
+    let mut diff = parse_diff_single(&output, file);
+    let parent = format!("{}^", oid);
+    fill_binary(
+        repo_path,
+        &mut diff,
+        Some(BlobSrc::Rev(&parent)),
+        BlobSrc::Rev(oid),
+    );
+    Ok(diff)
 }
 
 fn parse_diff_single(diff_text: &str, fallback_path: &str) -> FileDiff {
@@ -348,6 +465,7 @@ fn parse_diff_single(diff_text: &str, fallback_path: &str) -> FileDiff {
     let mut old_line = 0u32;
     let mut new_line = 0u32;
     let mut path = fallback_path.to_string();
+    let mut binary = false;
 
     let push_hunk =
         |hunks: &mut Vec<DiffHunk>, header: &str, lines: &mut Vec<DiffLine>, raw: &mut String| {
@@ -360,7 +478,15 @@ fn parse_diff_single(diff_text: &str, fallback_path: &str) -> FileDiff {
 
     for line in diff_text.lines() {
         if line.starts_with("+++ b/") {
-            path = line[6..].to_string();
+            // git дописывает хвостовой TAB, если имя содержит пробелы/спецсимволы.
+            path = line[6..].split('\t').next().unwrap_or("").to_string();
+        } else if let Some(rest) = line.strip_prefix("rename to ") {
+            // У чистого переименования нет строки `+++` — берём путь отсюда.
+            path = rest.split('\t').next().unwrap_or("").to_string();
+        } else if let Some(rest) = line.strip_prefix("copy to ") {
+            path = rest.split('\t').next().unwrap_or("").to_string();
+        } else if line.starts_with("Binary files ") {
+            binary = true;
         }
         if line.starts_with("@@ ") {
             if !current_header.is_empty() {
@@ -448,6 +574,10 @@ fn parse_diff_single(diff_text: &str, fallback_path: &str) -> FileDiff {
         insertions,
         deletions,
         header: patch_header,
+        binary,
+        old_image: None,
+        new_image: None,
+        byte_size: None,
     }
 }
 
@@ -708,6 +838,127 @@ mod diff_untracked_tests {
             .collect();
         assert_eq!(added, vec!["alpha", "beta", "gamma"]);
         assert_eq!(diff.path, "new.txt");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod diff_commit_tests {
+    use super::*;
+    use std::fs;
+
+    fn git(dir: &Path, args: &[&str]) {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+
+    fn temp_repo(tag: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("gitstream_{}_{}", tag, std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "-q"]);
+        git(&dir, &["config", "user.email", "t@t.t"]);
+        git(&dir, &["config", "user.name", "t"]);
+        fs::write(dir.join("seed.txt"), "seed\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "seed"]);
+        dir
+    }
+
+    fn head(dir: &Path) -> String {
+        run_git(dir, &["rev-parse", "HEAD"]).unwrap().trim().to_string()
+    }
+
+    // Имя файла на кириллице не должно превращаться в мусор: git c
+    // core.quotepath=false отдаёт путь дословно, парсер берёт его как есть.
+    #[test]
+    fn cyrillic_filename_parsed_verbatim() {
+        let dir = temp_repo("cyr");
+        fs::write(dir.join("файл.txt"), "привет\nмир\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "cyr"]);
+
+        let diffs = diff_commit(&dir, &head(&dir)).unwrap();
+        let d = diffs
+            .iter()
+            .find(|d| d.path == "файл.txt")
+            .expect("кириллический путь должен распознаться дословно");
+        assert_eq!(d.insertions, 2);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // Имя с пробелом: git добавляет хвостовой TAB в строку `+++`, парсер
+    // обязан его срезать.
+    #[test]
+    fn spaced_filename_trims_trailing_tab() {
+        let dir = temp_repo("space");
+        fs::write(dir.join("new file.txt"), "a\nb\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "spaced"]);
+
+        let d = diff_commit_file(&dir, &head(&dir), "new file.txt").unwrap();
+        assert_eq!(d.path, "new file.txt");
+        assert!(!d.hunks.is_empty());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // Бинарный файл флагуется и получает размер.
+    #[test]
+    fn binary_file_flagged_with_size() {
+        let dir = temp_repo("bin");
+        fs::write(dir.join("blob.bin"), [0u8, 1, 2, 0, 255, 3]).unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "bin"]);
+
+        let d = diff_commit_file(&dir, &head(&dir), "blob.bin").unwrap();
+        assert!(d.binary, "бинарный файл должен быть помечен");
+        assert_eq!(d.byte_size, Some(6));
+        assert!(d.hunks.is_empty());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // Перенос файла: обычный дифф коммита пуст (rename без хунков), а
+    // diff_commit_file показывает содержимое — пайспек `-- <file>` не даёт
+    // git'у определить переименование, файл выводится как добавление.
+    #[test]
+    fn renamed_file_shows_content() {
+        let dir = temp_repo("ren");
+        fs::create_dir_all(dir.join("old")).unwrap();
+        fs::write(dir.join("old/m.rs"), "fn a() {}\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "add"]);
+        git(&dir, &["mv", "old", "new"]);
+        git(&dir, &["commit", "-qm", "move"]);
+
+        let oid = head(&dir);
+        let listed = diff_commit(&dir, &oid)
+            .unwrap()
+            .into_iter()
+            .find(|d| d.path == "new/m.rs")
+            .expect("переименованный файл присутствует в списке");
+        assert!(listed.hunks.is_empty(), "rename в `git diff` без хунков");
+
+        // diff_commit_file ограничен пайспеком `-- new/m.rs`: git не видит
+        // удалённый old/m.rs и показывает файл как добавление с содержимым.
+        let renamed = diff_commit_file(&dir, &oid, "new/m.rs").unwrap();
+        assert!(
+            !renamed.hunks.is_empty(),
+            "diff_commit_file показывает содержимое переименованного файла"
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }

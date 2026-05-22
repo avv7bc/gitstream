@@ -39,16 +39,22 @@ export function useDiff() {
     lastFile = null;
     diffContext.value = "commit";
     const seq = ++diffSeq;
-    const diffs = await invoke<FileDiff[]>("get_diff_commit", {
+    if (!filePath) {
+      currentDiff.value = null;
+      return;
+    }
+    // Грузим дифф только выбранного файла, а не всего коммита: повторная
+    // выборка диффа целого коммита на каждый клик заметно тормозила навигацию.
+    // Пайспек `-- <file>` ограничивает вывод одним файлом, поэтому
+    // переименование git показывает как добавление с полным содержимым —
+    // панель не остаётся пустой на rename-файле.
+    const diff = await invoke<FileDiff>("get_diff_commit_file", {
       repoPath: repoPath.value,
       oid,
+      file: filePath,
     });
     if (seq !== diffSeq) return;
-    if (filePath) {
-      currentDiff.value = diffs.find((d) => d.path === filePath) ?? null;
-    } else {
-      currentDiff.value = diffs[0] ?? null;
-    }
+    currentDiff.value = diff;
   }
 
   // Повторяет последний дифф (после изменения индекса/рабочего дерева).

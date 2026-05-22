@@ -37,6 +37,7 @@ fn main() {
             commands::get_remotes,
             commands::get_diff_file,
             commands::get_diff_commit,
+            commands::get_diff_commit_file,
             commands::stage_files,
             commands::unstage_files,
             commands::discard_files,

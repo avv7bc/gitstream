@@ -86,6 +86,9 @@ const _ru = {
     stageHunkTitle: "Stage hunk",
     discardHunkTitle: "Discard hunk changes",
     unstageHunkTitle: "Unstage hunk",
+    emptyDiff: "No content to display",
+    binaryFile: "Binary file",
+    binaryAbsent: "—",
   },
   settings: {
     title: "Параметры",

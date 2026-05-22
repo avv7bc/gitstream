@@ -204,6 +204,20 @@ pub async fn get_diff_commit(repo_path: String, oid: String) -> Result<Vec<FileD
 }
 
 #[tauri::command]
+pub async fn get_diff_commit_file(
+    repo_path: String,
+    oid: String,
+    file: String,
+) -> Result<FileDiff, String> {
+    let path = PathBuf::from(repo_path);
+    tokio::task::spawn_blocking(move || {
+        query::diff_commit_file(&path, &oid, &file).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub fn stage_files(repo_path: String, files: Vec<String>) -> Result<(), String> {
     mutation::stage(Path::new(&repo_path), &files).map_err(|e| e.to_string())
 }

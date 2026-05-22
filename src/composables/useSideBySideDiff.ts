@@ -16,56 +16,32 @@ export interface DiffHunkWithWordDiff extends DiffHunk {
 
 export function useSideBySideDiff() {
   const dmp = new diff_match_patch();
-  const SIMILARITY_THRESHOLD = 0.3;
 
+  // Сопоставляет удалённые строки с добавленными для построчного word-diff.
+  // Внутри блока изменений (подряд идущие -/+ строки между контекстом) git
+  // выдаёт сначала все `-`, затем все `+`; парные правки совпадают по позиции
+  // в блоке. Позиционное сопоставление — O(n) против прежнего O(removed×added)
+  // со сравнением diff_main каждой пары, из-за которого крупные файлы зависали.
   function matchRelatedLines(hunk: DiffHunk): Map<number, number> {
-    // Map of removed line index -> added line index
     const mapping = new Map<number, number>();
-    const usedAddedIndices = new Set<number>();
-    const removedLines: Array<{ idx: number; content: string }> = [];
-    const addedLines: Array<{ idx: number; content: string }> = [];
-
-    for (let i = 0; i < hunk.lines.length; i++) {
-      const line = hunk.lines[i];
-      if (line.kind === "removed") {
-        removedLines.push({ idx: i, content: line.content });
-      } else if (line.kind === "added") {
-        addedLines.push({ idx: i, content: line.content });
+    let i = 0;
+    while (i < hunk.lines.length) {
+      if (hunk.lines[i].kind === "context") {
+        i++;
+        continue;
       }
+      // Границы блока изменений: подряд идущие added/removed строки.
+      const removed: number[] = [];
+      const added: number[] = [];
+      while (i < hunk.lines.length && hunk.lines[i].kind !== "context") {
+        if (hunk.lines[i].kind === "removed") removed.push(i);
+        else if (hunk.lines[i].kind === "added") added.push(i);
+        i++;
+      }
+      const pairs = Math.min(removed.length, added.length);
+      for (let k = 0; k < pairs; k++) mapping.set(removed[k], added[k]);
     }
-
-    // Simple matching: for each removed line, find the most similar added line
-    for (const removed of removedLines) {
-      let bestMatch = -1;
-      let bestScore = 0;
-
-      for (let j = 0; j < addedLines.length; j++) {
-        const added = addedLines[j];
-        const diffs = dmp.diff_main(removed.content, added.content);
-        const similarity = computeSimilarity(diffs);
-        if (similarity > bestScore && !usedAddedIndices.has(j) && similarity >= SIMILARITY_THRESHOLD) {
-          bestScore = similarity;
-          bestMatch = j;
-        }
-      }
-
-      if (bestMatch >= 0 && bestScore >= SIMILARITY_THRESHOLD) {
-        usedAddedIndices.add(addedLines[bestMatch].idx);
-        mapping.set(removed.idx, addedLines[bestMatch].idx);
-      }
-    }
-
     return mapping;
-  }
-
-  function computeSimilarity(diffs: Array<[number, string]>): number {
-    let sameCount = 0;
-    let totalCount = 0;
-    for (const [op] of diffs) {
-      if (op === 0) sameCount++;
-      totalCount++;
-    }
-    return totalCount > 0 ? sameCount / totalCount : 0;
   }
 
   function computeWordDiffs(oldText: string, newText: string): WordDiffSpan[] {
@@ -118,6 +94,10 @@ export function useSideBySideDiff() {
   }
 
   function enrichAllHunks(hunks: DiffHunk[]): DiffHunkWithWordDiff[] {
+    // Очень крупные диффы: пропускаем word-diff целиком — пользы от него нет,
+    // а вычисление diff_main по всем строкам ощутимо тормозит отрисовку.
+    const total = hunks.reduce((n, h) => n + h.lines.length, 0);
+    if (total > 20000) return hunks;
     return hunks.map(enrichHunkWithWordDiff);
   }
 

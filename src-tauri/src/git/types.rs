@@ -84,6 +84,14 @@ pub struct FileDiff {
     /// Дословные строки заголовка патча до первого хунка
     /// (`diff --git`, `index`, `---`, `+++`), для `git apply`.
     pub header: String,
+    /// Файл бинарный — текстового диффа нет.
+    pub binary: bool,
+    /// base64 изображения до изменения (только для бинарных картинок).
+    pub old_image: Option<String>,
+    /// base64 изображения после изменения.
+    pub new_image: Option<String>,
+    /// Размер файла в байтах (для бинарных файлов).
+    pub byte_size: Option<u64>,
 }
 
 #[derive(Serialize, Clone, Debug)]
