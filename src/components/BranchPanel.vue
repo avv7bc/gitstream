@@ -69,6 +69,12 @@ const ctxBranch = ref<BranchInfo | null>(null);
 function onBranchContextMenu(e: MouseEvent, branch: BranchInfo) {
   e.preventDefault();
   e.stopPropagation();
+  // Right-clicking an unselected branch selects just that branch first.
+  const key = `local:${branch.name}`;
+  if (!selectedKeys.value.has(key)) {
+    selectedKeys.value = new Set([key]);
+    anchorKey.value = key;
+  }
   ctxMenu.value = { x: e.clientX, y: e.clientY };
   ctxBranch.value = branch;
 }
@@ -92,6 +98,8 @@ const showDeleteConfirm = ref(false);
 const showForceDeleteConfirm = ref(false);
 const showRenameDialog = ref(false);
 const targetBranch = ref<BranchInfo | null>(null);
+const targetBranches = ref<BranchInfo[]>([]);
+const notMergedBranches = ref<BranchInfo[]>([]);
 
 async function handleCheckoutCtx() {
   const b = ctxBranch.value;
@@ -171,41 +179,53 @@ async function confirmRename(newName: string) {
 }
 
 function handleDeleteCtx() {
-  targetBranch.value = ctxBranch.value;
+  targetBranches.value = [...deletableBranches.value];
   closeCtxMenu();
+  if (!targetBranches.value.length) return;
   showDeleteConfirm.value = true;
 }
 
 async function confirmDelete() {
-  const b = targetBranch.value;
+  const targets = targetBranches.value;
   showDeleteConfirm.value = false;
-  if (!b) return;
-  try {
-    await deleteBranch(b.name, false);
-    emit("branchesChanged");
-    targetBranch.value = null;
-  } catch (e) {
-    const msg = String(e);
-    if (msg.includes("not fully merged")) {
-      showForceDeleteConfirm.value = true;
-    } else {
-      window.alert(`Delete failed: ${e}`);
-      targetBranch.value = null;
+  if (!targets.length) return;
+  const errors: string[] = [];
+  const notMerged: BranchInfo[] = [];
+  for (const b of targets) {
+    try {
+      await deleteBranch(b.name, false);
+    } catch (e) {
+      if (String(e).includes("not fully merged")) notMerged.push(b);
+      else errors.push(`${b.name}: ${e}`);
     }
+  }
+  if (errors.length) window.alert(`Delete failed:\n${errors.join("\n")}`);
+  emit("branchesChanged");
+  if (notMerged.length) {
+    notMergedBranches.value = notMerged;
+    showForceDeleteConfirm.value = true;
+  } else {
+    targetBranches.value = [];
+    clearSelection();
   }
 }
 
 async function confirmForceDelete() {
-  const b = targetBranch.value;
+  const targets = notMergedBranches.value;
   showForceDeleteConfirm.value = false;
-  if (!b) return;
-  try {
-    await deleteBranch(b.name, true);
-    emit("branchesChanged");
-  } catch (e) {
-    window.alert(`Delete failed: ${e}`);
+  const errors: string[] = [];
+  for (const b of targets) {
+    try {
+      await deleteBranch(b.name, true);
+    } catch (e) {
+      errors.push(`${b.name}: ${e}`);
+    }
   }
-  targetBranch.value = null;
+  if (errors.length) window.alert(`Delete failed:\n${errors.join("\n")}`);
+  emit("branchesChanged");
+  notMergedBranches.value = [];
+  targetBranches.value = [];
+  clearSelection();
 }
 
 // --- Tag context menu ---
@@ -463,6 +483,16 @@ function clearSelection() {
 const selectedTags = computed(() =>
   filteredTags.value.filter((t) => selectedKeys.value.has(`tag:${t.name}`)),
 );
+
+// Local branches currently selected, in display order.
+const selectedLocalBranches = computed(() =>
+  localBranches.value.filter((b) => selectedKeys.value.has(`local:${b.name}`)),
+);
+// Selected local branches eligible for deletion — the current branch can't be deleted.
+const deletableBranches = computed(() =>
+  selectedLocalBranches.value.filter((b) => !b.is_current),
+);
+const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
 </script>
 
 <template>
@@ -626,32 +656,41 @@ const selectedTags = computed(() =>
       >
         <button
           class="ctx-item"
-          :disabled="ctxBranch?.is_current"
+          :disabled="ctxBranch?.is_current || multiBranch"
           @click="handleCheckoutCtx"
         >{{ i18n.branches.checkout }}</button>
         <div class="ctx-separator" />
         <button
           class="ctx-item"
-          :disabled="ctxBranch?.is_current"
+          :disabled="ctxBranch?.is_current || multiBranch"
           @click="handleMergeCtx"
         >{{ i18n.branches.merge }}</button>
         <button
           class="ctx-item"
-          :disabled="ctxBranch?.is_current"
+          :disabled="ctxBranch?.is_current || multiBranch"
           @click="handleRebaseCtx"
         >{{ i18n.branches.rebaseOnto }}</button>
-        <button class="ctx-item" @click="handlePushCtx">{{ i18n.branches.push }}</button>
+        <button
+          class="ctx-item"
+          :disabled="multiBranch"
+          @click="handlePushCtx"
+        >{{ i18n.branches.push }}</button>
         <div class="ctx-separator" />
         <button
           class="ctx-item"
+          :disabled="multiBranch"
           @click="handleCreateBranchCtx"
         >{{ i18n.branches.createFrom }}</button>
-        <button class="ctx-item" @click="handleRenameCtx">{{ i18n.branches.rename }}</button>
+        <button
+          class="ctx-item"
+          :disabled="multiBranch"
+          @click="handleRenameCtx"
+        >{{ i18n.branches.rename }}</button>
         <button
           class="ctx-item ctx-danger"
-          :disabled="ctxBranch?.is_current"
+          :disabled="!deletableBranches.length"
           @click="handleDeleteCtx"
-        >{{ i18n.branches.delete }}</button>
+        >{{ deletableBranches.length > 1 ? `Delete ${deletableBranches.length} Branches` : i18n.branches.delete }}</button>
       </div>
       <div
         v-if="ctxMenu"
@@ -669,20 +708,26 @@ const selectedTags = computed(() =>
       />
 
       <ConfirmDialog
-        v-if="showDeleteConfirm && targetBranch"
-        :message="`Delete local branch '${targetBranch.name}'?`"
+        v-if="showDeleteConfirm && targetBranches.length"
+        :message="targetBranches.length > 1
+          ? `Delete ${targetBranches.length} local branches?`
+          : `Delete local branch '${targetBranches[0].name}'?`"
+        :items="targetBranches.length > 1 ? targetBranches.map((b) => b.name) : undefined"
         confirm-label="Delete"
         danger
-        @close="showDeleteConfirm = false; targetBranch = null"
+        @close="showDeleteConfirm = false; targetBranches = []"
         @confirm="confirmDelete"
       />
 
       <ConfirmDialog
-        v-if="showForceDeleteConfirm && targetBranch"
-        :message="`Branch '${targetBranch.name}' is not fully merged. Force delete anyway?`"
+        v-if="showForceDeleteConfirm && notMergedBranches.length"
+        :message="notMergedBranches.length > 1
+          ? `${notMergedBranches.length} branches are not fully merged. Force delete anyway?`
+          : `Branch '${notMergedBranches[0].name}' is not fully merged. Force delete anyway?`"
+        :items="notMergedBranches.length > 1 ? notMergedBranches.map((b) => b.name) : undefined"
         confirm-label="Force Delete"
         danger
-        @close="showForceDeleteConfirm = false; targetBranch = null"
+        @close="showForceDeleteConfirm = false; notMergedBranches = []; targetBranches = []"
         @confirm="confirmForceDelete"
       />
 
