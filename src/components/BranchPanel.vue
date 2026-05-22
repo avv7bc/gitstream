@@ -212,11 +212,17 @@ async function confirmForceDelete() {
 const tagCtxMenu = ref<{ x: number; y: number } | null>(null);
 const ctxTag = ref<TagInfo | null>(null);
 const showDeleteTagConfirm = ref(false);
-const targetTag = ref<TagInfo | null>(null);
+const targetTags = ref<TagInfo[]>([]);
 
 function onTagContextMenu(e: MouseEvent, tag: TagInfo) {
   e.preventDefault();
   e.stopPropagation();
+  // Right-clicking an unselected tag selects just that tag first.
+  const key = `tag:${tag.name}`;
+  if (!selectedKeys.value.has(key)) {
+    selectedKeys.value = new Set([key]);
+    anchorKey.value = key;
+  }
   tagCtxMenu.value = { x: e.clientX, y: e.clientY };
   ctxTag.value = tag;
 }
@@ -229,40 +235,48 @@ function closeTagCtxMenu() {
 const hasRemote = computed(() => remotes.value.length > 0);
 
 async function handlePushTagCtx() {
-  const t = ctxTag.value;
+  const targets = selectedTags.value;
   closeTagCtxMenu();
-  if (!t) return;
-  try {
-    await pushTag(remotes.value[0] ?? "origin", t.name, false);
-    emit("tagsChanged");
-  } catch (e) {
-    window.alert(`Push tag failed: ${e}`);
+  if (!targets.length) return;
+  const remote = remotes.value[0] ?? "origin";
+  const errors: string[] = [];
+  for (const t of targets) {
+    try {
+      await pushTag(remote, t.name, false);
+    } catch (e) {
+      errors.push(`${t.name}: ${e}`);
+    }
   }
+  if (errors.length) window.alert(`Push tag failed:\n${errors.join("\n")}`);
+  emit("tagsChanged");
 }
 
 function handleDeleteTagCtx() {
-  targetTag.value = ctxTag.value;
+  targetTags.value = [...selectedTags.value];
   closeTagCtxMenu();
+  if (!targetTags.value.length) return;
   showDeleteTagConfirm.value = true;
 }
 
 async function confirmDeleteTag(alsoRemote: boolean) {
-  const t = targetTag.value;
+  const targets = targetTags.value;
   showDeleteTagConfirm.value = false;
-  if (!t) {
-    targetTag.value = null;
-    return;
-  }
-  try {
-    await deleteTag(t.name);
-    if (alsoRemote && remotes.value.length > 0) {
-      await pushTag(remotes.value[0], t.name, true);
+  if (!targets.length) return;
+  const errors: string[] = [];
+  for (const t of targets) {
+    try {
+      await deleteTag(t.name);
+      if (alsoRemote && remotes.value.length > 0) {
+        await pushTag(remotes.value[0], t.name, true);
+      }
+    } catch (e) {
+      errors.push(`${t.name}: ${e}`);
     }
-    emit("tagsChanged");
-  } catch (e) {
-    window.alert(`Delete tag failed: ${e}`);
   }
-  targetTag.value = null;
+  if (errors.length) window.alert(`Delete tag failed:\n${errors.join("\n")}`);
+  clearSelection();
+  emit("tagsChanged");
+  targetTags.value = [];
 }
 
 // --- Stash context menu ---
@@ -439,6 +453,16 @@ function selectItem(key: string, event: MouseEvent) {
   selectedKeys.value = new Set([key]);
   anchorKey.value = key;
 }
+
+function clearSelection() {
+  selectedKeys.value = new Set();
+  anchorKey.value = null;
+}
+
+// Tags currently selected, in display order.
+const selectedTags = computed(() =>
+  filteredTags.value.filter((t) => selectedKeys.value.has(`tag:${t.name}`)),
+);
 </script>
 
 <template>
@@ -679,12 +703,12 @@ function selectItem(key: string, event: MouseEvent) {
           class="ctx-item"
           :disabled="!hasRemote"
           @click="handlePushTagCtx"
-        >{{ i18n.branches.pushTag }}</button>
+        >{{ selectedTags.length > 1 ? `Push ${selectedTags.length} Tags` : i18n.branches.pushTag }}</button>
         <div class="ctx-separator" />
         <button
           class="ctx-item ctx-danger"
           @click="handleDeleteTagCtx"
-        >{{ i18n.branches.deleteTag }}</button>
+        >{{ selectedTags.length > 1 ? `Delete ${selectedTags.length} Tags` : i18n.branches.deleteTag }}</button>
       </div>
       <div
         v-if="tagCtxMenu"
@@ -694,12 +718,15 @@ function selectItem(key: string, event: MouseEvent) {
       />
 
       <ConfirmDialog
-        v-if="showDeleteTagConfirm && targetTag"
-        :message="`Delete tag '${targetTag.name}'?`"
+        v-if="showDeleteTagConfirm && targetTags.length"
+        :message="targetTags.length > 1
+          ? `Delete ${targetTags.length} tags?`
+          : `Delete tag '${targetTags[0].name}'?`"
+        :items="targetTags.length > 1 ? targetTags.map((t) => t.name) : undefined"
         confirm-label="Delete"
         danger
         :checkbox-label="hasRemote ? `Also delete on remote '${remotes[0]}'` : undefined"
-        @close="showDeleteTagConfirm = false; targetTag = null"
+        @close="showDeleteTagConfirm = false; targetTags = []"
         @confirm="confirmDeleteTag"
       />
 
