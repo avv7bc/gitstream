@@ -445,6 +445,10 @@ function sectionKeys(section: string): string[] {
 }
 
 function selectItem(key: string, event: MouseEvent) {
+  // Only the primary (left) button changes selection. A right-button
+  // mousedown fires before `contextmenu`; if it ran the plain-click path
+  // it would collapse a multi-selection before the context menu opens.
+  if (event.button !== 0) return;
   // Shift+click: range from the anchor, but only within one section.
   if (
     event.shiftKey &&
