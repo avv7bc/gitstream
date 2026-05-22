@@ -104,6 +104,7 @@ src-tauri/src/                # Rust backend
 - Stage / Unstage / Discard файлов
 - **Частичный stage** — выбор строк/хунков в Side-by-side diff, stage/unstage/discard выбранного (`git apply --cached`)
 - `git rm` для tracked / disk-delete для untracked
+- **Множественное выделение** (Shift / Ctrl-клик) в панели файлов и BranchPanel — групповые операции над выбранным: stage/unstage/commit/discard/remove/delete файлов, batch delete веток, batch delete/push тегов
 - Commit (с amend), Reword (HEAD — amend; не-HEAD — rebase -i со сценарным редактором)
 - Squash нескольких коммитов в один
 - Push / Pull / Fetch (с диалогами выбора remote, таймаут сетевых операций)
@@ -111,8 +112,8 @@ src-tauri/src/                # Rust backend
 - Checkout branch (локальная + remote-ветка с созданием локальной)
 - Merge ветки
 - Rebase ветки на ветку (с continue/abort через ConflictBar)
-- Ветки: create (от HEAD / коммита / другой ветки), rename, delete (с force)
-- Теги: create (lightweight/annotated), delete, push tag
+- Ветки: create (от HEAD / коммита / другой ветки), rename, delete (с force), batch delete выделенных локальных веток
+- Теги: create (lightweight/annotated), delete, push tag, batch delete / push выделенных тегов
 - Stash: save (с сообщением, `--include-untracked`), apply, pop, drop
 - Reset (soft / mixed / hard), Revert, Cherry-pick — из контекстного меню CommitGraph
 - Разрешение конфликтов: accept ours/theirs, abort/continue для merge/rebase/cherry-pick/revert
@@ -120,7 +121,8 @@ src-tauri/src/                # Rust backend
 
 ### Просмотр
 - Unified + Side-by-side diff с переключателем, синхронным скроллом, виртуальным списком
-- Лог коммитов с деталями (виртуальный список)
+- Превью бинарных файлов и изображений в diff-панели
+- Лог коммитов с деталями (виртуальный список, бесконечная подгрузка при скролле)
 - Список веток / тегов / stash с поиском
 - Панель файлов со статусами
 - File compare диалог (произвольные ревизии)
@@ -148,7 +150,7 @@ src-tauri/src/                # Rust backend
 - **Stats** — статистика репозитория
 - **Settings** — тема, шрифты, таймаут сети, язык
 - **Add Repository / Add Group / Rename Node** — управление treeview
-- **Confirm** — универсальный диалог подтверждения
+- **Confirm** — универсальный диалог подтверждения, опц. список затрагиваемых объектов
 - Все диалоги draggable за header и закрываются по Esc
 
 ### Архитектура
