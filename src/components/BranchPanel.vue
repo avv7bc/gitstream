@@ -69,6 +69,12 @@ const ctxBranch = ref<BranchInfo | null>(null);
 function onBranchContextMenu(e: MouseEvent, branch: BranchInfo) {
   e.preventDefault();
   e.stopPropagation();
+  // Right-clicking an unselected branch selects just that branch first.
+  const key = `local:${branch.name}`;
+  if (!selectedKeys.value.has(key)) {
+    selectedKeys.value = new Set([key]);
+    anchorKey.value = key;
+  }
   ctxMenu.value = { x: e.clientX, y: e.clientY };
   ctxBranch.value = branch;
 }
@@ -92,6 +98,8 @@ const showDeleteConfirm = ref(false);
 const showForceDeleteConfirm = ref(false);
 const showRenameDialog = ref(false);
 const targetBranch = ref<BranchInfo | null>(null);
+const targetBranches = ref<BranchInfo[]>([]);
+const notMergedBranches = ref<BranchInfo[]>([]);
 
 async function handleCheckoutCtx() {
   const b = ctxBranch.value;
@@ -171,52 +179,70 @@ async function confirmRename(newName: string) {
 }
 
 function handleDeleteCtx() {
-  targetBranch.value = ctxBranch.value;
+  targetBranches.value = [...deletableBranches.value];
   closeCtxMenu();
+  if (!targetBranches.value.length) return;
   showDeleteConfirm.value = true;
 }
 
 async function confirmDelete() {
-  const b = targetBranch.value;
+  const targets = targetBranches.value;
   showDeleteConfirm.value = false;
-  if (!b) return;
-  try {
-    await deleteBranch(b.name, false);
-    emit("branchesChanged");
-    targetBranch.value = null;
-  } catch (e) {
-    const msg = String(e);
-    if (msg.includes("not fully merged")) {
-      showForceDeleteConfirm.value = true;
-    } else {
-      window.alert(`Delete failed: ${e}`);
-      targetBranch.value = null;
+  if (!targets.length) return;
+  const errors: string[] = [];
+  const notMerged: BranchInfo[] = [];
+  for (const b of targets) {
+    try {
+      await deleteBranch(b.name, false);
+    } catch (e) {
+      if (String(e).includes("not fully merged")) notMerged.push(b);
+      else errors.push(`${b.name}: ${e}`);
     }
+  }
+  if (errors.length) window.alert(`Delete failed:\n${errors.join("\n")}`);
+  emit("branchesChanged");
+  if (notMerged.length) {
+    notMergedBranches.value = notMerged;
+    showForceDeleteConfirm.value = true;
+  } else {
+    targetBranches.value = [];
+    clearSelection();
   }
 }
 
 async function confirmForceDelete() {
-  const b = targetBranch.value;
+  const targets = notMergedBranches.value;
   showForceDeleteConfirm.value = false;
-  if (!b) return;
-  try {
-    await deleteBranch(b.name, true);
-    emit("branchesChanged");
-  } catch (e) {
-    window.alert(`Delete failed: ${e}`);
+  const errors: string[] = [];
+  for (const b of targets) {
+    try {
+      await deleteBranch(b.name, true);
+    } catch (e) {
+      errors.push(`${b.name}: ${e}`);
+    }
   }
-  targetBranch.value = null;
+  if (errors.length) window.alert(`Delete failed:\n${errors.join("\n")}`);
+  emit("branchesChanged");
+  notMergedBranches.value = [];
+  targetBranches.value = [];
+  clearSelection();
 }
 
 // --- Tag context menu ---
 const tagCtxMenu = ref<{ x: number; y: number } | null>(null);
 const ctxTag = ref<TagInfo | null>(null);
 const showDeleteTagConfirm = ref(false);
-const targetTag = ref<TagInfo | null>(null);
+const targetTags = ref<TagInfo[]>([]);
 
 function onTagContextMenu(e: MouseEvent, tag: TagInfo) {
   e.preventDefault();
   e.stopPropagation();
+  // Right-clicking an unselected tag selects just that tag first.
+  const key = `tag:${tag.name}`;
+  if (!selectedKeys.value.has(key)) {
+    selectedKeys.value = new Set([key]);
+    anchorKey.value = key;
+  }
   tagCtxMenu.value = { x: e.clientX, y: e.clientY };
   ctxTag.value = tag;
 }
@@ -229,40 +255,48 @@ function closeTagCtxMenu() {
 const hasRemote = computed(() => remotes.value.length > 0);
 
 async function handlePushTagCtx() {
-  const t = ctxTag.value;
+  const targets = selectedTags.value;
   closeTagCtxMenu();
-  if (!t) return;
-  try {
-    await pushTag(remotes.value[0] ?? "origin", t.name, false);
-    emit("tagsChanged");
-  } catch (e) {
-    window.alert(`Push tag failed: ${e}`);
+  if (!targets.length) return;
+  const remote = remotes.value[0] ?? "origin";
+  const errors: string[] = [];
+  for (const t of targets) {
+    try {
+      await pushTag(remote, t.name, false);
+    } catch (e) {
+      errors.push(`${t.name}: ${e}`);
+    }
   }
+  if (errors.length) window.alert(`Push tag failed:\n${errors.join("\n")}`);
+  emit("tagsChanged");
 }
 
 function handleDeleteTagCtx() {
-  targetTag.value = ctxTag.value;
+  targetTags.value = [...selectedTags.value];
   closeTagCtxMenu();
+  if (!targetTags.value.length) return;
   showDeleteTagConfirm.value = true;
 }
 
 async function confirmDeleteTag(alsoRemote: boolean) {
-  const t = targetTag.value;
+  const targets = targetTags.value;
   showDeleteTagConfirm.value = false;
-  if (!t) {
-    targetTag.value = null;
-    return;
-  }
-  try {
-    await deleteTag(t.name);
-    if (alsoRemote && remotes.value.length > 0) {
-      await pushTag(remotes.value[0], t.name, true);
+  if (!targets.length) return;
+  const errors: string[] = [];
+  for (const t of targets) {
+    try {
+      await deleteTag(t.name);
+      if (alsoRemote && remotes.value.length > 0) {
+        await pushTag(remotes.value[0], t.name, true);
+      }
+    } catch (e) {
+      errors.push(`${t.name}: ${e}`);
     }
-    emit("tagsChanged");
-  } catch (e) {
-    window.alert(`Delete tag failed: ${e}`);
   }
-  targetTag.value = null;
+  if (errors.length) window.alert(`Delete tag failed:\n${errors.join("\n")}`);
+  clearSelection();
+  emit("tagsChanged");
+  targetTags.value = [];
 }
 
 // --- Stash context menu ---
@@ -386,11 +420,79 @@ function toggleSection(key: keyof typeof expandedSections.value) {
   expandedSections.value[key] = !expandedSections.value[key];
 }
 
-// --- Item selection (highlight on left/right click) ---
-const selectedKey = ref<string | null>(null);
-function selectItem(key: string) {
-  selectedKey.value = key;
+// --- Item selection (single + multi via shift / ctrl) ---
+const selectedKeys = ref<Set<string>>(new Set());
+const anchorKey = ref<string | null>(null);
+
+function sectionOf(key: string): string {
+  return key.slice(0, key.indexOf(":"));
 }
+
+// Ordered item keys for the section a given key belongs to.
+function sectionKeys(section: string): string[] {
+  switch (section) {
+    case "local":
+      return localBranches.value.map((b) => `local:${b.name}`);
+    case "remote":
+      return remoteBranches.value.map((b) => `remote:${b.name}`);
+    case "tag":
+      return filteredTags.value.map((t) => `tag:${t.name}`);
+    case "stash":
+      return filteredStashes.value.map((s) => `stash:${s.index}`);
+    default:
+      return [];
+  }
+}
+
+function selectItem(key: string, event: MouseEvent) {
+  // Shift+click: range from the anchor, but only within one section.
+  if (
+    event.shiftKey &&
+    anchorKey.value &&
+    sectionOf(anchorKey.value) === sectionOf(key)
+  ) {
+    const keys = sectionKeys(sectionOf(key));
+    const from = keys.indexOf(anchorKey.value);
+    const to = keys.indexOf(key);
+    if (from !== -1 && to !== -1) {
+      const [lo, hi] = from <= to ? [from, to] : [to, from];
+      selectedKeys.value = new Set(keys.slice(lo, hi + 1));
+      return;
+    }
+  }
+  // Ctrl/Cmd+click: toggle a single key, move the anchor.
+  if (event.ctrlKey || event.metaKey) {
+    const next = new Set(selectedKeys.value);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    selectedKeys.value = next;
+    anchorKey.value = key;
+    return;
+  }
+  // Plain click: replace selection.
+  selectedKeys.value = new Set([key]);
+  anchorKey.value = key;
+}
+
+function clearSelection() {
+  selectedKeys.value = new Set();
+  anchorKey.value = null;
+}
+
+// Tags currently selected, in display order.
+const selectedTags = computed(() =>
+  filteredTags.value.filter((t) => selectedKeys.value.has(`tag:${t.name}`)),
+);
+
+// Local branches currently selected, in display order.
+const selectedLocalBranches = computed(() =>
+  localBranches.value.filter((b) => selectedKeys.value.has(`local:${b.name}`)),
+);
+// Selected local branches eligible for deletion — the current branch can't be deleted.
+const deletableBranches = computed(() =>
+  selectedLocalBranches.value.filter((b) => !b.is_current),
+);
+const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
 </script>
 
 <template>
@@ -429,8 +531,8 @@ function selectItem(key: string) {
             v-for="branch in localBranches"
             :key="branch.name"
             class="branch-item"
-            :class="{ current: branch.is_current, selected: selectedKey === `local:${branch.name}` }"
-            @mousedown="selectItem(`local:${branch.name}`)"
+            :class="{ current: branch.is_current, selected: selectedKeys.has(`local:${branch.name}`) }"
+            @mousedown="selectItem(`local:${branch.name}`, $event)"
             @dblclick="handleLocalDblClick(branch)"
             @contextmenu="onBranchContextMenu($event, branch)"
           >
@@ -464,8 +566,8 @@ function selectItem(key: string) {
             v-for="branch in remoteBranches"
             :key="branch.name"
             class="branch-item"
-            :class="{ selected: selectedKey === `remote:${branch.name}` }"
-            @mousedown="selectItem(`remote:${branch.name}`)"
+            :class="{ selected: selectedKeys.has(`remote:${branch.name}`) }"
+            @mousedown="selectItem(`remote:${branch.name}`, $event)"
             @dblclick="emit('checkoutRemote', branch.name)"
           >
             <RefIcon kind="remote-branch" class="bp-icon bp-icon--remote" />
@@ -497,8 +599,8 @@ function selectItem(key: string) {
             v-for="tag in filteredTags"
             :key="tag.name"
             class="branch-item"
-            :class="{ selected: selectedKey === `tag:${tag.name}` }"
-            @mousedown="selectItem(`tag:${tag.name}`)"
+            :class="{ selected: selectedKeys.has(`tag:${tag.name}`) }"
+            @mousedown="selectItem(`tag:${tag.name}`, $event)"
             @contextmenu="onTagContextMenu($event, tag)"
           >
             <RefIcon kind="tag" class="bp-icon bp-icon--tag" />
@@ -530,8 +632,8 @@ function selectItem(key: string) {
             v-for="stash in filteredStashes"
             :key="stash.index"
             class="branch-item stash-item"
-            :class="{ selected: selectedKey === `stash:${stash.index}` }"
-            @mousedown="selectItem(`stash:${stash.index}`)"
+            :class="{ selected: selectedKeys.has(`stash:${stash.index}`) }"
+            @mousedown="selectItem(`stash:${stash.index}`, $event)"
             @contextmenu="onStashContextMenu($event, stash)"
           >
             <RefIcon kind="stash" class="bp-icon bp-icon--stash" />
@@ -554,32 +656,41 @@ function selectItem(key: string) {
       >
         <button
           class="ctx-item"
-          :disabled="ctxBranch?.is_current"
+          :disabled="ctxBranch?.is_current || multiBranch"
           @click="handleCheckoutCtx"
         >{{ i18n.branches.checkout }}</button>
         <div class="ctx-separator" />
         <button
           class="ctx-item"
-          :disabled="ctxBranch?.is_current"
+          :disabled="ctxBranch?.is_current || multiBranch"
           @click="handleMergeCtx"
         >{{ i18n.branches.merge }}</button>
         <button
           class="ctx-item"
-          :disabled="ctxBranch?.is_current"
+          :disabled="ctxBranch?.is_current || multiBranch"
           @click="handleRebaseCtx"
         >{{ i18n.branches.rebaseOnto }}</button>
-        <button class="ctx-item" @click="handlePushCtx">{{ i18n.branches.push }}</button>
+        <button
+          class="ctx-item"
+          :disabled="multiBranch"
+          @click="handlePushCtx"
+        >{{ i18n.branches.push }}</button>
         <div class="ctx-separator" />
         <button
           class="ctx-item"
+          :disabled="multiBranch"
           @click="handleCreateBranchCtx"
         >{{ i18n.branches.createFrom }}</button>
-        <button class="ctx-item" @click="handleRenameCtx">{{ i18n.branches.rename }}</button>
+        <button
+          class="ctx-item"
+          :disabled="multiBranch"
+          @click="handleRenameCtx"
+        >{{ i18n.branches.rename }}</button>
         <button
           class="ctx-item ctx-danger"
-          :disabled="ctxBranch?.is_current"
+          :disabled="!deletableBranches.length"
           @click="handleDeleteCtx"
-        >{{ i18n.branches.delete }}</button>
+        >{{ deletableBranches.length > 1 ? `Delete ${deletableBranches.length} Branches` : i18n.branches.delete }}</button>
       </div>
       <div
         v-if="ctxMenu"
@@ -597,20 +708,26 @@ function selectItem(key: string) {
       />
 
       <ConfirmDialog
-        v-if="showDeleteConfirm && targetBranch"
-        :message="`Delete local branch '${targetBranch.name}'?`"
+        v-if="showDeleteConfirm && targetBranches.length"
+        :message="targetBranches.length > 1
+          ? `Delete ${targetBranches.length} local branches?`
+          : `Delete local branch '${targetBranches[0].name}'?`"
+        :items="targetBranches.length > 1 ? targetBranches.map((b) => b.name) : undefined"
         confirm-label="Delete"
         danger
-        @close="showDeleteConfirm = false; targetBranch = null"
+        @close="showDeleteConfirm = false; targetBranches = []"
         @confirm="confirmDelete"
       />
 
       <ConfirmDialog
-        v-if="showForceDeleteConfirm && targetBranch"
-        :message="`Branch '${targetBranch.name}' is not fully merged. Force delete anyway?`"
+        v-if="showForceDeleteConfirm && notMergedBranches.length"
+        :message="notMergedBranches.length > 1
+          ? `${notMergedBranches.length} branches are not fully merged. Force delete anyway?`
+          : `Branch '${notMergedBranches[0].name}' is not fully merged. Force delete anyway?`"
+        :items="notMergedBranches.length > 1 ? notMergedBranches.map((b) => b.name) : undefined"
         confirm-label="Force Delete"
         danger
-        @close="showForceDeleteConfirm = false; targetBranch = null"
+        @close="showForceDeleteConfirm = false; notMergedBranches = []; targetBranches = []"
         @confirm="confirmForceDelete"
       />
 
@@ -631,12 +748,12 @@ function selectItem(key: string) {
           class="ctx-item"
           :disabled="!hasRemote"
           @click="handlePushTagCtx"
-        >{{ i18n.branches.pushTag }}</button>
+        >{{ selectedTags.length > 1 ? `Push ${selectedTags.length} Tags` : i18n.branches.pushTag }}</button>
         <div class="ctx-separator" />
         <button
           class="ctx-item ctx-danger"
           @click="handleDeleteTagCtx"
-        >{{ i18n.branches.deleteTag }}</button>
+        >{{ selectedTags.length > 1 ? `Delete ${selectedTags.length} Tags` : i18n.branches.deleteTag }}</button>
       </div>
       <div
         v-if="tagCtxMenu"
@@ -646,12 +763,15 @@ function selectItem(key: string) {
       />
 
       <ConfirmDialog
-        v-if="showDeleteTagConfirm && targetTag"
-        :message="`Delete tag '${targetTag.name}'?`"
+        v-if="showDeleteTagConfirm && targetTags.length"
+        :message="targetTags.length > 1
+          ? `Delete ${targetTags.length} tags?`
+          : `Delete tag '${targetTags[0].name}'?`"
+        :items="targetTags.length > 1 ? targetTags.map((t) => t.name) : undefined"
         confirm-label="Delete"
         danger
         :checkbox-label="hasRemote ? `Also delete on remote '${remotes[0]}'` : undefined"
-        @close="showDeleteTagConfirm = false; targetTag = null"
+        @close="showDeleteTagConfirm = false; targetTags = []"
         @confirm="confirmDeleteTag"
       />
 
