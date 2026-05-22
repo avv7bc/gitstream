@@ -386,10 +386,58 @@ function toggleSection(key: keyof typeof expandedSections.value) {
   expandedSections.value[key] = !expandedSections.value[key];
 }
 
-// --- Item selection (highlight on left/right click) ---
-const selectedKey = ref<string | null>(null);
-function selectItem(key: string) {
-  selectedKey.value = key;
+// --- Item selection (single + multi via shift / ctrl) ---
+const selectedKeys = ref<Set<string>>(new Set());
+const anchorKey = ref<string | null>(null);
+
+function sectionOf(key: string): string {
+  return key.slice(0, key.indexOf(":"));
+}
+
+// Ordered item keys for the section a given key belongs to.
+function sectionKeys(section: string): string[] {
+  switch (section) {
+    case "local":
+      return localBranches.value.map((b) => `local:${b.name}`);
+    case "remote":
+      return remoteBranches.value.map((b) => `remote:${b.name}`);
+    case "tag":
+      return filteredTags.value.map((t) => `tag:${t.name}`);
+    case "stash":
+      return filteredStashes.value.map((s) => `stash:${s.index}`);
+    default:
+      return [];
+  }
+}
+
+function selectItem(key: string, event: MouseEvent) {
+  // Shift+click: range from the anchor, but only within one section.
+  if (
+    event.shiftKey &&
+    anchorKey.value &&
+    sectionOf(anchorKey.value) === sectionOf(key)
+  ) {
+    const keys = sectionKeys(sectionOf(key));
+    const from = keys.indexOf(anchorKey.value);
+    const to = keys.indexOf(key);
+    if (from !== -1 && to !== -1) {
+      const [lo, hi] = from <= to ? [from, to] : [to, from];
+      selectedKeys.value = new Set(keys.slice(lo, hi + 1));
+      return;
+    }
+  }
+  // Ctrl/Cmd+click: toggle a single key, move the anchor.
+  if (event.ctrlKey || event.metaKey) {
+    const next = new Set(selectedKeys.value);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    selectedKeys.value = next;
+    anchorKey.value = key;
+    return;
+  }
+  // Plain click: replace selection.
+  selectedKeys.value = new Set([key]);
+  anchorKey.value = key;
 }
 </script>
 
@@ -429,8 +477,8 @@ function selectItem(key: string) {
             v-for="branch in localBranches"
             :key="branch.name"
             class="branch-item"
-            :class="{ current: branch.is_current, selected: selectedKey === `local:${branch.name}` }"
-            @mousedown="selectItem(`local:${branch.name}`)"
+            :class="{ current: branch.is_current, selected: selectedKeys.has(`local:${branch.name}`) }"
+            @mousedown="selectItem(`local:${branch.name}`, $event)"
             @dblclick="handleLocalDblClick(branch)"
             @contextmenu="onBranchContextMenu($event, branch)"
           >
@@ -464,8 +512,8 @@ function selectItem(key: string) {
             v-for="branch in remoteBranches"
             :key="branch.name"
             class="branch-item"
-            :class="{ selected: selectedKey === `remote:${branch.name}` }"
-            @mousedown="selectItem(`remote:${branch.name}`)"
+            :class="{ selected: selectedKeys.has(`remote:${branch.name}`) }"
+            @mousedown="selectItem(`remote:${branch.name}`, $event)"
             @dblclick="emit('checkoutRemote', branch.name)"
           >
             <RefIcon kind="remote-branch" class="bp-icon bp-icon--remote" />
@@ -497,8 +545,8 @@ function selectItem(key: string) {
             v-for="tag in filteredTags"
             :key="tag.name"
             class="branch-item"
-            :class="{ selected: selectedKey === `tag:${tag.name}` }"
-            @mousedown="selectItem(`tag:${tag.name}`)"
+            :class="{ selected: selectedKeys.has(`tag:${tag.name}`) }"
+            @mousedown="selectItem(`tag:${tag.name}`, $event)"
             @contextmenu="onTagContextMenu($event, tag)"
           >
             <RefIcon kind="tag" class="bp-icon bp-icon--tag" />
@@ -530,8 +578,8 @@ function selectItem(key: string) {
             v-for="stash in filteredStashes"
             :key="stash.index"
             class="branch-item stash-item"
-            :class="{ selected: selectedKey === `stash:${stash.index}` }"
-            @mousedown="selectItem(`stash:${stash.index}`)"
+            :class="{ selected: selectedKeys.has(`stash:${stash.index}`) }"
+            @mousedown="selectItem(`stash:${stash.index}`, $event)"
             @contextmenu="onStashContextMenu($event, stash)"
           >
             <RefIcon kind="stash" class="bp-icon bp-icon--stash" />
