@@ -115,7 +115,12 @@ fn fill_binary(repo_path: &Path, diff: &mut FileDiff, old: Option<BlobSrc>, new:
 }
 
 pub fn status(repo_path: &Path) -> Result<Vec<FileStatus>, GitError> {
-    let output = run_git(repo_path, &["status", "--porcelain=v2"])?;
+    // --untracked-files=all: иначе git схлопывает untracked-каталог в одну
+    // запись (`back/ws_server/`); UI должен показывать каждый файл отдельно.
+    let output = run_git(
+        repo_path,
+        &["status", "--porcelain=v2", "--untracked-files=all"],
+    )?;
     let mut files = Vec::new();
     for line in output.lines() {
         if line.starts_with('1') || line.starts_with('2') {
@@ -844,6 +849,70 @@ mod diff_untracked_tests {
             .collect();
         assert_eq!(added, vec!["alpha", "beta", "gamma"]);
         assert_eq!(diff.path, "new.txt");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod status_untracked_tests {
+    use super::*;
+    use std::fs;
+
+    fn git(dir: &Path, args: &[&str]) {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+
+    // git status по умолчанию схлопывает untracked-каталог в одну запись
+    // (`back/ws_server/`). UI должен показывать каждый файл отдельно — как
+    // SmartGit. Поэтому status() запрашивает --untracked-files=all.
+    #[test]
+    fn untracked_directory_lists_individual_files() {
+        let dir = std::env::temp_dir()
+            .join(format!("gitstream_status_untracked_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "-q"]);
+        git(&dir, &["config", "user.email", "t@t.t"]);
+        git(&dir, &["config", "user.name", "t"]);
+        fs::write(dir.join("seed.txt"), "seed\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "seed"]);
+
+        let nested = dir.join("back").join("ws_server").join("src");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(nested.join("server.rs"), "fn main() {}\n").unwrap();
+        fs::write(nested.join("metrics.rs"), "pub fn m() {}\n").unwrap();
+
+        let files = status(&dir).unwrap();
+        let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
+
+        assert!(
+            paths.contains(&"back/ws_server/src/server.rs"),
+            "ожидался отдельный файл, получено: {:?}",
+            paths
+        );
+        assert!(
+            paths.contains(&"back/ws_server/src/metrics.rs"),
+            "ожидался отдельный файл, получено: {:?}",
+            paths
+        );
+        assert!(
+            files.iter().all(|f| !f.path.ends_with('/')),
+            "каталог не должен попадать в список одной записью: {:?}",
+            paths
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
