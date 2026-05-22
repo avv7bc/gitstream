@@ -166,6 +166,12 @@ pub fn status(repo_path: &Path) -> Result<Vec<FileStatus>, GitError> {
 }
 
 pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> {
+    // Пустой репозиторий (`git init` без коммитов): HEAD ещё не существует,
+    // `git log` падает с кодом 128. Это не ошибка — лог просто пуст.
+    // Проверка через rev-parse не зависит от локали git.
+    if run_git(repo_path, &["rev-parse", "--verify", "--quiet", "HEAD"]).is_err() {
+        return Ok(Vec::new());
+    }
     // \x1e separates commit records; %B is the full message (may contain newlines)
     let format = "%x1e%H%x00%h%x00%an%x00%ae%x00%aI%x00%P%x00%D%x00%B";
     let limit_str = format!("-{}", limit);
@@ -959,6 +965,21 @@ mod diff_commit_tests {
             !renamed.hunks.is_empty(),
             "diff_commit_file показывает содержимое переименованного файла"
         );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // Пустой репозиторий (`git init` без коммитов): `log` отдаёт пустой
+    // список, а не ошибку — иначе фронтенд не очистит граф при переключении.
+    #[test]
+    fn log_empty_repo_returns_empty_list() {
+        let dir = std::env::temp_dir().join(format!("gitstream_empty_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "-q"]);
+
+        let commits = log(&dir, 500).expect("пустой репозиторий не должен давать ошибку");
+        assert!(commits.is_empty(), "лог пустого репозитория должен быть пуст");
 
         let _ = fs::remove_dir_all(&dir);
     }
