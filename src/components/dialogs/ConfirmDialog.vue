@@ -8,6 +8,7 @@ const props = defineProps<{
   confirmLabel?: string;
   danger?: boolean;
   checkboxLabel?: string;
+  items?: string[];
 }>();
 
 const emit = defineEmits<{
@@ -36,6 +37,9 @@ function onConfirm() {
 
       <div class="dialog-body">
         <p class="confirm-message">{{ message }}</p>
+        <ul v-if="items && items.length" class="confirm-list">
+          <li v-for="item in items" :key="item">{{ item }}</li>
+        </ul>
         <label v-if="checkboxLabel" class="confirm-checkbox">
           <input type="checkbox" v-model="checked" />
           {{ checkboxLabel }}
@@ -74,5 +78,24 @@ function onConfirm() {
   margin-top: 12px;
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
+}
+
+.confirm-list {
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  max-height: 160px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+.confirm-list li {
+  padding: 1px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>
