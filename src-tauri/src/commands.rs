@@ -38,7 +38,7 @@ fn version_gt(latest: &str, current: &str) -> bool {
 }
 
 /// Запускает `git` для сетевой операции с таймаутом. Стримит stderr как
-/// события прогресса. `repo_path = None` для `clone`.
+/// события прогресса.
 async fn run_network_git(
     app: &tauri::AppHandle,
     repo_path: Option<&Path>,
@@ -443,17 +443,6 @@ pub async fn do_push_tag(
         "push",
     )
     .await
-}
-
-#[tauri::command]
-pub async fn do_clone(
-    app: tauri::AppHandle,
-    url: String,
-    dest: String,
-    timeout_secs: Option<u64>,
-) -> Result<String, String> {
-    let args = mutation::clone_args(&url, &dest);
-    run_network_git(&app, None, &args, timeout_secs, "clone").await
 }
 
 #[tauri::command]

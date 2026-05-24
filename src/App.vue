@@ -10,7 +10,6 @@ import SideBySideDiffView from "./components/SideBySideDiffView.vue";
 import StatusBar from "./components/StatusBar.vue";
 import ConflictBar from "./components/ConflictBar.vue";
 import CommitDialog from "./components/dialogs/CommitDialog.vue";
-import CloneDialog from "./components/dialogs/CloneDialog.vue";
 import PushDialog from "./components/dialogs/PushDialog.vue";
 import PullDialog from "./components/dialogs/PullDialog.vue";
 import CheckoutDialog from "./components/dialogs/CheckoutDialog.vue";
@@ -71,7 +70,6 @@ watch(repoPath, (val) => {
 });
 
 const showCommitDialog = ref(false);
-const showCloneDialog = ref(false);
 const showPushDialog = ref(false);
 const showPullDialog = ref(false);
 const showCheckoutDialog = ref(false);
@@ -200,7 +198,7 @@ function handleAddGroup() {
 }
 
 // --- Close any open dialog on Esc ---
-const dialogs = [showCommitDialog, showCloneDialog, showPushDialog, showPullDialog, showCheckoutDialog, showConfirmDialog, showDiscardDialog, showErrorDialog, showSettingsDialog, showStatsDialog];
+const dialogs = [showCommitDialog, showPushDialog, showPullDialog, showCheckoutDialog, showConfirmDialog, showDiscardDialog, showErrorDialog, showSettingsDialog, showStatsDialog];
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") {
@@ -346,7 +344,6 @@ function onMouseUp() {
     <!-- Toolbar -->
     <AppToolbar
       @commit="showCommitDialog = true"
-      @clone="showCloneDialog = true"
       @push="handlePushRequest('origin', false)"
       @pull="showPullDialog = true"
       @checkout="showCheckoutDialog = true"
@@ -434,7 +431,6 @@ function onMouseUp() {
 
     <!-- Dialogs -->
     <CommitDialog v-if="showCommitDialog" @close="showCommitDialog = false; refreshAll()" />
-    <CloneDialog v-if="showCloneDialog" @close="showCloneDialog = false; refreshAll()" />
     <PushDialog v-if="showPushDialog" @close="showPushDialog = false" @push="handlePushRequest" />
     <PullDialog v-if="showPullDialog" @close="showPullDialog = false" @pull="handlePullRequest" />
     <CheckoutDialog v-if="showCheckoutDialog" @close="showCheckoutDialog = false; refreshAll()" />

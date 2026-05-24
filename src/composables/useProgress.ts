@@ -22,7 +22,6 @@ const COMMAND_LABEL_BUILDERS: Record<string, (args: Args) => string> = {
   do_push: (a) => withRemote("Push to", a),
   do_push_branch: (a) => withRemote("Push to", a),
   do_push_tag: (a) => withRemote("Push tag to", a),
-  do_clone: () => "Cloning…",
   get_status: () => "File status…",
   get_log: () => "Loading log…",
   stage_files: () => "Stage…",

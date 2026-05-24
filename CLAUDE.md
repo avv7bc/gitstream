@@ -54,7 +54,7 @@ src/                          # Vue.js frontend
 │   ├── useLog.ts             # Лог коммитов, reset/revert/cherry-pick
 │   ├── useDiff.ts            # Diff файлов и коммитов
 │   ├── useCommit.ts          # Создание коммитов, squash, reword
-│   ├── useRemote.ts          # Fetch, pull, push, clone
+│   ├── useRemote.ts          # Fetch, pull, push
 │   ├── useConflicts.ts       # Состояние merge/rebase + accept ours/theirs
 │   ├── useI18n.ts            # Локализация RU/EN
 │   ├── useSettings.ts        # Настройки приложения
@@ -71,7 +71,7 @@ src-tauri/src/                # Rust backend
     ├── query.rs              # run_git, status, log, branches, tags,
     │                         # stashes, remotes, repo_info, diff
     └── mutation.rs           # stage, unstage, discard, commit, checkout,
-                              # merge, branch/tag ops, fetch, pull, push, clone
+                              # merge, branch/tag ops, fetch, pull, push
 ```
 
 **Layout UI:**
@@ -108,7 +108,6 @@ src-tauri/src/                # Rust backend
 - Commit (с amend), Reword (HEAD — amend; не-HEAD — rebase -i со сценарным редактором)
 - Squash нескольких коммитов в один
 - Push / Pull / Fetch (с диалогами выбора remote, таймаут сетевых операций)
-- Clone репозитория
 - Checkout branch (локальная + remote-ветка с созданием локальной)
 - Merge ветки
 - Rebase ветки на ветку (с continue/abort через ConflictBar)
@@ -137,7 +136,6 @@ src-tauri/src/                # Rust backend
 
 ### Диалоги
 - **Commit** — сообщение, amend, индикатор длины строки, Commit & Push
-- **Clone** — URL + путь, автоимя папки из URL
 - **Push / Pull** — выбор remote, force/rebase, behind-счётчик
 - **Checkout** (локальная) и **Checkout Remote** (с созданием локальной)
 - **Create Branch** — имя, start point, опц. checkout

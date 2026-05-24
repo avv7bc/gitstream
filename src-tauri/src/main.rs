@@ -75,7 +75,6 @@ fn main() {
             commands::do_create_tag,
             commands::do_delete_tag,
             commands::do_push_tag,
-            commands::do_clone,
             settings::get_settings,
             settings::set_settings,
             commands::check_repo_path,

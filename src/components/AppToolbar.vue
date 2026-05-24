@@ -6,7 +6,6 @@ const { i18n } = useI18n();
 
 defineEmits<{
   commit: [];
-  clone: [];
   push: [];
   pull: [];
   checkout: [];
@@ -172,13 +171,6 @@ function closeMenu() {
           <rect x="3" y="11" width="10" height="3" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/>
         </svg>
         <span>{{ i18n.toolbar.stash }}</span>
-      </button>
-      <button class="toolbar-btn" @click="$emit('clone')" :title="i18n.toolbar.clone">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M10 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V5l-3-3z" fill="none" stroke="currentColor" stroke-width="1.2"/>
-          <path d="M10 2v3h3" fill="none" stroke="currentColor" stroke-width="1.2"/>
-        </svg>
-        <span>{{ i18n.toolbar.clone }}</span>
       </button>
     </div>
 

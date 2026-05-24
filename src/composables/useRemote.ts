@@ -57,15 +57,5 @@ export function useRemote() {
     );
   }
 
-  async function cloneRepo(url: string, dest: string) {
-    await wrapAsync(() =>
-      invoke("do_clone", {
-        url,
-        dest,
-        timeoutSecs: networkTimeoutSecs.value,
-      })
-    );
-  }
-
-  return { isBusy, lastError, fetchRemote, pull, push, cloneRepo };
+  return { isBusy, lastError, fetchRemote, pull, push };
 }

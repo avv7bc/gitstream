@@ -583,10 +583,6 @@ pub fn push_tag_args(remote: &str, name: &str, delete: bool) -> Vec<String> {
     vec!["push".into(), remote.into(), refspec]
 }
 
-pub fn clone_args(url: &str, dest: &str) -> Vec<String> {
-    vec!["clone".into(), url.into(), dest.into()]
-}
-
 /// Разбирает заголовок хунка "@@ -a,b +c,d @@ tail".
 /// Возвращает (old_start, new_start, tail) — где tail включает ведущий пробел.
 fn parse_hunk_header(h: &str) -> Option<(usize, usize, String)> {
@@ -916,13 +912,6 @@ mod tag_tests {
         );
     }
 
-    #[test]
-    fn clone_args_basic() {
-        assert_eq!(
-            clone_args("https://x/y.git", "/tmp/y"),
-            vec!["clone", "https://x/y.git", "/tmp/y"]
-        );
-    }
 }
 
 #[cfg(test)]
