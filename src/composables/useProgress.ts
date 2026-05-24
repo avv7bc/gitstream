@@ -4,16 +4,30 @@ import { computed, ref } from "vue";
 
 const THRESHOLD_MS = 100;
 
-const COMMAND_LABELS: Record<string, string> = {
-  do_fetch: "Fetch…",
-  do_pull: "Pull…",
-  do_push: "Push…",
-  do_clone: "Cloning…",
-  get_status: "File status…",
-  get_log: "Loading log…",
-  stage_files: "Stage…",
-  unstage_files: "Unstage…",
-  discard_files: "Discard…",
+type Args = Record<string, unknown> | undefined;
+
+function remoteOf(args: Args): string {
+  const r = args?.remote;
+  return typeof r === "string" && r ? r : "";
+}
+
+function withRemote(prefix: string, args: Args): string {
+  const r = remoteOf(args);
+  return r ? `${prefix} ${r}…` : `${prefix}…`;
+}
+
+const COMMAND_LABEL_BUILDERS: Record<string, (args: Args) => string> = {
+  do_fetch: (a) => withRemote("Fetch from", a),
+  do_pull: (a) => withRemote("Pull from", a),
+  do_push: (a) => withRemote("Push to", a),
+  do_push_branch: (a) => withRemote("Push to", a),
+  do_push_tag: (a) => withRemote("Push tag to", a),
+  do_clone: () => "Cloning…",
+  get_status: () => "File status…",
+  get_log: () => "Loading log…",
+  stage_files: () => "Stage…",
+  unstage_files: () => "Unstage…",
+  discard_files: () => "Discard…",
 };
 
 const FALLBACK_LABEL = "Working…";
@@ -21,10 +35,26 @@ const FALLBACK_LABEL = "Working…";
 interface ActiveOp {
   cmd: string;
   label: string;
+  startedAt: number;
+  timeoutSecs?: number;
 }
 
 const active = ref(new Map<number, ActiveOp>());
 let seq = 0;
+
+const tick = ref(0);
+let tickTimer: ReturnType<typeof setInterval> | null = null;
+
+function ensureTicker() {
+  if (tickTimer) return;
+  tickTimer = setInterval(() => {
+    if (active.value.size === 0) {
+      if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+      return;
+    }
+    tick.value = (tick.value + 1) | 0;
+  }, 1000);
+}
 
 const networkProgressLine = ref("");
 let networkProgressTimer: ReturnType<typeof setTimeout> | null = null;
@@ -37,13 +67,21 @@ listen<{ op: string; line: string }>("network_progress", (event) => {
 
 export const isWorking = computed(() => active.value.size > 0);
 
+function formatCountdown(op: ActiveOp): string {
+  if (!op.timeoutSecs) return op.label;
+  void tick.value;
+  const elapsed = Math.min(op.timeoutSecs, Math.floor((Date.now() - op.startedAt) / 1000));
+  return `${op.label} ${elapsed}/${op.timeoutSecs}`;
+}
+
 export const progressLabel = computed(() => {
   if (networkProgressLine.value) return networkProgressLine.value;
   const size = active.value.size;
   if (size === 0) return "";
   if (size > 1) return `Operations: ${size}`;
   const first = active.value.values().next().value as ActiveOp | undefined;
-  return first?.label ?? FALLBACK_LABEL;
+  if (!first) return FALLBACK_LABEL;
+  return formatCountdown(first);
 });
 
 export async function invoke<T>(
@@ -51,12 +89,16 @@ export async function invoke<T>(
   args?: Record<string, unknown>,
 ): Promise<T> {
   const id = ++seq;
-  const label = COMMAND_LABELS[cmd] ?? FALLBACK_LABEL;
+  const builder = COMMAND_LABEL_BUILDERS[cmd];
+  const label = builder ? builder(args) : FALLBACK_LABEL;
+  const timeoutRaw = args?.timeoutSecs;
+  const timeoutSecs = typeof timeoutRaw === "number" && timeoutRaw > 0 ? timeoutRaw : undefined;
 
   const timer = setTimeout(() => {
     const next = new Map(active.value);
-    next.set(id, { cmd, label });
+    next.set(id, { cmd, label, startedAt: Date.now(), timeoutSecs });
     active.value = next;
+    if (timeoutSecs) ensureTicker();
   }, THRESHOLD_MS);
 
   try {

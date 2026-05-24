@@ -424,8 +424,25 @@ pub fn diff_file(repo_path: &Path, file: &str, staged: bool) -> Result<FileDiff,
 }
 
 pub fn diff_commit(repo_path: &Path, oid: &str) -> Result<Vec<FileDiff>, GitError> {
-    let range = format!("{}^..{}", oid, oid);
-    let output = run_git(repo_path, &["-c", "core.quotepath=false", "diff", &range])?;
+    // Корневой коммит не имеет parent — `oid^..oid` падает с «unknown
+    // revision». Для остальных оставляем диапазон: на merge-коммитах он
+    // отдаёт diff против первого родителя (`oid^` ≡ `oid^1`), а `git show`/
+    // `git log -p` вернули бы пустой combined-diff и панель файлов осталась
+    // бы пуста.
+    let has_parent = run_git(
+        repo_path,
+        &["rev-parse", "--verify", "--quiet", &format!("{}^", oid)],
+    )
+    .is_ok();
+    let output = if has_parent {
+        let range = format!("{}^..{}", oid, oid);
+        run_git(repo_path, &["-c", "core.quotepath=false", "diff", &range])?
+    } else {
+        run_git(
+            repo_path,
+            &["-c", "core.quotepath=false", "show", oid, "--format="],
+        )?
+    };
     Ok(parse_diff_multi(&output))
 }
 
@@ -1034,6 +1051,64 @@ mod diff_commit_tests {
             !renamed.hunks.is_empty(),
             "diff_commit_file показывает содержимое переименованного файла"
         );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // Корневой коммит (первый, без parent): `git diff oid^..oid` падает —
+    // надо использовать `git show`, иначе FileList пуст на свежем репозитории
+    // с единственным коммитом.
+    #[test]
+    fn root_commit_files_listed() {
+        let dir = std::env::temp_dir().join(format!("gitstream_root_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "-q"]);
+        git(&dir, &["config", "user.email", "t@t.t"]);
+        git(&dir, &["config", "user.name", "t"]);
+        fs::write(dir.join("a.txt"), "first\n").unwrap();
+        fs::write(dir.join("b.txt"), "second\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "initial"]);
+
+        let oid = head(&dir);
+        let diffs = diff_commit(&dir, &oid)
+            .expect("корневой коммит должен отдавать список файлов, а не ошибку");
+        let paths: Vec<_> = diffs.iter().map(|d| d.path.as_str()).collect();
+        assert!(paths.contains(&"a.txt"), "a.txt должен быть в списке: {:?}", paths);
+        assert!(paths.contains(&"b.txt"), "b.txt должен быть в списке: {:?}", paths);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // Merge-коммит: diff показывается против первого родителя (как раньше).
+    // Регрессия: `git show --format=` отдавал бы пустой combined-diff,
+    // и панель файлов сливалась бы для всех merge-коммитов без конфликтов.
+    #[test]
+    fn merge_commit_diffs_first_parent() {
+        let dir = std::env::temp_dir().join(format!("gitstream_merge_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "-q", "-b", "main"]);
+        git(&dir, &["config", "user.email", "t@t.t"]);
+        git(&dir, &["config", "user.name", "t"]);
+        fs::write(dir.join("a.txt"), "a\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "initial"]);
+        git(&dir, &["checkout", "-qb", "feature"]);
+        fs::write(dir.join("b.txt"), "b\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "feat"]);
+        git(&dir, &["checkout", "-q", "main"]);
+        fs::write(dir.join("a.txt"), "c\n").unwrap();
+        git(&dir, &["commit", "-qam", "c"]);
+        git(&dir, &["merge", "--no-ff", "-q", "feature", "-m", "merge"]);
+
+        let merge_oid = head(&dir);
+        let diffs = diff_commit(&dir, &merge_oid).expect("merge не должен падать");
+        let paths: Vec<_> = diffs.iter().map(|d| d.path.as_str()).collect();
+        // Diff vs первого родителя (main с a=c): только добавление b.txt.
+        assert_eq!(paths, vec!["b.txt"], "ожидаем diff vs first parent, получили {:?}", paths);
 
         let _ = fs::remove_dir_all(&dir);
     }

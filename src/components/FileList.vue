@@ -120,6 +120,10 @@ const isWorkingTree = computed(() => !selectedCommit.value || selectedCommit.val
 // Защита от гонки: при быстрой навигации по коммитам (стрелки ↑/↓)
 // применяем только самый свежий ответ, иначе показываются файлы чужого коммита.
 let commitFilesSeq = 0;
+// immediate: true — компонент может смонтироваться, когда selectedCommit
+// уже выставлен (HMR, переоткрытие FileList). Без immediate watch ждёт
+// СМЕНЫ значения, и при стабильно выбранном коммите панель файлов остаётся
+// пустой до следующего клика по графу.
 watch(selectedCommit, async (oid) => {
   selectedPaths.value = [];
   anchorPath.value = null;
@@ -142,7 +146,7 @@ watch(selectedCommit, async (oid) => {
     if (seq !== commitFilesSeq) return;
     commitFiles.value = [];
   }
-});
+}, { immediate: true });
 
 watch([activeFilter, fileFilter], () => {
   selectedPaths.value = [];

@@ -46,7 +46,7 @@ const formattedDate = computed(() => {
             <span class="detail-label">{{ i18n.commitDetails.by }}</span>
             <span class="detail-value author">{{ commit.author }}</span>
           </div>
-          <div class="detail-row">
+          <div v-if="commit.parents.length" class="detail-row">
             <span class="detail-label">{{ i18n.commitDetails.parent }}</span>
             <span class="detail-value hash link">{{ commit.parents[0].slice(0, 8) }}</span>
           </div>
