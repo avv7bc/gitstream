@@ -26,6 +26,8 @@ const commitFiles = ref<FileDiff[]>([]);
 const selectedPaths = ref<string[]>([]);
 const anchorPath = ref<string | null>(null);
 
+const listBodyRef = ref<HTMLElement | null>(null);
+
 const ctxMenu = ref<{ x: number; y: number } | null>(null);
 
 const ctxFiles = computed(() =>
@@ -81,6 +83,32 @@ async function ctxRun(action: "stage" | "unstage" | "commit" | "discard" | "remo
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === "Escape" && ctxMenu.value) closeCtxMenu();
+}
+
+// Локальный keydown на body списка: сработает только когда панель файлов
+// в фокусе (mousedown → .focus()). Скоупит Ctrl+A в пределах компонента,
+// не задевая другие панели и инпуты.
+function onListKeydown(e: KeyboardEvent) {
+  // e.code вместо e.key: физическая клавиша A, независимо от раскладки
+  // (в русской раскладке e.key === "ф", и проверка по букве не сработает).
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.code === "KeyA") {
+    const all = isWorkingTree.value
+      ? filteredFiles.value.map((f) => f.path)
+      : filteredCommitFiles.value.map((f) => f.path);
+    if (all.length === 0) return;
+    e.preventDefault();
+    selectedPaths.value = all;
+    const last = all[all.length - 1];
+    anchorPath.value = last;
+    selectedFile.value = last;
+  }
+}
+
+function onBodyMousedown(e: MouseEvent) {
+  if (e.detail > 1) e.preventDefault();
+  // Программный фокус: клик может прийти на дочерний .file-item без tabindex,
+  // поэтому форсим focus на сам контейнер, чтобы keydown ловился именно здесь.
+  listBodyRef.value?.focus();
 }
 
 onMounted(() => window.addEventListener("keydown", onKeydown));
@@ -204,7 +232,24 @@ async function selectFile(path: string, e?: MouseEvent) {
   }
 }
 
-async function selectCommitFile(path: string) {
+async function selectCommitFile(path: string, e?: MouseEvent) {
+  const list = filteredCommitFiles.value.map((f) => f.path);
+  if (e?.shiftKey && anchorPath.value !== null) {
+    const a = list.indexOf(anchorPath.value);
+    const b = list.indexOf(path);
+    if (a !== -1 && b !== -1) {
+      const [lo, hi] = a < b ? [a, b] : [b, a];
+      selectedPaths.value = list.slice(lo, hi + 1);
+    }
+  } else if (e?.ctrlKey || e?.metaKey) {
+    const i = selectedPaths.value.indexOf(path);
+    if (i === -1) selectedPaths.value = [...selectedPaths.value, path];
+    else selectedPaths.value = selectedPaths.value.filter((p) => p !== path);
+    anchorPath.value = path;
+  } else {
+    selectedPaths.value = [path];
+    anchorPath.value = path;
+  }
   selectedFile.value = path;
   if (selectedCommit.value && selectedCommit.value !== "__worktree__") {
     await diffCommit(selectedCommit.value, path);
@@ -253,7 +298,14 @@ function compareCommitFile(path: string) {
 
     <!-- @contextmenu.prevent на контейнере гасит нативное меню браузера на пустой области;
          меню файла открывается обработчиком на самом .file-item (событие всплывает). -->
-    <div class="file-list-body" @mousedown="(e) => e.detail > 1 && e.preventDefault()" @contextmenu.prevent>
+    <div
+      ref="listBodyRef"
+      class="file-list-body"
+      tabindex="-1"
+      @mousedown="onBodyMousedown"
+      @keydown="onListKeydown"
+      @contextmenu.prevent
+    >
       <!-- Working tree files -->
       <template v-if="isWorkingTree">
         <div
@@ -295,8 +347,8 @@ function compareCommitFile(path: string) {
           v-for="cf in filteredCommitFiles"
           :key="cf.path"
           class="file-item"
-          :class="{ selected: selectedFile === cf.path }"
-          @click="selectCommitFile(cf.path)"
+          :class="{ selected: selectedPaths.includes(cf.path) }"
+          @click="selectCommitFile(cf.path, $event)"
           @dblclick="compareCommitFile(cf.path)"
         >
           <span class="state-badge" :style="{ color: 'var(--blue)' }">M</span>
@@ -414,6 +466,7 @@ function compareCommitFile(path: string) {
 .file-list-body {
   flex: 1;
   overflow-y: auto;
+  outline: none;
 }
 
 .file-item {
