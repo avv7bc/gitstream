@@ -78,6 +78,21 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 - **Backend:** Tauri 2 (Rust)
 - **Git:** git CLI under the hood, `--porcelain` / `--format` parsing
 
+## Download
+
+Latest release: **v0.6.3**
+
+| Platform | Package | Link |
+|----------|---------|------|
+| Linux | `.deb` (Debian / Ubuntu) | [GitStream_0.6.3_amd64.deb](https://github.com/avv7bc/gitstream/releases/download/v0.6.3/GitStream_0.6.3_amd64.deb) |
+| Linux | `.rpm` (Fedora / RHEL) | [GitStream-0.6.3-1.x86_64.rpm](https://github.com/avv7bc/gitstream/releases/download/v0.6.3/GitStream-0.6.3-1.x86_64.rpm) |
+| Linux | `.AppImage` | [GitStream_0.6.3_amd64.AppImage](https://github.com/avv7bc/gitstream/releases/download/v0.6.3/GitStream_0.6.3_amd64.AppImage) |
+| macOS | `.dmg` (Apple Silicon) | [GitStream_0.6.3_aarch64.dmg](https://github.com/avv7bc/gitstream/releases/download/v0.6.3/GitStream_0.6.3_aarch64.dmg) |
+| Windows | `.exe` installer | [GitStream_0.6.3_x64-setup.exe](https://github.com/avv7bc/gitstream/releases/download/v0.6.3/GitStream_0.6.3_x64-setup.exe) |
+| Windows | `.msi` | [GitStream_0.6.3_x64_en-US.msi](https://github.com/avv7bc/gitstream/releases/download/v0.6.3/GitStream_0.6.3_x64_en-US.msi) |
+
+All releases: [github.com/avv7bc/gitstream/releases](https://github.com/avv7bc/gitstream/releases)
+
 ## Getting started
 
 ### Prerequisites
