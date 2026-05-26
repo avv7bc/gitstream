@@ -231,12 +231,6 @@ function closeBranchMenu() {
         </svg>
         <span>{{ i18n.toolbar.push }}</span>
       </button>
-      <button class="toolbar-btn-action" disabled>
-        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8 13V5M5 9l3 4 3-4M3 3h10"/>
-        </svg>
-        <span>{{ i18n.toolbar.fetch }}</span>
-      </button>
     </div>
 
     <div class="toolbar-spacer" />

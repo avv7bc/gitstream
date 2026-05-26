@@ -365,6 +365,28 @@ pub fn remotes(repo_path: &Path) -> Result<Vec<String>, GitError> {
         .collect())
 }
 
+/// Список remote'ов с fetch-URL. Парсит `git remote -v`, берёт строки `(fetch)`.
+pub fn remote_urls(repo_path: &Path) -> Result<Vec<RemoteInfo>, GitError> {
+    let output = run_git(repo_path, &["remote", "-v"])?;
+    let mut result = Vec::new();
+    for line in output.lines() {
+        if !line.ends_with("(fetch)") {
+            continue;
+        }
+        let mut parts = line.split_whitespace();
+        let name = match parts.next() {
+            Some(n) => n.to_string(),
+            None => continue,
+        };
+        let url = match parts.next() {
+            Some(u) => u.to_string(),
+            None => continue,
+        };
+        result.push(RemoteInfo { name, url });
+    }
+    Ok(result)
+}
+
 /// Состояние репозитория: незавершённая merge/rebase/cherry-pick/revert.
 /// Возвращает "clean" | "merging" | "rebasing" | "cherry-picking" | "reverting".
 pub fn repo_state(repo_path: &Path) -> Result<String, GitError> {

@@ -53,6 +53,12 @@ pub struct TagInfo {
 }
 
 #[derive(Serialize, Clone, Debug)]
+pub struct RemoteInfo {
+    pub name: String,
+    pub url: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
 pub struct StashEntry {
     pub index: usize,
     pub message: String,

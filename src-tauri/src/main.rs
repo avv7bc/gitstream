@@ -35,6 +35,7 @@ fn main() {
             commands::get_tags,
             commands::get_stashes,
             commands::get_remotes,
+            commands::get_remote_urls,
             commands::get_diff_file,
             commands::get_diff_commit,
             commands::get_diff_commit_file,

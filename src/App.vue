@@ -42,7 +42,7 @@ const { refresh: refreshFiles, selectedFile, files, stageFiles, unstageFiles } =
 const { refresh: refreshBranches, createTag, stashSave } = useBranches();
 const { refresh: refreshLog, selectedCommit, commits, squashCommits, rewordCommit } = useLog();
 const { clearDiff } = useDiff();
-const { pull, push, networkError, clearNetworkError } = useRemote();
+const { pull, push, fetchRemote, networkError, clearNetworkError } = useRemote();
 const { target: compareTarget } = useFileCompare();
 const { refresh: refreshConflicts } = useConflicts();
 const { updateInfo, checkForUpdate } = useUpdate();
@@ -194,6 +194,20 @@ function handlePullRequest(remote: string, rebase: boolean) {
       document.body.style.cursor = "wait";
       try {
         await pull(remote, rebase);
+        await refreshAll();
+      } finally {
+        document.body.style.cursor = "";
+      }
+    });
+  });
+}
+function handleFetchRequest(remote: string) {
+  showPullDialog.value = false;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(async () => {
+      document.body.style.cursor = "wait";
+      try {
+        await fetchRemote(remote);
         await refreshAll();
       } finally {
         document.body.style.cursor = "";
@@ -496,7 +510,7 @@ function onMouseUp() {
     <!-- Dialogs -->
     <CommitDialog v-if="showCommitDialog" @close="showCommitDialog = false; refreshAll()" />
     <PushDialog v-if="showPushDialog" @close="showPushDialog = false" @push="handlePushRequest" />
-    <PullDialog v-if="showPullDialog" @close="showPullDialog = false" @pull="handlePullRequest" />
+    <PullDialog v-if="showPullDialog" @close="showPullDialog = false" @pull="handlePullRequest" @fetch="handleFetchRequest" />
     <CheckoutDialog v-if="showCheckoutDialog" @close="showCheckoutDialog = false" @checked-out="onBranchCheckedOut()" />
     <CheckoutRemoteDialog
       v-if="checkoutRemoteTarget"

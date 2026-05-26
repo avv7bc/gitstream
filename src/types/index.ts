@@ -60,6 +60,11 @@ export interface StashEntry {
   date: string;
 }
 
+export interface RemoteInfo {
+  name: string;
+  url: string;
+}
+
 export interface DiffLine {
   kind: "context" | "added" | "removed";
   old_lineno: number | null;

@@ -192,6 +192,11 @@ pub fn get_remotes(repo_path: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+pub fn get_remote_urls(repo_path: String) -> Result<Vec<RemoteInfo>, String> {
+    query::remote_urls(Path::new(&repo_path)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn get_diff_file(repo_path: String, file: String, staged: bool) -> Result<FileDiff, String> {
     query::diff_file(Path::new(&repo_path), &file, staged).map_err(|e| e.to_string())
 }

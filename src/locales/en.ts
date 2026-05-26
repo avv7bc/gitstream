@@ -144,11 +144,15 @@ export const en: Translations = {
     },
     pull: {
       title: "Pull",
-      remote: "Remote",
+      heading: "Pull commits from a remote repository",
+      description: "In contrast to Fetch Only, Pull will also incorporate the fetched changes (expand the options below to configure).",
+      fetchFrom: "Fetch From:",
+      moreOptions: "More Options",
       mode: "Mode",
       merge: "Merge",
       rebase: "Rebase",
       pull: "Pull",
+      fetch: "Fetch Only",
       cancel: "Cancel",
     },
     checkout: {
