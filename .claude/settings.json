@@ -47,7 +47,8 @@
       "Read(//home/avv/.claude/plugins/cache/claude-plugins-official/superpowers/f2cbfbefebbf/skills/subagent-driven-development/**)",
       "Read(//home/avv/.claude/plugins/cache/claude-plugins-official/superpowers/f2cbfbefebbf/skills/requesting-code-review/**)",
       "Read(//home/avv/.claude/plugins/**)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npm view *)"
     ],
     "additionalDirectories": [
       "/home/avv/projects/gitstream/docs/superpowers/specs",

@@ -36,7 +36,7 @@ GitStream — самостоятельный Git GUI. Приоритет — у�
 ```
 src/                          # Vue.js frontend
 ├── components/               # UI-компоненты
-│   ├── AppToolbar.vue        # Панель инструментов
+│   ├── AppToolbar.vue        # Тулбар: Repository▾/Local▾/Branch▾ + Pull/Push/Fetch
 │   ├── RepositoriesPanel.vue # Treeview репозиториев (drag-and-drop)
 │   ├── BranchPanel.vue       # Ветки, теги, stashes
 │   ├── CommitGraph.vue       # Лог коммитов
@@ -78,7 +78,7 @@ src-tauri/src/                # Rust backend
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  Toolbar (Pull, Push, Fetch, Commit, Checkout...)    │
+│  Toolbar: Repository▾ Local▾ | Pull Push Fetch | Branch▾ │
 ├─────────────┬─────────────────────┬──────────────────┤
 │ Repositories│                     │ Commit Details   │
 │ (treeview,  │  Commit Graph       │ (SHA, author,    │
@@ -105,9 +105,10 @@ src-tauri/src/                # Rust backend
 - **Частичный stage** — выбор строк/хунков в Side-by-side diff, stage/unstage/discard выбранного (`git apply --cached`)
 - `git rm` для tracked / disk-delete для untracked
 - **Множественное выделение** (Shift / Ctrl-клик) в панели файлов и BranchPanel — групповые операции над выбранным: stage/unstage/commit/discard/remove/delete файлов, batch delete веток, batch delete/push тегов
+- **Ctrl+A** — выделить все файлы в FileList (working tree и commit-файлы)
 - Commit (с amend), Reword (HEAD — amend; не-HEAD — rebase -i со сценарным редактором)
 - Squash нескольких коммитов в один
-- Push / Pull / Fetch (с диалогами выбора remote, таймаут сетевых операций)
+- Push / Pull / Fetch (с диалогами выбора remote, таймаут сетевых операций, индикатор remote + обратный отсчёт)
 - Checkout branch (локальная + remote-ветка с созданием локальной)
 - Merge ветки
 - Rebase ветки на ветку (с continue/abort через ConflictBar)
@@ -118,16 +119,26 @@ src-tauri/src/                # Rust backend
 - Разрешение конфликтов: accept ours/theirs, abort/continue для merge/rebase/cherry-pick/revert
 - Settings dialog (тема, шрифты, таймаут сети, язык RU/EN)
 
+### Горячие клавиши
+- **Ctrl+K** — открыть диалог коммита
+- **Ctrl+T** — stage выбранных файлов
+- **Shift+Ctrl+T** — unstage выбранных файлов
+- **Ctrl+M** — merge ветки
+- **Ctrl+D** — rebase ветки
+- **F7** — открыть Create Branch
+- **Shift+F7** — открыть Create Tag
+
 ### Просмотр
 - Unified + Side-by-side diff с переключателем, синхронным скроллом, виртуальным списком
 - Превью бинарных файлов и изображений в diff-панели
 - Лог коммитов с деталями (виртуальный список, бесконечная подгрузка при скролле)
-- Список веток / тегов / stash с поиском
-- Панель файлов со статусами
+- Поддержка root-коммитов (без родителей) в diff, деталях и списке файлов
+- Список веток / тегов / stash с поиском; шеврон-индикатор текущей ветки
+- Панель файлов со статусами; автовыбор первого файла при загрузке коммита
 - File compare диалог (произвольные ревизии)
 - Stats — статистика репозитория
 - i18n (русский / английский)
-- Авто-обновление приложения
+- Авто-обновление приложения; заголовок окна `GitStream v{version}`
 
 ### Repositories (treeview)
 - Drag-and-drop: репозитории в папки, папки в папки, на верхний уровень
