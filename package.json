@@ -12,7 +12,7 @@
     "tauri:dev": "WEBKIT_DISABLE_DMABUF_RENDERER=1 tauri dev"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "diff-match-patch": "^1.0.5",
     "vue": "^3.5.0"
