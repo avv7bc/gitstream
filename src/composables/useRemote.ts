@@ -1,10 +1,17 @@
 import { ref } from "vue";
-import { invoke } from "@/composables/useProgress";
+import { invoke, networkProgressLog } from "@/composables/useProgress";
 import { useRepo } from "./useRepo";
 import { useSettings } from "./useSettings";
 
 const isBusy = ref(false);
 const lastError = ref<string | null>(null);
+
+export interface NetworkError {
+  message: string;
+  log: string[];
+}
+
+const networkError = ref<NetworkError | null>(null);
 
 export function useRemote() {
   const { repoPath } = useRepo();
@@ -16,7 +23,12 @@ export function useRemote() {
     try {
       await fn();
     } catch (e) {
-      lastError.value = String(e);
+      const message = String(e);
+      lastError.value = message;
+      networkError.value = {
+        message,
+        log: [...networkProgressLog.value],
+      };
     } finally {
       isBusy.value = false;
     }
@@ -57,5 +69,9 @@ export function useRemote() {
     );
   }
 
-  return { isBusy, lastError, fetchRemote, pull, push };
+  function clearNetworkError() {
+    networkError.value = null;
+  }
+
+  return { isBusy, lastError, networkError, clearNetworkError, fetchRemote, pull, push };
 }

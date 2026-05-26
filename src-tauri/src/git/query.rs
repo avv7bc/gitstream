@@ -387,6 +387,11 @@ pub fn repo_state(repo_path: &Path) -> Result<String, GitError> {
     Ok(state.to_string())
 }
 
+pub fn current_branch_name(repo_path: &Path) -> Result<String, GitError> {
+    let out = run_git(repo_path, &["branch", "--show-current"])?;
+    Ok(out.trim().to_string())
+}
+
 pub fn repo_info(repo_path: &Path) -> Result<RepoInfo, GitError> {
     let path = run_git(repo_path, &["rev-parse", "--show-toplevel"])?;
     let branch = run_git(repo_path, &["branch", "--show-current"])?;

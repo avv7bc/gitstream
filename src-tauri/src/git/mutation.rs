@@ -204,10 +204,27 @@ pub fn commit(repo_path: &Path, message: &str, amend: bool) -> Result<String, Gi
     run_git_mut(repo_path, &args)
 }
 
+/// Тихо пытается настроить upstream-трекинг для ветки.
+/// Перебирает все remotes, ищет совпадающую remote-ветку, устанавливает tracking.
+fn try_set_upstream(repo_path: &Path, branch: &str) {
+    let Ok(remotes_out) = super::query::run_git(repo_path, &["remote"]) else {
+        return;
+    };
+    for remote in remotes_out.lines().map(str::trim).filter(|s| !s.is_empty()) {
+        let upstream = format!("{}/{}", remote, branch);
+        let ref_path = format!("refs/remotes/{}", upstream);
+        if super::query::run_git(repo_path, &["rev-parse", "--verify", &ref_path]).is_ok() {
+            let _ = run_git_mut(repo_path, &["branch", "--set-upstream-to", &upstream, branch]);
+            return;
+        }
+    }
+}
+
 pub fn checkout(repo_path: &Path, branch: &str) -> Result<(), GitError> {
     validate_ref_name(branch)?;
     let result = run_git_mut(repo_path, &["switch", "--", branch]);
     if result.is_ok() {
+        try_set_upstream(repo_path, branch);
         return Ok(());
     }
     if let Some(local) = branch.split('/').last() {
@@ -545,19 +562,25 @@ pub fn fetch_args(remote: &str) -> Vec<String> {
     vec!["fetch".into(), remote.into()]
 }
 
-pub fn pull_args(remote: &str, rebase: bool) -> Vec<String> {
+pub fn pull_args(remote: &str, branch: &str, rebase: bool) -> Vec<String> {
     if rebase {
-        vec!["pull".into(), "--rebase".into(), remote.into()]
+        vec!["pull".into(), "--rebase".into(), remote.into(), branch.into()]
     } else {
-        vec!["pull".into(), remote.into()]
+        vec!["pull".into(), remote.into(), branch.into()]
     }
 }
 
-pub fn push_args(remote: &str, force: bool) -> Vec<String> {
+pub fn push_args(remote: &str, branch: &str, force: bool) -> Vec<String> {
     if force {
-        vec!["push".into(), "--force".into(), remote.into()]
+        vec![
+            "push".into(),
+            "--force".into(),
+            "--set-upstream".into(),
+            remote.into(),
+            branch.into(),
+        ]
     } else {
-        vec!["push".into(), remote.into()]
+        vec!["push".into(), "--set-upstream".into(), remote.into(), branch.into()]
     }
 }
 
@@ -566,11 +589,12 @@ pub fn push_branch_args(remote: &str, branch: &str, force: bool) -> Vec<String> 
         vec![
             "push".into(),
             "--force".into(),
+            "--set-upstream".into(),
             remote.into(),
             branch.into(),
         ]
     } else {
-        vec!["push".into(), remote.into(), branch.into()]
+        vec!["push".into(), "--set-upstream".into(), remote.into(), branch.into()]
     }
 }
 

@@ -81,8 +81,11 @@ async fn run_network_git(
                 match reader.read_line(&mut line).await {
                     Ok(0) | Err(_) => break,
                     Ok(_) => {
-                        // git пишет прогресс с \r — обрезаем
-                        let trimmed = line.trim_end_matches(|c| c == '\r' || c == '\n').trim();
+                        // git пишет прогресс с \r внутри строки — берём последний сегмент
+                        let stripped = line.trim_end_matches(|c| c == '\r' || c == '\n');
+                        let trimmed = stripped.rsplit('\r').find(|s| !s.trim().is_empty())
+                            .unwrap_or(stripped)
+                            .trim();
                         if !trimmed.is_empty() {
                             let _ = app_handle.emit(
                                 "network_progress",
@@ -375,15 +378,10 @@ pub async fn do_pull(
     rebase: bool,
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
-    let args = mutation::pull_args(&remote, rebase);
-    run_network_git(
-        &app,
-        Some(Path::new(&repo_path)),
-        &args,
-        timeout_secs,
-        "pull",
-    )
-    .await
+    let path = Path::new(&repo_path);
+    let branch = query::current_branch_name(path).map_err(|e| e.to_string())?;
+    let args = mutation::pull_args(&remote, &branch, rebase);
+    run_network_git(&app, Some(path), &args, timeout_secs, "pull").await
 }
 
 #[tauri::command]
@@ -394,15 +392,10 @@ pub async fn do_push(
     force: bool,
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
-    let args = mutation::push_args(&remote, force);
-    run_network_git(
-        &app,
-        Some(Path::new(&repo_path)),
-        &args,
-        timeout_secs,
-        "push",
-    )
-    .await
+    let path = Path::new(&repo_path);
+    let branch = query::current_branch_name(path).map_err(|e| e.to_string())?;
+    let args = mutation::push_args(&remote, &branch, force);
+    run_network_git(&app, Some(path), &args, timeout_secs, "push").await
 }
 
 #[tauri::command]

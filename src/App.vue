@@ -22,6 +22,7 @@ import SquashDialog from "./components/dialogs/SquashDialog.vue";
 import RewordDialog from "./components/dialogs/RewordDialog.vue";
 import FileCompareDialog from "./components/dialogs/FileCompareDialog.vue";
 import AddTagDialog from "./components/dialogs/AddTagDialog.vue";
+import NetworkErrorDialog from "./components/dialogs/NetworkErrorDialog.vue";
 import StashSaveDialog from "./components/dialogs/StashSaveDialog.vue";
 import UpdateBanner from "./components/UpdateBanner.vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -41,7 +42,7 @@ const { refresh: refreshFiles, selectedFile, files, stageFiles, unstageFiles } =
 const { refresh: refreshBranches, createTag, stashSave } = useBranches();
 const { refresh: refreshLog, selectedCommit, commits, squashCommits, rewordCommit } = useLog();
 const { clearDiff } = useDiff();
-const { pull, push } = useRemote();
+const { pull, push, networkError, clearNetworkError } = useRemote();
 const { target: compareTarget } = useFileCompare();
 const { refresh: refreshConflicts } = useConflicts();
 const { updateInfo, checkForUpdate } = useUpdate();
@@ -194,8 +195,6 @@ function handlePullRequest(remote: string, rebase: boolean) {
       try {
         await pull(remote, rebase);
         await refreshAll();
-      } catch (e) {
-        showError(String(e));
       } finally {
         document.body.style.cursor = "";
       }
@@ -210,8 +209,6 @@ function handlePushRequest(remote: string, force: boolean) {
       try {
         await push(remote, force);
         await refreshAll();
-      } catch (e) {
-        showError(String(e));
       } finally {
         document.body.style.cursor = "";
       }
@@ -235,9 +232,11 @@ function handleAddGroup() {
 
 // --- Close any open dialog on Esc ---
 const dialogs = [showCommitDialog, showPushDialog, showPullDialog, showCheckoutDialog, showConfirmDialog, showDiscardDialog, showErrorDialog, showSettingsDialog, showStatsDialog];
+// networkError закрывается через clearNetworkError — обрабатывается отдельно в onKeydown
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") {
+    if (networkError.value) { clearNetworkError(); return; }
     if (checkoutRemoteTarget.value) { checkoutRemoteTarget.value = null; return; }
     if (showAddTagDialog.value) { showAddTagDialog.value = false; addTagTarget.value = null; return; }
     for (const d of dialogs) {
@@ -542,6 +541,12 @@ function onMouseUp() {
       confirm-label="OK"
       @close="showErrorDialog = false"
       @confirm="showErrorDialog = false"
+    />
+    <NetworkErrorDialog
+      v-if="networkError"
+      :message="networkError.message"
+      :log="networkError.log"
+      @close="clearNetworkError()"
     />
     <UpdateBanner
       v-if="updateInfo"

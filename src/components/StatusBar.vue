@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useRepo } from "@/composables/useRepo";
 import { useRemote } from "@/composables/useRemote";
 import { useBranches } from "@/composables/useBranches";
@@ -7,13 +7,22 @@ import { useProgress } from "@/composables/useProgress";
 
 const { repoInfo } = useRepo();
 const { lastError } = useRemote();
-const { isWorking, progressLabel } = useProgress();
+const { isWorking, progressLabel, networkProgressLog } = useProgress();
 const { branches } = useBranches();
 
 const currentBranchInfo = computed(() => branches.value.find((b) => b.is_current));
 const ahead = computed(() => currentBranchInfo.value?.ahead ?? 0);
 const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
 
+const logOpen = ref(false);
+
+function toggleLog() {
+  if (networkProgressLog.value.length > 0) logOpen.value = !logOpen.value;
+}
+
+function closeLog() {
+  logOpen.value = false;
+}
 </script>
 
 <template>
@@ -38,16 +47,36 @@ const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
 
     <div class="statusbar-center">
       <span v-if="lastError" class="status-message">{{ lastError }}</span>
-      <span v-else-if="isWorking" class="status-message progress">
-        <svg class="codicon spin" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+      <span
+        v-else-if="isWorking || networkProgressLog.length > 0"
+        class="status-message progress"
+        :class="{ clickable: networkProgressLog.length > 0 }"
+        :title="networkProgressLog.length > 0 ? 'Нажмите для просмотра лога' : undefined"
+        @click="toggleLog"
+      >
+        <svg v-if="isWorking" class="codicon spin" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
           <path fill-rule="evenodd" clip-rule="evenodd" d="M8 1.5a6.5 6.5 0 1 0 6.5 6.5h-1.5a5 5 0 1 1-5-5V1.5z"/>
         </svg>
         <span>{{ progressLabel }}</span>
+        <svg v-if="networkProgressLog.length > 0" class="log-chevron" :class="{ open: logOpen }" width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M7.976 10.072l-4.357-4.357.62-.618L7.976 8.837l3.737-3.74.62.618z"/>
+        </svg>
       </span>
     </div>
 
     <div class="statusbar-right">
     </div>
+
+    <Teleport to="body">
+      <div v-if="logOpen" class="progress-log-backdrop" @click="closeLog" />
+      <div v-if="logOpen" class="progress-log-popup">
+        <div class="progress-log-header">
+          <span>Git output</span>
+          <button class="progress-log-close" @click="closeLog">✕</button>
+        </div>
+        <pre class="progress-log-content">{{ networkProgressLog.join('\n') }}</pre>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -104,7 +133,9 @@ const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
 
 .statusbar-center {
   flex: 1;
+  min-width: 0;
   text-align: center;
+  overflow: hidden;
 }
 
 .statusbar-right {
@@ -115,13 +146,32 @@ const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
 }
 
 .status-message {
+  display: block;
   color: var(--statusbar-fg-muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .status-message.progress {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.status-message.progress span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.status-message.clickable {
+  cursor: pointer;
+}
+.status-message.clickable:hover {
+  color: var(--statusbar-fg);
 }
 
 .codicon.spin {
@@ -131,5 +181,77 @@ const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
 @keyframes gs-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+.log-chevron {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+.log-chevron.open {
+  transform: rotate(180deg);
+}
+
+.progress-log-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+}
+
+.progress-log-popup {
+  position: fixed;
+  bottom: calc(var(--statusbar-height) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  width: min(680px, 90vw);
+  max-height: 320px;
+  background: var(--panel-bg, #1e1e2e);
+  border: 1px solid var(--border, #45475a);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.progress-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--text-muted, #a6adc8);
+  background: var(--titlebar-bg, #181825);
+  border-bottom: 1px solid var(--border, #45475a);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.progress-log-close {
+  background: none;
+  border: none;
+  color: var(--text-muted, #a6adc8);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 12px;
+  line-height: 1;
+}
+.progress-log-close:hover {
+  color: var(--text, #cdd6f4);
+}
+
+.progress-log-content {
+  margin: 0;
+  padding: 8px 10px;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text, #cdd6f4);
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+  cursor: text;
 }
 </style>

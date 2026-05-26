@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { computed, ref } from "vue";
 
 const THRESHOLD_MS = 100;
+const MAX_LOG_LINES = 200;
 
 type Args = Record<string, unknown> | undefined;
 
@@ -56,10 +57,16 @@ function ensureTicker() {
 }
 
 const networkProgressLine = ref("");
+export const networkProgressLog = ref<string[]>([]);
 let networkProgressTimer: ReturnType<typeof setTimeout> | null = null;
 
 listen<{ op: string; line: string }>("network_progress", (event) => {
-  networkProgressLine.value = event.payload.line;
+  const line = event.payload.line;
+  networkProgressLine.value = line;
+  networkProgressLog.value = [
+    ...networkProgressLog.value.slice(-(MAX_LOG_LINES - 1)),
+    line,
+  ];
   if (networkProgressTimer) clearTimeout(networkProgressTimer);
   networkProgressTimer = setTimeout(() => { networkProgressLine.value = ""; }, 3000);
 });
@@ -113,5 +120,5 @@ export async function invoke<T>(
 }
 
 export function useProgress() {
-  return { isWorking, progressLabel };
+  return { isWorking, progressLabel, networkProgressLog };
 }
