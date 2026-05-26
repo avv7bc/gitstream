@@ -2,7 +2,7 @@ import type { Translations } from "./ru";
 
 export const en: Translations = {
   toolbar: {
-    menu: "Menu",
+    menu: "Repository",
     pull: "Pull",
     push: "Push",
     fetch: "Fetch",
@@ -14,6 +14,8 @@ export const en: Translations = {
     merge: "Merge",
     rebase: "Rebase",
     stash: "Stash",
+    local: "Local",
+    branch: "Branch",
     addRepository: "Add Repository",
     addGroup: "Add Group",
   },

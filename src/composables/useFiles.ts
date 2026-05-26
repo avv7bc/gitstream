@@ -3,6 +3,7 @@ import { invoke } from "@/composables/useProgress";
 import type { FileStatus, LineOp, LineHunkSelection } from "@/types";
 import { useRepo } from "./useRepo";
 import { useDiff } from "./useDiff";
+import { useLog } from "./useLog";
 
 const files = ref<FileStatus[]>([]);
 const selectedFile = ref<string | null>(null);
@@ -24,6 +25,15 @@ export function useFiles() {
     // Более новый refresh уже стартовал — отбрасываем устаревший ответ.
     if (seq !== refreshSeq) return;
     files.value = data;
+    // В режиме рабочего дерева: если выбранный файл больше не имеет изменений
+    // (например, после переключения ветки), сбрасываем устаревший дифф.
+    const { selectedCommit } = useLog();
+    const isWorktree = !selectedCommit.value || selectedCommit.value === "__worktree__";
+    if (isWorktree && selectedFile.value && !data.some((f) => f.path === selectedFile.value)) {
+      const { clearDiff } = useDiff();
+      selectedFile.value = null;
+      clearDiff();
+    }
   }
 
   // После изменения индекса/рабочего дерева: обновить список файлов и

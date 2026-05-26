@@ -14,7 +14,6 @@ const currentBranchInfo = computed(() => branches.value.find((b) => b.is_current
 const ahead = computed(() => currentBranchInfo.value?.ahead ?? 0);
 const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
 
-const appVersion = __APP_VERSION__;
 </script>
 
 <template>
@@ -48,7 +47,6 @@ const appVersion = __APP_VERSION__;
     </div>
 
     <div class="statusbar-right">
-      <span class="version">{{ appVersion }}</span>
     </div>
   </div>
 </template>
@@ -117,9 +115,6 @@ const appVersion = __APP_VERSION__;
 }
 
 .status-message {
-  color: var(--statusbar-fg-muted);
-}
-.version {
   color: var(--statusbar-fg-muted);
 }
 

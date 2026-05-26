@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import AppToolbar from "./components/AppToolbar.vue";
 import RepositoriesPanel from "./components/RepositoriesPanel.vue";
 import BranchPanel from "./components/BranchPanel.vue";
@@ -22,7 +22,9 @@ import SquashDialog from "./components/dialogs/SquashDialog.vue";
 import RewordDialog from "./components/dialogs/RewordDialog.vue";
 import FileCompareDialog from "./components/dialogs/FileCompareDialog.vue";
 import AddTagDialog from "./components/dialogs/AddTagDialog.vue";
+import StashSaveDialog from "./components/dialogs/StashSaveDialog.vue";
 import UpdateBanner from "./components/UpdateBanner.vue";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useUpdate } from "@/composables/useUpdate";
 import type { CommitInfo } from "@/types";
 import { useFileCompare } from "@/composables/useFileCompare";
@@ -35,14 +37,27 @@ import { useRemote } from "@/composables/useRemote";
 import { useConflicts } from "@/composables/useConflicts";
 
 const { repoPath, onRepoOpened, restoreLastRepo } = useRepo();
-const { refresh: refreshFiles, selectedFile } = useFiles();
-const { refresh: refreshBranches, createTag } = useBranches();
+const { refresh: refreshFiles, selectedFile, files, stageFiles, unstageFiles } = useFiles();
+const { refresh: refreshBranches, createTag, stashSave } = useBranches();
 const { refresh: refreshLog, selectedCommit, commits, squashCommits, rewordCommit } = useLog();
 const { clearDiff } = useDiff();
 const { pull, push } = useRemote();
 const { target: compareTarget } = useFileCompare();
 const { refresh: refreshConflicts } = useConflicts();
 const { updateInfo, checkForUpdate } = useUpdate();
+
+const selectedFileStatus = computed(() =>
+  files.value.find((f) => f.path === selectedFile.value) ?? null,
+);
+const canStageGlobal = computed(
+  () => !!selectedFileStatus.value && selectedFileStatus.value.staged !== "staged",
+);
+const canUnstageGlobal = computed(
+  () =>
+    !!selectedFileStatus.value &&
+    (selectedFileStatus.value.staged === "staged" ||
+      selectedFileStatus.value.staged === "partial"),
+);
 
 async function refreshAll() {
   await Promise.all([
@@ -51,6 +66,15 @@ async function refreshAll() {
     refreshLog(),
     refreshConflicts(),
   ]);
+}
+
+// После checkout: сбрасываем selectedCommit, чтобы refreshLog выбрал HEAD
+// новой ветки. Сбрасываем всегда (включая worktree-режим): если новая ветка
+// чистая (нет изменений рабочего дерева), worktree-режим даёт пустую панель
+// Files — пользователю не видно никаких файлов.
+async function onBranchCheckedOut() {
+  selectedCommit.value = null;
+  await refreshAll();
 }
 
 // Открыт другой репозиторий: выделение коммита/файла и дифф — это
@@ -70,6 +94,7 @@ watch(repoPath, (val) => {
 });
 
 const showCommitDialog = ref(false);
+const showStashSaveDialog = ref(false);
 const showPushDialog = ref(false);
 const showPullDialog = ref(false);
 const showCheckoutDialog = ref(false);
@@ -142,6 +167,16 @@ async function handleCreateTag(payload: {
     showError(String(e));
   }
   addTagTarget.value = null;
+}
+
+async function handleStashSave(payload: { message: string | null; includeUntracked: boolean }) {
+  showStashSaveDialog.value = false;
+  try {
+    await stashSave(payload.message, payload.includeUntracked);
+    await refreshAll();
+  } catch (e) {
+    showError(String(e));
+  }
 }
 
 const errorMessage = ref("");
@@ -229,6 +264,24 @@ function onKeydown(e: KeyboardEvent) {
     e.preventDefault();
     if (repoPath.value) openAddTag(null);
   }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "t" || e.key === "T" || e.code === "KeyT")) {
+    e.preventDefault();
+    if (canStageGlobal.value && selectedFile.value) stageFiles([selectedFile.value]);
+  }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "t" || e.key === "T" || e.code === "KeyT")) {
+    e.preventDefault();
+    if (canUnstageGlobal.value && selectedFile.value) unstageFiles([selectedFile.value]);
+  }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "k" || e.key === "K" || e.code === "KeyK")) {
+    e.preventDefault();
+    if (repoPath.value) showCommitDialog.value = true;
+  }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "m" || e.key === "M" || e.code === "KeyM")) {
+    e.preventDefault();
+  }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "d" || e.key === "D" || e.code === "KeyD")) {
+    e.preventDefault();
+  }
 }
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let pollStopped = false;
@@ -254,6 +307,7 @@ function onContextMenu(e: MouseEvent) {
 }
 
 onMounted(() => {
+  getCurrentWindow().setTitle(`GitStream v${__APP_VERSION__}`);
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("contextmenu", onContextMenu);
   restoreLastRepo();
@@ -361,6 +415,7 @@ function onMouseUp() {
       @add-repository="handleAddRepository"
       @add-group="handleAddGroup"
       @discard="showDiscardDialog = true"
+      @stash="showStashSaveDialog = true"
     />
 
     <ConflictBar @changed="refreshAll()" />
@@ -380,7 +435,7 @@ function onMouseUp() {
           <BranchPanel
             ref="branchPanelRef"
             @checkout-remote="checkoutRemoteTarget = $event"
-            @checked-out="refreshAll()"
+            @checked-out="onBranchCheckedOut()"
             @branches-changed="refreshAll()"
             @tags-changed="refreshAll()"
             @create-tag="openAddTag(null)"
@@ -443,11 +498,12 @@ function onMouseUp() {
     <CommitDialog v-if="showCommitDialog" @close="showCommitDialog = false; refreshAll()" />
     <PushDialog v-if="showPushDialog" @close="showPushDialog = false" @push="handlePushRequest" />
     <PullDialog v-if="showPullDialog" @close="showPullDialog = false" @pull="handlePullRequest" />
-    <CheckoutDialog v-if="showCheckoutDialog" @close="showCheckoutDialog = false; refreshAll()" />
+    <CheckoutDialog v-if="showCheckoutDialog" @close="showCheckoutDialog = false" @checked-out="onBranchCheckedOut()" />
     <CheckoutRemoteDialog
       v-if="checkoutRemoteTarget"
       :remote-branch="checkoutRemoteTarget"
-      @close="checkoutRemoteTarget = null; refreshAll()"
+      @close="checkoutRemoteTarget = null"
+      @checked-out="onBranchCheckedOut()"
     />
     <ConfirmDialog
       v-if="showConfirmDialog"
@@ -455,6 +511,7 @@ function onMouseUp() {
       @close="showConfirmDialog = false"
     />
     <DiscardDialog v-if="showDiscardDialog" @close="showDiscardDialog = false; refreshAll()" />
+    <StashSaveDialog v-if="showStashSaveDialog" @close="showStashSaveDialog = false" @confirm="handleStashSave" />
     <SettingsDialog v-if="showSettingsDialog" @close="showSettingsDialog = false" />
     <StatsDialog v-if="showStatsDialog" @close="showStatsDialog = false" />
     <AddTagDialog

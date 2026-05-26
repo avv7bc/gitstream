@@ -7,7 +7,7 @@ type DeepStringify<T> = T extends string
 // он остаётся переведённым на русский по запросу пользователя.
 const _ru = {
   toolbar: {
-    menu: "Menu",
+    menu: "Repository",
     pull: "Pull",
     push: "Push",
     fetch: "Fetch",
@@ -19,6 +19,8 @@ const _ru = {
     merge: "Merge",
     rebase: "Rebase",
     stash: "Stash",
+    local: "Local",
+    branch: "Branch",
     addRepository: "Add Repository",
     addGroup: "Add Group",
   },

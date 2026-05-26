@@ -5,7 +5,7 @@ import { useDraggable } from "@/composables/useDraggable";
 import { useI18n } from "@/composables/useI18n";
 import { highlight } from "@/utils/highlight";
 
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; checkedOut: [] }>();
 
 const { branches, checkout } = useBranches();
 const { dragStyle, onDragStart } = useDraggable();
@@ -27,6 +27,7 @@ async function handleCheckout() {
   if (!selectedBranch.value) return;
   await checkout(selectedBranch.value);
   emit("close");
+  emit("checkedOut");
 }
 </script>
 

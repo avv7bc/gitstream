@@ -958,11 +958,9 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
   pointer-events: none;
   transition: opacity 0.1s;
 }
-.branch-item:hover .branch-arrow,
-.branch-item.current .branch-arrow,
-.branch-item.selected .branch-arrow {
+.branch-item.current .branch-arrow {
   opacity: 1;
-  color: var(--text-primary);
+  color: var(--accent);
 }
 
 .bp-icon--branch {

@@ -142,6 +142,15 @@ watch(selectedCommit, async (oid) => {
     const data = await invoke<FileDiff[]>("get_diff_commit", { repoPath: repoPath.value, oid });
     if (seq !== commitFilesSeq) return;
     commitFiles.value = data;
+    // Автоматически выбираем первый файл, чтобы дифф отображался сразу —
+    // без ручного клика после переключения ветки или выбора коммита.
+    if (data.length > 0) {
+      const first = data[0].path;
+      selectedPaths.value = [first];
+      anchorPath.value = first;
+      selectedFile.value = first;
+      if (seq === commitFilesSeq) await diffCommit(oid, first);
+    }
   } catch {
     if (seq !== commitFilesSeq) return;
     commitFiles.value = [];

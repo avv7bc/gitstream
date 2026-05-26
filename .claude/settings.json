@@ -46,7 +46,8 @@
       "Bash(grep -A5 \"input$\\\\|input \" /home/avv/projects/gitstream/src/components/BranchPanel.vue)",
       "Read(//home/avv/.claude/plugins/cache/claude-plugins-official/superpowers/f2cbfbefebbf/skills/subagent-driven-development/**)",
       "Read(//home/avv/.claude/plugins/cache/claude-plugins-official/superpowers/f2cbfbefebbf/skills/requesting-code-review/**)",
-      "Read(//home/avv/.claude/plugins/**)"
+      "Read(//home/avv/.claude/plugins/**)",
+      "Bash(npm run *)"
     ],
     "additionalDirectories": [
       "/home/avv/projects/gitstream/docs/superpowers/specs",

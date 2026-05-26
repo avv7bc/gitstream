@@ -5,7 +5,7 @@ import { useDraggable } from "@/composables/useDraggable";
 import { useI18n } from "@/composables/useI18n";
 
 const props = defineProps<{ remoteBranch: string }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; checkedOut: [] }>();
 
 const { checkoutRemote } = useBranches();
 const { dragStyle, onDragStart } = useDraggable();
@@ -45,6 +45,7 @@ async function handleCheckout() {
       mode.value === "create" ? localName.value.trim() : null
     );
     emit("close");
+    emit("checkedOut");
   } catch (e) {
     error.value = String(e);
   } finally {

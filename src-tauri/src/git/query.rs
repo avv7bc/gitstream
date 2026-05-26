@@ -446,36 +446,58 @@ pub fn diff_commit(repo_path: &Path, oid: &str) -> Result<Vec<FileDiff>, GitErro
     Ok(parse_diff_multi(&output))
 }
 
-/// Дифф одного файла внутри коммита (`git show <oid> -- <file>`).
+/// Дифф одного файла внутри коммита.
 ///
 /// Запрашивается на каждый клик по файлу коммита — это дешевле, чем парсить
 /// дифф всего коммита.
 ///
-/// Пайспек `-- <file>` ограничивает вывод одним файлом, поэтому git не видит
-/// парный (удалённый) путь переименования — определение rename не срабатывает,
-/// и файл всегда показывается как добавление с полным содержимым. Это ровно
-/// то, что нужно для просмотра: панель не остаётся пустой на rename-файле.
-/// `git show` (в отличие от `oid^..oid`) корректно работает и для корневого
-/// коммита.
+/// Для обычных и merge-коммитов используем `git diff oid^..oid -- file`
+/// (diff vs первого родителя), что совпадает с логикой `diff_commit`.
+/// `git show oid -- file` использует combined diff: для merge-коммитов с
+/// чистым слиянием он возвращает пустой вывод, хотя файл реально изменился
+/// (виден в списке файлов через `diff_commit`).
+/// Для корневого коммита (нет родителя) `oid^` не существует — в этом случае
+/// откатываемся к `git show`.
+/// Пайспек `-- file` убирает детектирование переименований, поэтому
+/// переименованный файл всегда показывается как полное добавление.
 pub fn diff_commit_file(repo_path: &Path, oid: &str, file: &str) -> Result<FileDiff, GitError> {
-    let output = run_git(
+    let has_parent = run_git(
         repo_path,
-        &[
-            "-c",
-            "core.quotepath=false",
-            "show",
-            oid,
-            "--format=",
-            "--",
-            file,
-        ],
-    )?;
+        &["rev-parse", "--verify", "--quiet", &format!("{}^", oid)],
+    )
+    .is_ok();
+
+    let output = if has_parent {
+        let range = format!("{}^..{}", oid, oid);
+        run_git(
+            repo_path,
+            &["-c", "core.quotepath=false", "diff", &range, "--", file],
+        )?
+    } else {
+        run_git(
+            repo_path,
+            &[
+                "-c",
+                "core.quotepath=false",
+                "show",
+                oid,
+                "--format=",
+                "--",
+                file,
+            ],
+        )?
+    };
+
     let mut diff = parse_diff_single(&output, file);
     let parent = format!("{}^", oid);
     fill_binary(
         repo_path,
         &mut diff,
-        Some(BlobSrc::Rev(&parent)),
+        if has_parent {
+            Some(BlobSrc::Rev(&parent))
+        } else {
+            None
+        },
         BlobSrc::Rev(oid),
     );
     Ok(diff)
@@ -1109,6 +1131,16 @@ mod diff_commit_tests {
         let paths: Vec<_> = diffs.iter().map(|d| d.path.as_str()).collect();
         // Diff vs первого родителя (main с a=c): только добавление b.txt.
         assert_eq!(paths, vec!["b.txt"], "ожидаем diff vs first parent, получили {:?}", paths);
+
+        // diff_commit_file на merge-коммите должен показывать содержимое файла
+        // (diff vs первого родителя), а не пустой combined diff.
+        // Регрессия: git show отдавал бы пустой combined-diff для чистых слияний.
+        let file_diff = diff_commit_file(&dir, &merge_oid, "b.txt")
+            .expect("diff_commit_file для merge не должен падать");
+        assert!(
+            !file_diff.hunks.is_empty(),
+            "diff_commit_file на merge-коммите должен показывать хунки, а не пустой combined diff"
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
