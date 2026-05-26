@@ -45,7 +45,8 @@ jobs:
         with:
           node-version: '20'
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust stable
+        run: rustup toolchain install stable --profile minimal && rustup default stable
 
       - uses: Swatinem/rust-cache@v2
         with:
