@@ -47,6 +47,8 @@ function handleCreateBranchCtx() {
   openCreateBranch(b ? b.name : null);
 }
 
+defineExpose({ openCreateBranch });
+
 async function confirmCreateBranch(payload: {
   name: string;
   startPoint: string | null;
@@ -541,6 +543,7 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
             @contextmenu="onBranchContextMenu($event, branch)"
           >
             <RefIcon kind="local-branch" class="bp-icon bp-icon--branch" />
+            <span class="branch-arrow">›</span>
             <span class="branch-name" v-html="highlight(branch.name, filter)" />
             <span v-if="branch.ahead > 0" class="ahead-badge" :title="`${branch.ahead} ahead`">
               {{ branch.ahead }}
@@ -944,6 +947,22 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
 .branch-item.current {
   color: var(--accent);
   font-weight: 600;
+}
+.branch-arrow {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s;
+}
+.branch-item:hover .branch-arrow,
+.branch-item.current .branch-arrow,
+.branch-item.selected .branch-arrow {
+  opacity: 1;
+  color: var(--text-primary);
 }
 
 .bp-icon--branch {

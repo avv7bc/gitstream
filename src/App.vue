@@ -188,6 +188,7 @@ const confirmMessage = ref("");
 
 // --- Template ref for RepositoriesPanel ---
 const repositoriesPanelRef = ref<InstanceType<typeof RepositoriesPanel> | null>(null);
+const branchPanelRef = ref<InstanceType<typeof BranchPanel> | null>(null);
 
 function handleAddRepository() {
   repositoriesPanelRef.value?.triggerAddRepository();
@@ -219,6 +220,14 @@ function onKeydown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P" || e.code === "KeyP")) {
     e.preventDefault();
     showSettingsDialog.value = true;
+  }
+  if (e.key === "F7" && !e.shiftKey) {
+    e.preventDefault();
+    if (repoPath.value) branchPanelRef.value?.openCreateBranch(null);
+  }
+  if (e.key === "F7" && e.shiftKey) {
+    e.preventDefault();
+    if (repoPath.value) openAddTag(null);
   }
 }
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -369,6 +378,7 @@ function onMouseUp() {
         <div class="resize-handle-h" @mousedown="onMouseDown($event, 'repos')" />
         <div class="branches-section">
           <BranchPanel
+            ref="branchPanelRef"
             @checkout-remote="checkoutRemoteTarget = $event"
             @checked-out="refreshAll()"
             @branches-changed="refreshAll()"
