@@ -43,6 +43,10 @@ function linePath(l: GraphLine, topRow = false): string {
     // ячейки — чтобы граф заканчивался на коммите (нет «палки» вверх к WT).
     return `M ${x1} ${topRow ? mid : 0} L ${x1} ${GRAPH_ROW_H}`;
   }
+  if (l.style === "tip") {
+    // Lane появляется на этом коммите впервые — над dot ничего нет.
+    return `M ${x1} ${mid} L ${x1} ${GRAPH_ROW_H}`;
+  }
   if (l.style === "fork") {
     const cy = (mid + GRAPH_ROW_H) / 2;
     return `M ${x1} ${mid} C ${x1} ${cy} ${x2} ${cy} ${x2} ${GRAPH_ROW_H}`;
@@ -63,7 +67,45 @@ const graphMaxCol = computed(() => {
   return m;
 });
 const graphColW = computed(() => Math.max(80, laneX(graphMaxCol.value) + 16));
-const wtCol = computed(() => commits.value[0]?.column ?? 0);
+
+// Индекс HEAD-коммита в отфильтрованном списке: ищем по ref-у текущей
+// локальной ветки. С `git log --all` HEAD больше не обязательно сверху —
+// WT-строка должна стоять прямо перед ним, а не всегда на самом верху.
+const headIdx = computed(() => {
+  return filteredCommits.value.findIndex((c) =>
+    c.refs.some((r) => r.kind === "current-branch")
+  );
+});
+const wtInline = computed(() => headIdx.value > 0);
+const wtAtTop = computed(() => headIdx.value <= 0);
+// Колонка для WT, когда он наверху: либо колонка HEAD (если headIdx === 0),
+// либо колонка самого первого коммита (detached/нет HEAD в списке).
+const wtCol = computed(() => {
+  if (headIdx.value === 0) return filteredCommits.value[0]?.column ?? 0;
+  return filteredCommits.value[0]?.column ?? 0;
+});
+// Lane-ы, рисуемые сквозь WT-строку между commits[headIdx-1] и commits[headIdx].
+// Берём из `lines` HEAD-коммита: straight и merge-* идут из верхней половины
+// ячейки → lane был активен над HEAD → рисуем full-vertical через WT.
+// Колонка самого HEAD: если её lane не был активен сверху (tip-коммит),
+// рисуем только нижнюю половину под dot, иначе будет «обрубок» вверх.
+const wtInlineLines = computed<{ col: number; full: boolean }[]>(() => {
+  if (!wtInline.value) return [];
+  const next = filteredCommits.value[headIdx.value];
+  if (!next) return [];
+  const activeAbove = new Set<number>();
+  for (const ln of next.lines) {
+    if (ln.style === "straight" || ln.style === "merge-left" || ln.style === "merge-right") {
+      activeAbove.add(ln.from_column);
+    }
+  }
+  const out: { col: number; full: boolean }[] = [];
+  for (const c of activeAbove) out.push({ col: c, full: true });
+  if (!activeAbove.has(next.column)) {
+    out.push({ col: next.column, full: false });
+  }
+  return out.sort((a, b) => a.col - b.col);
+});
 const { files } = useFiles();
 const { repoPath } = useRepo();
 
@@ -228,45 +270,48 @@ function selectWorkingTree() {
   selectedCommit.value = "__worktree__";
 }
 
-function getCurrentIndex(): number {
-  // Working Tree is at position -1
-  if (selectedCommit.value === "__worktree__") {
-    return -1; // Working Tree is always shown at position -1
-  }
-
-  // Find commit in filtered list
-  const idx = filteredCommits.value.findIndex((c) => c.oid === selectedCommit.value);
-  return idx >= 0 ? idx : 0; // fallback to 0 if not found
-}
-
 function navigateCommits(direction: 'up' | 'down'): void {
-  const currentIdx = getCurrentIndex();
-  const hasWorkingTree = true;
-  const maxIdx = filteredCommits.value.length - 1;
+  const commits = filteredCommits.value;
+  if (commits.length === 0) return;
 
-  let newIdx: number;
+  // WT-якорь: индекс коммита, перед которым стоит WT-строка
+  // (либо headIdx при inline, либо 0 при wtAtTop).
+  const wtAnchor = wtInline.value ? headIdx.value : 0;
+  const wtIsBefore = wtAtTop.value || wtInline.value; // WT всегда есть
+
+  const isWt = selectedCommit.value === "__worktree__";
+  const curIdx = isWt ? -1 : commits.findIndex((c) => c.oid === selectedCommit.value);
 
   if (direction === 'up') {
-    newIdx = currentIdx - 1;
-    // Boundary: don't go above -1 (Working Tree) or 0 (first commit)
-    if (newIdx < (hasWorkingTree ? -1 : 0)) {
-      return; // no-op, stay at boundary
+    if (isWt) {
+      // ArrowUp от WT: на коммит непосредственно над WT
+      if (wtInline.value && wtAnchor > 0) {
+        selectedCommit.value = commits[wtAnchor - 1].oid;
+      }
+      return;
     }
-  } else {
-    // direction === 'down'
-    newIdx = currentIdx + 1;
-    // Boundary: don't go beyond last commit
-    if (newIdx > maxIdx) {
-      return; // no-op, stay at boundary
+    if (curIdx < 0) return;
+    // Если над текущим коммитом стоит WT — прыгаем на WT
+    if (wtIsBefore && curIdx === wtAnchor) {
+      selectWorkingTree();
+      return;
     }
+    if (curIdx > 0) selectedCommit.value = commits[curIdx - 1].oid;
+    return;
   }
 
-  // Apply new selection
-  if (newIdx === -1) {
-    selectWorkingTree();
-  } else {
-    selectedCommit.value = filteredCommits.value[newIdx].oid;
+  // direction === 'down'
+  if (isWt) {
+    if (wtAnchor < commits.length) selectedCommit.value = commits[wtAnchor].oid;
+    return;
   }
+  if (curIdx < 0) return;
+  // Если под текущим коммитом стоит WT — прыгаем на WT
+  if (wtInline.value && curIdx + 1 === wtAnchor) {
+    selectWorkingTree();
+    return;
+  }
+  if (curIdx < commits.length - 1) selectedCommit.value = commits[curIdx + 1].oid;
 }
 
 function handleKeyDown(e: KeyboardEvent): void {
@@ -371,15 +416,26 @@ watch(selectedCommit, (oid) => {
   el?.scrollIntoView({ block: "nearest" });
 }, { flush: "post" });
 
-const firstRemoteIdx = computed(() => {
-  return filteredCommits.value.findIndex((c) =>
-    c.refs.some((r) => r.kind === "remote-branch")
-  );
-});
+// Коммиты выше HEAD — это история, существующая только на remote-ах
+// (после fetch). Визуально приглушаем, чтобы взгляд цеплялся за «свои».
+function isAboveHead(idx: number): boolean {
+  const hi = headIdx.value;
+  return hi > 0 && idx < hi;
+}
 
+// «Unpushed» — коммиты, которые есть локально на HEAD, но ещё не запушены
+// в upstream. Берём `ahead` из текущей ветки и помечаем подряд идущие
+// коммиты в lane HEAD, начиная с самого HEAD. С `git log --all` старая
+// логика «всё до первого remote-ref-а» больше не работает — remote-ref
+// теперь чаще всего наверху.
 function isUnpushed(idx: number): boolean {
-  const ri = firstRemoteIdx.value;
-  return ri === -1 ? false : idx < ri;
+  const ahead = currentBranch.value?.ahead ?? 0;
+  if (ahead <= 0) return false;
+  const hi = headIdx.value;
+  if (hi < 0) return false;
+  if (idx < hi || idx >= hi + ahead) return false;
+  const headCol = filteredCommits.value[hi]?.column;
+  return headCol !== undefined && filteredCommits.value[idx]?.column === headCol;
 }
 
 const maxAuthorLen = computed(() => {
@@ -434,8 +490,9 @@ function formatDate(iso: string): string {
 
 
     <div ref="graphBodyRef" class="graph-body" tabindex="0" role="listbox" @keydown="handleKeyDown">
-      <!-- Working Tree / Index row -->
+      <!-- Working Tree / Index row (когда HEAD сверху списка или вовсе отсутствует) -->
       <div
+        v-if="wtAtTop"
         class="graph-row wt-row"
         :class="{ selected: isWorkingTreeSelected }"
         @mousedown.shift.prevent
@@ -465,20 +522,63 @@ function formatDate(iso: string): string {
         <span class="date-col"></span>
       </div>
 
-      <div
-        v-for="(commit, idx) in filteredCommits"
-        :key="commit.oid"
-        class="graph-row"
-        :class="{ selected: selectedCommit === commit.oid, unpushed: isUnpushed(idx), 'in-range': selectedOids.includes(commit.oid) && selectedOids.length > 1 }"
-        @mousedown.shift.prevent
-        @click="handleCommitClick(commit.oid, $event)"
-        @contextmenu="onContextMenu($event, commit.oid)"
-      >
+      <template v-for="(commit, idx) in filteredCommits" :key="commit.oid">
+        <!-- Inline WT-строка — прямо перед HEAD (после --all HEAD редко на самом верху) -->
+        <div
+          v-if="wtInline && idx === headIdx"
+          class="graph-row wt-row"
+          :class="{ selected: isWorkingTreeSelected }"
+          @mousedown.shift.prevent
+          @click="handleWtClick"
+          @dblclick="emit('commit')"
+          @contextmenu="onContextMenu($event, '__worktree__')"
+        >
+          <div class="graph-col">
+            <svg :width="graphColW" height="24" class="graph-svg">
+              <line
+                v-for="ln in wtInlineLines"
+                :key="ln.col"
+                :x1="laneX(ln.col)"
+                :y1="ln.full ? 0 : 12"
+                :x2="laneX(ln.col)"
+                y2="24"
+                :stroke="laneColor(ln.col)"
+                stroke-width="2"
+                stroke-opacity="0.35"
+              />
+              <circle
+                :cx="laneX(commit.column)"
+                cy="12"
+                r="5"
+                fill="var(--green)"
+                stroke="var(--bg-primary)"
+                stroke-width="1.5"
+              />
+            </svg>
+          </div>
+          <div class="message-col">
+            <span class="wt-label">Working Tree/Index ({{ changedCount > 0 ? changedCount + ' changed' : 'clean' }})</span>
+          </div>
+          <span class="author-col"></span>
+          <span class="date-col"></span>
+        </div>
+
+        <div
+          class="graph-row"
+          :class="{ selected: selectedCommit === commit.oid, unpushed: isUnpushed(idx), 'above-head': isAboveHead(idx), 'in-range': selectedOids.includes(commit.oid) && selectedOids.length > 1 }"
+          @mousedown.shift.prevent
+          @click="handleCommitClick(commit.oid, $event)"
+          @contextmenu="onContextMenu($event, commit.oid)"
+        >
         <!-- Graph column with SVG lane lines -->
         <div class="graph-col">
           <svg :width="graphColW" height="24" class="graph-svg">
+            <!-- Полу-линия от верха ячейки до dot нужна, только если над этим
+                 коммитом стоит WT-строка (наверху над первым или inline над HEAD) —
+                 иначе это "обрубок" в воздухе. Для tip-коммита замыкает разрыв,
+                 для обычного перекрывается существующей straight без артефактов. -->
             <line
-              v-if="idx === 0"
+              v-if="(idx === 0 && wtAtTop) || (wtInline && idx === headIdx)"
               :x1="laneX(commit.column)"
               y1="0"
               :x2="laneX(commit.column)"
@@ -534,6 +634,7 @@ function formatDate(iso: string): string {
         <span class="author-col" v-html="highlight(commit.author, graphFilter)" />
         <span class="date-col" v-html="highlight(formatDate(commit.date), graphFilter)" />
       </div>
+      </template>
 
       <div
         v-if="hasMore && !graphFilter"
@@ -682,6 +783,17 @@ function formatDate(iso: string): string {
 .graph-row.unpushed .date-col,
 .graph-row.unpushed .hash-col {
   color: #c8c8c8;
+}
+/* Коммиты выше HEAD: история только с remote-ов, приглушаем. */
+.graph-row.above-head .commit-message,
+.graph-row.above-head .author-col,
+.graph-row.above-head .date-col,
+.graph-row.above-head .hash-col {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+.graph-row.above-head .ref-label {
+  opacity: 0.75;
 }
 
 .graph-col {

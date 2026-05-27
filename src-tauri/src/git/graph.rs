@@ -13,17 +13,20 @@ pub fn assign_lanes(commits: &mut [CommitInfo]) {
         let parents = commits[idx].parents.clone();
         let mut lines: Vec<GraphLine> = Vec::new();
 
-        // 1. колонка узла
-        let col = match lanes
+        // 1. колонка узла. `lane_was_active` = lane уже указывал на этот коммит
+        // (тянулась сверху); иначе lane появляется здесь впервые — над dot
+        // ничего нет, и его вертикаль рисуется только от dot вниз (`tip`),
+        // иначе получится «палка в воздух».
+        let (col, lane_was_active) = match lanes
             .iter()
             .position(|l| l.as_deref() == Some(oid.as_str()))
         {
-            Some(c) => c,
+            Some(c) => (c, true),
             None => match lanes.iter().position(|l| l.is_none()) {
-                Some(c) => c,
+                Some(c) => (c, false),
                 None => {
                     lanes.push(None);
-                    lanes.len() - 1
+                    (lanes.len() - 1, false)
                 }
             },
         };
@@ -57,12 +60,13 @@ pub fn assign_lanes(commits: &mut [CommitInfo]) {
             }
         }
 
-        // 5. вертикаль узла (всегда)
+        // 5. вертикаль узла (всегда). Если lane появился здесь впервые,
+        // рисуем только нижнюю половину (`tip`).
         lines.push(GraphLine {
             from_column: col as u32,
             to_column: col as u32,
             color: (col as u32) % COLORS,
-            style: "straight".to_string(),
+            style: if lane_was_active { "straight" } else { "tip" }.to_string(),
         });
 
         // исходящие родители
@@ -122,7 +126,13 @@ mod tests {
         assert_eq!(v[0].column, 0);
         assert_eq!(v[1].column, 0);
         assert_eq!(v[2].column, 0);
-        for row in &v {
+        // Самый верхний коммит — tip (его lane появляется здесь), остальные —
+        // straight (lane тянется сверху).
+        assert!(v[0]
+            .lines
+            .iter()
+            .any(|l| l.style == "tip" && l.from_column == 0 && l.to_column == 0));
+        for row in &v[1..] {
             assert!(row
                 .lines
                 .iter()
@@ -159,10 +169,11 @@ mod tests {
         assign_lanes(&mut v);
         assert_eq!(v[0].column, 0);
         assert!(!v[0].lines.iter().any(|l| l.style == "fork"));
+        // Единственный коммит — он же tip, lane не тянется сверху.
         assert!(v[0]
             .lines
             .iter()
-            .any(|l| l.style == "straight" && l.from_column == 0));
+            .any(|l| l.style == "tip" && l.from_column == 0));
     }
 
     #[test]
@@ -172,5 +183,30 @@ mod tests {
         assign_lanes(&mut v);
         assert_eq!(v[0].column, 0); // A
         assert_eq!(v[1].column, 1); // C — lane0 занят B
+
+        // C появляется в lane1 впервые → его вертикаль — tip (только нижняя
+        // половина), иначе во фронте получим «палку» из dot вверх в воздух.
+        let c_own_line = v[1]
+            .lines
+            .iter()
+            .find(|l| l.from_column == 1 && l.to_column == 1)
+            .expect("у C должна быть собственная вертикаль");
+        assert_eq!(c_own_line.style, "tip");
+
+        // A — самый первый коммит, его lane тоже tip.
+        let a_own_line = v[0]
+            .lines
+            .iter()
+            .find(|l| l.from_column == 0 && l.to_column == 0)
+            .expect("у A должна быть собственная вертикаль");
+        assert_eq!(a_own_line.style, "tip");
+
+        // B берёт lane0 как продолжение A → straight, не tip.
+        let b_own_line = v[2]
+            .lines
+            .iter()
+            .find(|l| l.from_column == 0 && l.to_column == 0)
+            .expect("у B должна быть собственная вертикаль");
+        assert_eq!(b_own_line.style, "straight");
     }
 }

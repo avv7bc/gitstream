@@ -36,7 +36,7 @@ export interface GraphLine {
   from_column: number;
   to_column: number;
   color: number;
-  style: "straight" | "merge-left" | "merge-right" | "fork";
+  style: "straight" | "merge-left" | "merge-right" | "fork" | "tip";
 }
 
 export interface BranchInfo {

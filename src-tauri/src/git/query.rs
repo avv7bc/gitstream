@@ -180,9 +180,23 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
     // \x1e separates commit records; %B is the full message (may contain newlines)
     let format = "%x1e%H%x00%h%x00%an%x00%ae%x00%aI%x00%P%x00%D%x00%B";
     let limit_str = format!("-{}", limit);
+    // --branches --remotes: видны все локальные и remote-ветки (после fetch
+    // тоже). Теги намеренно НЕ включаем (в отличие от --all), иначе коммиты,
+    // живые лишь из-за тега (после squash/amend в ветке), рисуются паразитной
+    // отдельной веткой. Теги на достижимых коммитах всё равно показываются
+    // как ref-лейблы. HEAD добавляем явно ради detached-режима.
+    // --date-order: согласованный порядок при ветвлении нескольких refs.
     let output = run_git(
         repo_path,
-        &["log", &format!("--format={}", format), &limit_str],
+        &[
+            "log",
+            "--branches",
+            "--remotes",
+            "HEAD",
+            "--date-order",
+            &format!("--format={}", format),
+            &limit_str,
+        ],
     )?;
     let mut commits = Vec::new();
     for record in output.split('\x1e') {

@@ -568,10 +568,24 @@ pub fn fetch_args(remote: &str) -> Vec<String> {
 }
 
 pub fn pull_args(remote: &str, branch: &str, rebase: bool) -> Vec<String> {
+    // --tags: иначе git pull тянет только теги, достижимые из подтягиваемой
+    // ветки (авто-фолловинг), и теги на сторонних ветках/коммитах не
+    // приезжают — для пользователя выглядит как «теги не затягиваются».
     if rebase {
-        vec!["pull".into(), "--rebase".into(), remote.into(), branch.into()]
+        vec![
+            "pull".into(),
+            "--rebase".into(),
+            "--tags".into(),
+            remote.into(),
+            branch.into(),
+        ]
     } else {
-        vec!["pull".into(), remote.into(), branch.into()]
+        vec![
+            "pull".into(),
+            "--tags".into(),
+            remote.into(),
+            branch.into(),
+        ]
     }
 }
 
@@ -904,10 +918,13 @@ mod tag_tests {
 
     #[test]
     fn pull_args_rebase_toggle() {
-        assert_eq!(pull_args("origin", "main", false), vec!["pull", "origin", "main"]);
+        assert_eq!(
+            pull_args("origin", "main", false),
+            vec!["pull", "--tags", "origin", "main"]
+        );
         assert_eq!(
             pull_args("origin", "main", true),
-            vec!["pull", "--rebase", "origin", "main"]
+            vec!["pull", "--rebase", "--tags", "origin", "main"]
         );
     }
 
