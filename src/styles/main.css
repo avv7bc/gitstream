@@ -48,6 +48,10 @@
   --teal: #2a8a8a;
   --orange: #d97706;
 
+  /* Метка незапушенного коммита в графе. Тёплый янтарь, читается на любом
+     фоне темы, не совпадает с цветами lane-палитры. */
+  --unpushed: #c8870c;
+
   --diff-added-bg: #d4f8d4;
   --diff-added-line: #eaffea;
   --diff-removed-bg: #fcd9d9;
@@ -82,6 +86,8 @@
   --purple: #bb86fc;
   --teal: #03dac6;
   --orange: #ffab40;
+
+  --unpushed: #ffc107;          /* material amber 500 */
 
   --diff-added-bg: rgba(3, 218, 198, 0.18);
   --diff-added-line: rgba(3, 218, 198, 0.08);
@@ -118,6 +124,8 @@
   --teal: #4ec9b0;             /* type green-teal */
   --orange: #ce9178;           /* string orange */
 
+  --unpushed: #e3b341;         /* warmer than muted --yellow для контраста с lane-палитрой */
+
   --diff-added-bg: rgba(155, 185, 85, 0.20);
   --diff-added-line: rgba(155, 185, 85, 0.10);
   --diff-removed-bg: rgba(255, 0, 0, 0.20);
@@ -152,6 +160,8 @@
   --purple: #9b5de5;           /* purple */
   --teal: #00d9ff;             /* cyan */
   --orange: #e67e22;           /* orange */
+
+  --unpushed: #f5b942;         /* тёплый жёлто-золотой между --yellow и --orange */
 
   --diff-added-bg: rgba(46, 202, 75, 0.20);
   --diff-added-line: rgba(46, 202, 75, 0.08);
@@ -188,6 +198,8 @@
   --teal: #94e2d5;
   --orange: #fab387;
 
+  --unpushed: #f9c66b;          /* warmer/более насыщенный, чем пастельный --yellow */
+
   --diff-added-bg: rgba(166, 227, 161, 0.12);
   --diff-added-line: rgba(166, 227, 161, 0.28);
   --diff-removed-bg: rgba(243, 139, 168, 0.12);
@@ -222,6 +234,8 @@
   --purple: #bd93f9;
   --teal: #8be9fd;
   --orange: #ffb86c;
+
+  --unpushed: #f1fa8c;          /* signature dracula lime-жёлтый */
 
   --diff-added-bg: rgba(80, 250, 123, 0.12);
   --diff-added-line: rgba(80, 250, 123, 0.28);
@@ -258,6 +272,8 @@
   --teal: #58a6ff;
   --orange: #db6d28;           /* severe.fg */
 
+  --unpushed: #e3b341;         /* github attention amber, чуть светлее --yellow */
+
   --diff-added-bg: rgba(46,160,67,0.15);
   --diff-added-line: rgba(46,160,67,0.08);
   --diff-removed-bg: rgba(248,81,73,0.15);
@@ -292,6 +308,8 @@
   --purple: #ab9df2;
   --teal: #78dce8;
   --orange: #fc9867;
+
+  --unpushed: #ffd866;          /* monokai pro yellow, выразительно на тёмно-сером */
 
   --diff-added-bg: rgba(169, 220, 118, 0.15);
   --diff-added-line: rgba(169, 220, 118, 0.07);

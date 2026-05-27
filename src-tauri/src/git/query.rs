@@ -271,10 +271,23 @@ fn parse_ref_labels(raw: &str) -> Vec<RefLabel> {
 
 pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
     let format = "%(refname:short)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)";
-    let output = run_git(
-        repo_path,
-        &["branch", "-a", &format!("--format={}", format)],
-    )?;
+    // LC_ALL=C: `%(upstream:track)` git локализует ("впереди 1" в ru) —
+    // парсер ahead/behind понимает только английский, иначе индикатор
+    // незапушенных коммитов всегда показывает 0.
+    let output = Command::new("git")
+        .env("LC_ALL", "C")
+        .arg("-C")
+        .arg(repo_path)
+        .args(["branch", "-a", &format!("--format={}", format)])
+        .output()
+        .map_err(|e| GitError::CommandFailed {
+            message: format!("Failed to run git: {}", e),
+            hint: Some("Is git installed and in PATH?".into()),
+        })?;
+    if !output.status.success() {
+        return Err(classify_git_error(&String::from_utf8_lossy(&output.stderr)));
+    }
+    let output = String::from_utf8_lossy(&output.stdout).to_string();
     let mut result = Vec::new();
     for line in output.lines() {
         if line.is_empty() {

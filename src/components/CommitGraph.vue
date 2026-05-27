@@ -595,12 +595,15 @@ function formatDate(iso: string): string {
               stroke-width="2"
               fill="none"
             />
+            <!-- Незапушенный коммит — hollow кружок с контуром --unpushed
+                 (отдельный per-theme токен янтаря). Размер и стиль как у
+                 обычного, отличие только в цвете обводки. -->
             <circle
               :cx="laneX(commit.column)"
               cy="12"
-              :r="isUnpushed(idx) ? 5 : 4"
-              :fill="isUnpushed(idx) ? 'var(--yellow)' : 'var(--bg-primary)'"
-              :stroke="isUnpushed(idx) ? 'var(--bg-primary)' : laneColor(commit.column)"
+              r="4"
+              fill="var(--bg-primary)"
+              :stroke="isUnpushed(idx) ? 'var(--unpushed)' : laneColor(commit.column)"
               stroke-width="2"
             />
           </svg>
@@ -776,14 +779,7 @@ function formatDate(iso: string): string {
 .graph-row.in-range {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
-.graph-row.unpushed .commit-message {
-  color: #e8e8e8;
-}
-.graph-row.unpushed .author-col,
-.graph-row.unpushed .date-col,
-.graph-row.unpushed .hash-col {
-  color: #c8c8c8;
-}
+/* Незапушенные коммиты помечаются жёлтым кружком в графе — текст не трогаем. */
 /* Коммиты выше HEAD: история только с remote-ов, приглушаем. */
 .graph-row.above-head .commit-message,
 .graph-row.above-head .author-col,
