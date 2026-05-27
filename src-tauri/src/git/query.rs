@@ -198,6 +198,9 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
             &limit_str,
         ],
     )?;
+    // Список remote'ов нужен parse_ref_labels: иначе локальные ветки
+    // вида `feature/auth` неотличимы от `origin/main` (в %D обе со слешем).
+    let remotes_list = remotes(repo_path).unwrap_or_default();
     let mut commits = Vec::new();
     for record in output.split('\x1e') {
         if record.is_empty() {
@@ -207,7 +210,7 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
         if parts.len() < 8 {
             continue;
         }
-        let refs = parse_ref_labels(parts[6]);
+        let refs = parse_ref_labels(parts[6], &remotes_list);
         let parents: Vec<String> = parts[5].split_whitespace().map(|s| s.to_string()).collect();
         let message = parts[7].trim_end_matches('\n').to_string();
         commits.push(CommitInfo {
@@ -227,10 +230,16 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
     Ok(commits)
 }
 
-fn parse_ref_labels(raw: &str) -> Vec<RefLabel> {
+fn parse_ref_labels(raw: &str, remotes: &[String]) -> Vec<RefLabel> {
     if raw.trim().is_empty() {
         return Vec::new();
     }
+    // Ветка считается remote только если её первый сегмент совпадает с
+    // именем настоящего remote'а — иначе локальная ветка `feature/auth`
+    // ошибочно классифицировалась бы как remote (просто потому что в имени
+    // есть слеш).
+    let is_remote_name =
+        |name: &str| remotes.iter().any(|rem| name.starts_with(&format!("{}/", rem)));
     raw.split(", ")
         .filter_map(|r| {
             let r = r.trim();
@@ -250,11 +259,17 @@ fn parse_ref_labels(raw: &str) -> Vec<RefLabel> {
                 });
             }
             if let Some(t) = r.strip_prefix("tag: ") {
-                Some(RefLabel {
+                return Some(RefLabel {
                     name: t.to_string(),
                     kind: "tag".to_string(),
-                })
-            } else if r.contains('/') {
+                });
+            }
+            if is_remote_name(r) {
+                // Symbolic `<remote>/HEAD` — alias на дефолтную ветку, дублирует
+                // её ref. Не рисуем: SmartGit/GitKraken тоже прячут.
+                if r.ends_with("/HEAD") {
+                    return None;
+                }
                 Some(RefLabel {
                     name: r.to_string(),
                     kind: "remote-branch".to_string(),
@@ -270,7 +285,11 @@ fn parse_ref_labels(raw: &str) -> Vec<RefLabel> {
 }
 
 pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
-    let format = "%(refname:short)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)";
+    // %(refname) — полный путь (refs/heads/... vs refs/remotes/...) для
+    // надёжной классификации local/remote (имя со слешем вроде `feature/auth`
+    // — локальная ветка, не remote).
+    let format =
+        "%(refname)%00%(refname:short)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)";
     // LC_ALL=C: `%(upstream:track)` git локализует ("впереди 1" в ru) —
     // парсер ahead/behind понимает только английский, иначе индикатор
     // незапушенных коммитов всегда показывает 0.
@@ -293,22 +312,29 @@ pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
         if line.is_empty() {
             continue;
         }
-        let parts: Vec<&str> = line.splitn(4, '\0').collect();
-        if parts.len() < 4 {
+        let parts: Vec<&str> = line.splitn(5, '\0').collect();
+        if parts.len() < 5 {
             continue;
         }
-        let name = parts[0].to_string();
+        let full_ref = parts[0];
+        let name = parts[1].to_string();
+        // Symbolic refs `<remote>/HEAD` — alias дефолтной ветки, не
+        // показываем как отдельную сущность.
+        if full_ref.starts_with("refs/remotes/") && name.ends_with("/HEAD") {
+            continue;
+        }
+        // Старая фильтрация на случай вывода `git branch -a` со стрелкой.
         if name.contains("HEAD") && name.contains("->") {
             continue;
         }
-        let is_remote = name.starts_with("origin/") || name.contains('/');
-        let upstream = if parts[1].is_empty() {
+        let is_remote = full_ref.starts_with("refs/remotes/");
+        let upstream = if parts[2].is_empty() {
             None
         } else {
-            Some(parts[1].to_string())
+            Some(parts[2].to_string())
         };
-        let (ahead, behind) = parse_track(parts[2]);
-        let is_current = parts[3].trim() == "*";
+        let (ahead, behind) = parse_track(parts[3]);
+        let is_current = parts[4].trim() == "*";
         result.push(BranchInfo {
             name,
             is_remote,
@@ -858,7 +884,11 @@ mod ref_label_tests {
     use super::*;
 
     fn kinds(raw: &str) -> Vec<(String, String)> {
-        parse_ref_labels(raw)
+        kinds_with_remotes(raw, &["origin".to_string()])
+    }
+
+    fn kinds_with_remotes(raw: &str, remotes: &[String]) -> Vec<(String, String)> {
+        parse_ref_labels(raw, remotes)
             .into_iter()
             .map(|r| (r.name, r.kind))
             .collect()
@@ -905,6 +935,44 @@ mod ref_label_tests {
                 ("v1".to_string(), "tag".to_string()),
                 ("origin/main".to_string(), "remote-branch".to_string()),
             ]
+        );
+    }
+
+    // Локальная ветка со слэшем (`feature/auth`) — НЕ remote, даже если в
+    // имени есть `/`. Прежняя эвристика `contains('/')` ломала классификацию.
+    #[test]
+    fn local_branch_with_slash_is_not_remote() {
+        assert_eq!(
+            kinds("feature/auth"),
+            vec![("feature/auth".to_string(), "local-branch".to_string())]
+        );
+    }
+
+    // Symbolic ref `origin/HEAD` не рисуется отдельной пилюлей (дубликат
+    // дефолтной ветки), иначе граф захламляется.
+    #[test]
+    fn remote_head_symbolic_ref_filtered() {
+        assert_eq!(kinds("origin/HEAD"), Vec::<(String, String)>::new());
+        assert_eq!(
+            kinds("origin/main, origin/HEAD"),
+            vec![("origin/main".to_string(), "remote-branch".to_string())]
+        );
+    }
+
+    // Несколько remote'ов: ветка распознаётся как remote, только если её
+    // первый сегмент совпадает с настоящим именем remote'а.
+    #[test]
+    fn multi_remote_distinguishes_local_and_remote() {
+        let remotes = vec!["origin".to_string(), "upstream".to_string()];
+        assert_eq!(
+            kinds_with_remotes("upstream/dev", &remotes),
+            vec![("upstream/dev".to_string(), "remote-branch".to_string())]
+        );
+        // Локальная ветка `feature/upstream` — не remote (нет remote'а
+        // с именем "feature").
+        assert_eq!(
+            kinds_with_remotes("feature/upstream", &remotes),
+            vec![("feature/upstream".to_string(), "local-branch".to_string())]
         );
     }
 }
