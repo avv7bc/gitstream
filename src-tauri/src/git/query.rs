@@ -288,8 +288,12 @@ pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
     // %(refname) — полный путь (refs/heads/... vs refs/remotes/...) для
     // надёжной классификации local/remote (имя со слешем вроде `feature/auth`
     // — локальная ветка, не remote).
-    let format =
-        "%(refname)%00%(refname:short)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)";
+    // %(symref) — для symbolic ref'ов (например `refs/remotes/origin/HEAD`)
+    // даёт целевой ref; такие алиасы фильтруем, иначе они дублируют
+    // настоящую ветку и засоряют список (а %(refname:short) у них к тому
+    // же возвращает просто `origin`, что коллизит с реальной локальной
+    // веткой по имени `origin`).
+    let format = "%(refname)%00%(refname:short)%00%(symref)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)";
     // LC_ALL=C: `%(upstream:track)` git локализует ("впереди 1" в ru) —
     // парсер ahead/behind понимает только английский, иначе индикатор
     // незапушенных коммитов всегда показывает 0.
@@ -312,15 +316,15 @@ pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
         if line.is_empty() {
             continue;
         }
-        let parts: Vec<&str> = line.splitn(5, '\0').collect();
-        if parts.len() < 5 {
+        let parts: Vec<&str> = line.splitn(6, '\0').collect();
+        if parts.len() < 6 {
             continue;
         }
         let full_ref = parts[0];
         let name = parts[1].to_string();
-        // Symbolic refs `<remote>/HEAD` — alias дефолтной ветки, не
-        // показываем как отдельную сущность.
-        if full_ref.starts_with("refs/remotes/") && name.ends_with("/HEAD") {
+        let symref = parts[2];
+        // Любой symbolic ref пропускаем — это alias, не самостоятельная ветка.
+        if !symref.is_empty() {
             continue;
         }
         // Старая фильтрация на случай вывода `git branch -a` со стрелкой.
@@ -328,13 +332,13 @@ pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
             continue;
         }
         let is_remote = full_ref.starts_with("refs/remotes/");
-        let upstream = if parts[2].is_empty() {
+        let upstream = if parts[3].is_empty() {
             None
         } else {
-            Some(parts[2].to_string())
+            Some(parts[3].to_string())
         };
-        let (ahead, behind) = parse_track(parts[3]);
-        let is_current = parts[4].trim() == "*";
+        let (ahead, behind) = parse_track(parts[4]);
+        let is_current = parts[5].trim() == "*";
         result.push(BranchInfo {
             name,
             is_remote,
