@@ -58,17 +58,40 @@ function ensureTicker() {
 
 const networkProgressLine = ref("");
 export const networkProgressLog = ref<string[]>([]);
+export const logOpen = ref(false);
 let networkProgressTimer: ReturnType<typeof setTimeout> | null = null;
+
+function appendLog(...lines: string[]) {
+  let log = networkProgressLog.value;
+  for (const line of lines) {
+    log = [...log.slice(-(MAX_LOG_LINES - 1)), line];
+  }
+  networkProgressLog.value = log;
+}
+
+export function toggleLog() {
+  if (networkProgressLog.value.length > 0) logOpen.value = !logOpen.value;
+}
+
+export function closeLog() {
+  logOpen.value = false;
+}
 
 listen<{ op: string; line: string }>("network_progress", (event) => {
   const line = event.payload.line;
   networkProgressLine.value = line;
-  networkProgressLog.value = [
-    ...networkProgressLog.value.slice(-(MAX_LOG_LINES - 1)),
-    line,
-  ];
+  appendLog(line);
   if (networkProgressTimer) clearTimeout(networkProgressTimer);
   networkProgressTimer = setTimeout(() => { networkProgressLine.value = ""; }, 3000);
+});
+
+listen<{ cmd: string; output: string; success: boolean }>("git_command", (event) => {
+  const { cmd, output } = event.payload;
+  if (output) {
+    appendLog(cmd, output);
+  } else {
+    appendLog(cmd);
+  }
 });
 
 export const isWorking = computed(() => active.value.size > 0);

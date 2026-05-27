@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod app_log;
 mod commands;
 mod git;
 mod settings;
@@ -18,6 +19,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             use tauri::Manager;
+            crate::app_log::init(app.handle().clone());
             if let Some(window) = app.get_webview_window("main") {
                 let icon_bytes = include_bytes!("../icons/icon.png");
                 if let Ok(image) = tauri::image::Image::from_bytes(icon_bytes) {

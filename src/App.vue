@@ -36,6 +36,7 @@ import { useLog } from "@/composables/useLog";
 import { useDiff } from "@/composables/useDiff";
 import { useRemote } from "@/composables/useRemote";
 import { useConflicts } from "@/composables/useConflicts";
+import { toggleLog } from "@/composables/useProgress";
 
 const { repoPath, onRepoOpened, restoreLastRepo } = useRepo();
 const { refresh: refreshFiles, selectedFile, files, stageFiles, unstageFiles } = useFiles();
@@ -294,6 +295,10 @@ function onKeydown(e: KeyboardEvent) {
   }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "d" || e.key === "D" || e.code === "KeyD")) {
     e.preventDefault();
+  }
+  if ((e.altKey || e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyO") {
+    e.preventDefault();
+    toggleLog();
   }
 }
 let pollTimer: ReturnType<typeof setTimeout> | null = null;

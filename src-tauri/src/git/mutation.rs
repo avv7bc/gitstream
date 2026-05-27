@@ -19,7 +19,12 @@ pub enum LineOp {
 }
 
 fn run_git_mut(repo_path: &Path, args: &[&str]) -> Result<String, GitError> {
-    super::query::run_git(repo_path, args)
+    let result = super::query::run_git(repo_path, args);
+    match &result {
+        Ok(out) => crate::app_log::log_git(args, out, true),
+        Err(e) => crate::app_log::log_git(args, &e.to_string(), false),
+    }
+    result
 }
 
 fn validate_file_path(file: &str) -> Result<(), GitError> {

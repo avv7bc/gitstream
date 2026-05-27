@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, watch } from "vue";
 import { useRepo } from "@/composables/useRepo";
 import { useRemote } from "@/composables/useRemote";
 import { useBranches } from "@/composables/useBranches";
-import { useProgress } from "@/composables/useProgress";
+import { useProgress, logOpen, toggleLog, closeLog } from "@/composables/useProgress";
 
 const { repoInfo } = useRepo();
 const { lastError } = useRemote();
@@ -14,15 +14,17 @@ const currentBranchInfo = computed(() => branches.value.find((b) => b.is_current
 const ahead = computed(() => currentBranchInfo.value?.ahead ?? 0);
 const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
 
-const logOpen = ref(false);
-
-function toggleLog() {
-  if (networkProgressLog.value.length > 0) logOpen.value = !logOpen.value;
+function onEscKey(e: KeyboardEvent) {
+  if (e.key === "Escape") {
+    e.stopPropagation();
+    closeLog();
+  }
 }
 
-function closeLog() {
-  logOpen.value = false;
-}
+watch(logOpen, (open) => {
+  if (open) window.addEventListener("keydown", onEscKey, true);
+  else window.removeEventListener("keydown", onEscKey, true);
+});
 </script>
 
 <template>
