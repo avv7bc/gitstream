@@ -367,7 +367,18 @@ fn parse_track(track: &str) -> (u32, u32) {
 
 pub fn tags(repo_path: &Path) -> Result<Vec<TagInfo>, GitError> {
     let format = "%(refname:short)%00%(*objectname:short)%00%(contents:subject)";
-    let output = run_git(repo_path, &["tag", "-l", &format!("--format={}", format)])?;
+    // --sort=-version:refname — semver-сортировка по убыванию (v0.7.13 идёт
+    // после v0.7.9, а не между v0.7.0 и v0.7.2 как при алфавитной по умолчанию).
+    // Как в SmartGit: новые версии сверху.
+    let output = run_git(
+        repo_path,
+        &[
+            "tag",
+            "-l",
+            "--sort=-version:refname",
+            &format!("--format={}", format),
+        ],
+    )?;
     let mut result = Vec::new();
     for line in output.lines() {
         if line.is_empty() {
