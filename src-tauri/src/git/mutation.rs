@@ -559,7 +559,7 @@ pub fn delete_tag(repo_path: &Path, name: &str) -> Result<(), GitError> {
 }
 
 pub fn fetch_args(remote: &str) -> Vec<String> {
-    vec!["fetch".into(), remote.into()]
+    vec!["fetch".into(), "--tags".into(), remote.into()]
 }
 
 pub fn pull_args(remote: &str, branch: &str, rebase: bool) -> Vec<String> {
@@ -894,33 +894,39 @@ mod tag_tests {
 
     #[test]
     fn fetch_args_basic() {
-        assert_eq!(fetch_args("origin"), vec!["fetch", "origin"]);
+        assert_eq!(fetch_args("origin"), vec!["fetch", "--tags", "origin"]);
     }
 
     #[test]
     fn pull_args_rebase_toggle() {
-        assert_eq!(pull_args("origin", false), vec!["pull", "origin"]);
+        assert_eq!(pull_args("origin", "main", false), vec!["pull", "origin", "main"]);
         assert_eq!(
-            pull_args("origin", true),
-            vec!["pull", "--rebase", "origin"]
+            pull_args("origin", "main", true),
+            vec!["pull", "--rebase", "origin", "main"]
         );
     }
 
     #[test]
     fn push_args_force_toggle() {
-        assert_eq!(push_args("origin", false), vec!["push", "origin"]);
-        assert_eq!(push_args("origin", true), vec!["push", "--force", "origin"]);
+        assert_eq!(
+            push_args("origin", "main", false),
+            vec!["push", "--set-upstream", "origin", "main"]
+        );
+        assert_eq!(
+            push_args("origin", "main", true),
+            vec!["push", "--force", "--set-upstream", "origin", "main"]
+        );
     }
 
     #[test]
     fn push_branch_args_force_toggle() {
         assert_eq!(
             push_branch_args("origin", "main", false),
-            vec!["push", "origin", "main"]
+            vec!["push", "--set-upstream", "origin", "main"]
         );
         assert_eq!(
             push_branch_args("origin", "main", true),
-            vec!["push", "--force", "origin", "main"]
+            vec!["push", "--force", "--set-upstream", "origin", "main"]
         );
     }
 
