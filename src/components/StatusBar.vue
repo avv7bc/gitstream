@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useRepo } from "@/composables/useRepo";
 import { useRemote } from "@/composables/useRemote";
 import { useBranches } from "@/composables/useBranches";
@@ -21,10 +21,24 @@ function onEscKey(e: KeyboardEvent) {
   }
 }
 
+const logContentRef = ref<HTMLPreElement | null>(null);
+
 watch(logOpen, (open) => {
-  if (open) window.addEventListener("keydown", onEscKey, true);
-  else window.removeEventListener("keydown", onEscKey, true);
+  if (open) {
+    window.addEventListener("keydown", onEscKey, true);
+    nextTick(scrollToBottom);
+  } else {
+    window.removeEventListener("keydown", onEscKey, true);
+  }
 });
+
+watch(networkProgressLog, () => {
+  if (logOpen.value) nextTick(scrollToBottom);
+});
+
+function scrollToBottom() {
+  if (logContentRef.value) logContentRef.value.scrollTop = logContentRef.value.scrollHeight;
+}
 </script>
 
 <template>
@@ -67,16 +81,20 @@ watch(logOpen, (open) => {
     </div>
 
     <div class="statusbar-right">
+      <span class="git-output-btn" :class="{ active: logOpen }" title="Git output (Alt+O)" @click="toggleLog">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M2 2.5A.5.5 0 0 1 2.5 2h11a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5H9.207l-2.854 2.854A.5.5 0 0 1 5.5 14.5V12H2.5a.5.5 0 0 1-.5-.5v-9zm1 .5v8h3.5a.5.5 0 0 1 .5.5v2.293L9.293 11.5a.5.5 0 0 1 .354-.146H13V3H3zm1 2h7v1H4V5zm0 2h7v1H4V7zm0 2h4v1H4V9z"/>
+        </svg>
+      </span>
     </div>
 
     <Teleport to="body">
-      <div v-if="logOpen" class="progress-log-backdrop" @click="closeLog" />
       <div v-if="logOpen" class="progress-log-popup">
         <div class="progress-log-header">
           <span>Git output</span>
           <button class="progress-log-close" @click="closeLog">✕</button>
         </div>
-        <pre class="progress-log-content">{{ networkProgressLog.join('\n') }}</pre>
+        <pre ref="logContentRef" class="progress-log-content">{{ networkProgressLog.join('\n') }}</pre>
       </div>
     </Teleport>
   </div>
@@ -144,7 +162,23 @@ watch(logOpen, (open) => {
   display: flex;
   align-items: center;
   height: 100%;
-  padding: 0 8px;
+  padding: 0 4px;
+}
+
+.git-output-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 6px;
+  cursor: pointer;
+  color: var(--statusbar-fg-muted, #7f849c);
+  opacity: 0.7;
+}
+.git-output-btn:hover,
+.git-output-btn.active {
+  color: var(--statusbar-fg, #cdd6f4);
+  opacity: 1;
 }
 
 .status-message {
@@ -193,12 +227,6 @@ watch(logOpen, (open) => {
   transform: rotate(180deg);
 }
 
-.progress-log-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
-}
-
 .progress-log-popup {
   position: fixed;
   bottom: calc(var(--statusbar-height) + 4px);
@@ -206,7 +234,7 @@ watch(logOpen, (open) => {
   transform: translateX(-50%);
   z-index: 9999;
   width: min(680px, 90vw);
-  max-height: 320px;
+  height: 320px;
   background: var(--panel-bg, #1e1e2e);
   border: 1px solid var(--border, #45475a);
   border-radius: 6px;
@@ -244,6 +272,8 @@ watch(logOpen, (open) => {
 }
 
 .progress-log-content {
+  flex: 1;
+  min-height: 0;
   margin: 0;
   padding: 8px 10px;
   font-family: var(--font-mono, monospace);

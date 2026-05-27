@@ -237,20 +237,23 @@ function closeBranchMenu() {
 
     <div class="toolbar-group">
       <button class="toolbar-btn icon-only" @click="$emit('stats')" title="Repository Statistics">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <rect x="2" y="10" width="3" height="4" rx="0.5"/>
           <rect x="6.5" y="6" width="3" height="8" rx="0.5"/>
           <rect x="11" y="2" width="3" height="12" rx="0.5"/>
         </svg>
       </button>
       <button class="toolbar-btn icon-only" @click="$emit('settings')" title="Settings">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-          <line x1="4" y1="6" x2="20" y2="6"/>
-          <line x1="4" y1="12" x2="20" y2="12"/>
-          <line x1="4" y1="18" x2="20" y2="18"/>
-          <circle cx="15" cy="6" r="2" fill="var(--bg-secondary)"/>
-          <circle cx="9" cy="12" r="2" fill="var(--bg-secondary)"/>
-          <circle cx="16" cy="18" r="2" fill="var(--bg-secondary)"/>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <line x1="2" y1="4" x2="7.5" y2="4"/>
+          <line x1="12.5" y1="4" x2="14" y2="4"/>
+          <circle cx="10" cy="4" r="2.5" fill="currentColor" stroke="none"/>
+          <line x1="2" y1="8" x2="3.5" y2="8"/>
+          <line x1="8.5" y1="8" x2="14" y2="8"/>
+          <circle cx="6" cy="8" r="2.5" fill="currentColor" stroke="none"/>
+          <line x1="2" y1="12" x2="7.5" y2="12"/>
+          <line x1="12.5" y1="12" x2="14" y2="12"/>
+          <circle cx="10" cy="12" r="2.5" fill="currentColor" stroke="none"/>
         </svg>
       </button>
     </div>
@@ -359,6 +362,11 @@ function closeBranchMenu() {
 }
 .toolbar-btn.icon-only {
   padding: 6px;
+  color: var(--text-primary);
+  opacity: 0.7;
+}
+.toolbar-btn.icon-only:hover:not(:disabled) {
+  opacity: 1;
 }
 
 .toolbar-separator {

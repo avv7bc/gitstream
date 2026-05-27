@@ -501,6 +501,7 @@ watch(locale, () => scheduleSave());
 .vs-cat .chev {
   color: var(--text-muted);
   flex-shrink: 0;
+  opacity: 0;
 }
 .vs-cat:hover {
   background: var(--bg-hover);
@@ -509,6 +510,10 @@ watch(locale, () => scheduleSave());
   background: var(--bg-active);
   color: var(--text-primary);
   font-weight: 600;
+}
+.vs-cat.active .chev {
+  opacity: 1;
+  color: var(--accent);
 }
 
 /* Content */

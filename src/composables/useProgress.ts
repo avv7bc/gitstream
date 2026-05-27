@@ -61,6 +61,14 @@ export const networkProgressLog = ref<string[]>([]);
 export const logOpen = ref(false);
 let networkProgressTimer: ReturnType<typeof setTimeout> | null = null;
 
+function timestamp(): string {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  return `[${hh}:${mm}:${ss}]`;
+}
+
 function appendLog(...lines: string[]) {
   let log = networkProgressLog.value;
   for (const line of lines) {
@@ -70,7 +78,7 @@ function appendLog(...lines: string[]) {
 }
 
 export function toggleLog() {
-  if (networkProgressLog.value.length > 0) logOpen.value = !logOpen.value;
+  logOpen.value = !logOpen.value;
 }
 
 export function closeLog() {
@@ -80,7 +88,7 @@ export function closeLog() {
 listen<{ op: string; line: string }>("network_progress", (event) => {
   const line = event.payload.line;
   networkProgressLine.value = line;
-  appendLog(line);
+  appendLog(`${timestamp()} ${line}`);
   if (networkProgressTimer) clearTimeout(networkProgressTimer);
   networkProgressTimer = setTimeout(() => { networkProgressLine.value = ""; }, 3000);
 });
@@ -88,9 +96,9 @@ listen<{ op: string; line: string }>("network_progress", (event) => {
 listen<{ cmd: string; output: string; success: boolean }>("git_command", (event) => {
   const { cmd, output } = event.payload;
   if (output) {
-    appendLog(cmd, output);
+    appendLog(`${timestamp()} ${cmd}`, output);
   } else {
-    appendLog(cmd);
+    appendLog(`${timestamp()} ${cmd}`);
   }
 });
 
