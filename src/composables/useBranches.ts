@@ -81,6 +81,16 @@ export function useBranches() {
     await invoke("do_delete_branch", { repoPath: repoPath.value, branch, force });
   }
 
+  async function deleteRemoteBranch(remote: string, branch: string) {
+    if (!repoPath.value) return;
+    await invoke("do_delete_remote_branch", {
+      repoPath: repoPath.value,
+      remote,
+      branch,
+      timeoutSecs: networkTimeoutSecs.value,
+    });
+  }
+
   async function pushBranch(branch: string, remote: string, force: boolean) {
     if (!repoPath.value) return;
     await invoke("do_push_branch", {
@@ -151,7 +161,7 @@ export function useBranches() {
   return {
     branches, tags, stashes, remotes,
     refresh, checkout, checkoutRemote,
-    createBranch, mergeBranch, rebaseOnto, renameBranch, deleteBranch, pushBranch,
+    createBranch, mergeBranch, rebaseOnto, renameBranch, deleteBranch, deleteRemoteBranch, pushBranch,
     createTag, deleteTag, pushTag,
     stashSave, stashApply, stashPop, stashDrop,
   };

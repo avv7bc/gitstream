@@ -290,11 +290,17 @@ function onKeydown(e: KeyboardEvent) {
     e.preventDefault();
     if (repoPath.value) showCommitDialog.value = true;
   }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "g" || e.key === "G" || e.code === "KeyG")) {
+    e.preventDefault();
+    if (repoPath.value) branchPanelRef.value?.triggerCheckoutRemote();
+  }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "m" || e.key === "M" || e.code === "KeyM")) {
     e.preventDefault();
+    if (repoPath.value) branchPanelRef.value?.triggerMerge();
   }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "d" || e.key === "D" || e.code === "KeyD")) {
     e.preventDefault();
+    if (repoPath.value) branchPanelRef.value?.triggerRebase();
   }
   if ((e.altKey || e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyO") {
     e.preventDefault();

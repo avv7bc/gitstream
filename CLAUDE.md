@@ -123,8 +123,9 @@ src-tauri/src/                # Rust backend
 - **Ctrl+K** — открыть диалог коммита
 - **Ctrl+T** — stage выбранных файлов
 - **Shift+Ctrl+T** — unstage выбранных файлов
-- **Ctrl+M** — merge ветки
-- **Ctrl+D** — rebase ветки
+- **Ctrl+G** — checkout выделенной remote-ветки
+- **Ctrl+M** — merge выделенной ветки (local или remote)
+- **Ctrl+D** — rebase onto выделенной ветки (local или remote)
 - **F7** — открыть Create Branch
 - **Shift+F7** — открыть Create Tag
 

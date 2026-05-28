@@ -38,6 +38,7 @@ export const en: Translations = {
     delete: "Delete",
     pushTag: "Push Tag",
     deleteTag: "Delete Tag",
+    deleteRemoteBranch: "Delete Remote Branch",
     apply: "Apply",
     pop: "Pop",
     drop: "Drop",

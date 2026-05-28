@@ -626,6 +626,10 @@ pub fn push_tag_args(remote: &str, name: &str, delete: bool) -> Vec<String> {
     vec!["push".into(), remote.into(), refspec]
 }
 
+pub fn delete_remote_branch_args(remote: &str, branch: &str) -> Vec<String> {
+    vec!["push".into(), remote.into(), "--delete".into(), branch.into()]
+}
+
 /// Разбирает заголовок хунка "@@ -a,b +c,d @@ tail".
 /// Возвращает (old_start, new_start, tail) — где tail включает ведущий пробел.
 fn parse_hunk_header(h: &str) -> Option<(usize, usize, String)> {

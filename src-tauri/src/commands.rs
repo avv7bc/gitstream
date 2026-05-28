@@ -463,6 +463,18 @@ pub fn do_delete_branch(repo_path: String, branch: String, force: bool) -> Resul
 }
 
 #[tauri::command]
+pub async fn do_delete_remote_branch(
+    app: tauri::AppHandle,
+    repo_path: String,
+    remote: String,
+    branch: String,
+    timeout_secs: Option<u64>,
+) -> Result<String, String> {
+    let args = mutation::delete_remote_branch_args(&remote, &branch);
+    run_network_git(&app, Some(Path::new(&repo_path)), &args, timeout_secs, "push").await
+}
+
+#[tauri::command]
 pub fn do_create_tag(
     repo_path: String,
     name: String,

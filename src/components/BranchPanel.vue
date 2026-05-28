@@ -27,7 +27,7 @@ async function handleLocalDblClick(branch: { name: string; is_current: boolean }
 
 const {
   branches, tags, stashes, remotes,
-  checkout, createBranch, mergeBranch, rebaseOnto, renameBranch, deleteBranch, pushBranch,
+  checkout, createBranch, mergeBranch, rebaseOnto, renameBranch, deleteBranch, deleteRemoteBranch, pushBranch,
   deleteTag, pushTag,
   stashSave, stashApply, stashPop, stashDrop,
 } = useBranches();
@@ -47,7 +47,37 @@ function handleCreateBranchCtx() {
   openCreateBranch(b ? b.name : null);
 }
 
-defineExpose({ openCreateBranch });
+function triggerCheckoutRemote() {
+  const b = selectedRemoteBranches.value[0];
+  if (!b) return;
+  emit("checkoutRemote", b.name);
+}
+
+function triggerMerge() {
+  const remote = selectedRemoteBranches.value[0];
+  const local = selectedLocalBranches.value.find((b) => !b.is_current);
+  const b = remote ?? local;
+  if (!b) return;
+  targetBranch.value = b;
+  showMergeConfirm.value = true;
+}
+
+async function triggerRebase() {
+  const remote = selectedRemoteBranches.value[0];
+  const local = selectedLocalBranches.value.find((b) => !b.is_current);
+  const b = remote ?? local;
+  if (!b) return;
+  if (!window.confirm(`Rebase current branch onto '${b.name}'?`)) return;
+  try {
+    await rebaseOnto(b.name);
+  } catch (e) {
+    window.alert(`Rebase failed (resolve conflicts below if any): ${e}`);
+  } finally {
+    emit("branchesChanged");
+  }
+}
+
+defineExpose({ openCreateBranch, triggerCheckoutRemote, triggerMerge, triggerRebase });
 
 async function confirmCreateBranch(payload: {
   name: string;
@@ -299,6 +329,95 @@ async function confirmDeleteTag(alsoRemote: boolean) {
   clearSelection();
   emit("tagsChanged");
   targetTags.value = [];
+}
+
+// --- Remote branch context menu ---
+const remoteCtxMenu = ref<{ x: number; y: number } | null>(null);
+const remoteCtxBranch = ref<BranchInfo | null>(null);
+const showDeleteRemoteConfirm = ref(false);
+const targetRemoteBranches = ref<BranchInfo[]>([]);
+
+const selectedRemoteBranches = computed(() =>
+  remoteBranches.value.filter((b) => selectedKeys.value.has(`remote:${b.name}`)),
+);
+
+function parseRemoteBranch(fullName: string): { remote: string; branch: string } {
+  const idx = fullName.indexOf("/");
+  return idx > 0
+    ? { remote: fullName.slice(0, idx), branch: fullName.slice(idx + 1) }
+    : { remote: fullName, branch: fullName };
+}
+
+function onRemoteBranchContextMenu(e: MouseEvent, branch: BranchInfo) {
+  e.preventDefault();
+  e.stopPropagation();
+  const key = `remote:${branch.name}`;
+  if (!selectedKeys.value.has(key)) {
+    selectedKeys.value = new Set([key]);
+    anchorKey.value = key;
+  }
+  remoteCtxMenu.value = { x: e.clientX, y: e.clientY };
+  remoteCtxBranch.value = branch;
+}
+
+function closeRemoteCtxMenu() {
+  remoteCtxMenu.value = null;
+  remoteCtxBranch.value = null;
+}
+
+function handleCheckoutRemoteCtx() {
+  const b = remoteCtxBranch.value;
+  closeRemoteCtxMenu();
+  if (!b) return;
+  emit("checkoutRemote", b.name);
+}
+
+function handleMergeRemoteCtx() {
+  const b = remoteCtxBranch.value;
+  closeRemoteCtxMenu();
+  if (!b) return;
+  targetBranch.value = b;
+  showMergeConfirm.value = true;
+}
+
+async function handleRebaseRemoteCtx() {
+  const b = remoteCtxBranch.value;
+  closeRemoteCtxMenu();
+  if (!b) return;
+  if (!window.confirm(`Rebase current branch onto '${b.name}'?`)) return;
+  try {
+    await rebaseOnto(b.name);
+  } catch (e) {
+    window.alert(`Rebase failed (resolve conflicts below if any): ${e}`);
+  } finally {
+    emit("branchesChanged");
+  }
+}
+
+function handleDeleteRemoteCtx() {
+  targetRemoteBranches.value = [...selectedRemoteBranches.value];
+  closeRemoteCtxMenu();
+  if (!targetRemoteBranches.value.length) return;
+  showDeleteRemoteConfirm.value = true;
+}
+
+async function confirmDeleteRemote() {
+  const targets = targetRemoteBranches.value;
+  showDeleteRemoteConfirm.value = false;
+  if (!targets.length) return;
+  const errors: string[] = [];
+  for (const b of targets) {
+    const { remote, branch } = parseRemoteBranch(b.name);
+    try {
+      await deleteRemoteBranch(remote, branch);
+    } catch (e) {
+      errors.push(`${b.name}: ${e}`);
+    }
+  }
+  if (errors.length) window.alert(`Delete remote branch failed:\n${errors.join("\n")}`);
+  clearSelection();
+  emit("branchesChanged");
+  targetRemoteBranches.value = [];
 }
 
 // --- Stash context menu ---
@@ -576,6 +695,7 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
             :class="{ selected: selectedKeys.has(`remote:${branch.name}`) }"
             @mousedown="selectItem(`remote:${branch.name}`, $event)"
             @dblclick="emit('checkoutRemote', branch.name)"
+            @contextmenu="onRemoteBranchContextMenu($event, branch)"
           >
             <RefIcon kind="remote-branch" class="bp-icon bp-icon--remote" />
             <span class="branch-name" v-html="highlight(branch.name, filter)" />
@@ -780,6 +900,47 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
         :checkbox-label="hasRemote ? `Also delete on remote '${remotes[0]}'` : undefined"
         @close="showDeleteTagConfirm = false; targetTags = []"
         @confirm="confirmDeleteTag"
+      />
+
+      <div
+        v-if="remoteCtxMenu"
+        class="ctx-menu"
+        :style="{ left: remoteCtxMenu.x + 'px', top: remoteCtxMenu.y + 'px' }"
+        @click.stop
+      >
+        <button class="ctx-item ctx-item--keyed" @click="handleCheckoutRemoteCtx">
+          <span>{{ i18n.branches.checkout }}</span><span class="ctx-hotkey">Ctrl+G</span>
+        </button>
+        <div class="ctx-separator" />
+        <button class="ctx-item ctx-item--keyed" @click="handleMergeRemoteCtx">
+          <span>{{ i18n.branches.merge }}</span><span class="ctx-hotkey">Ctrl+M</span>
+        </button>
+        <button class="ctx-item ctx-item--keyed" @click="handleRebaseRemoteCtx">
+          <span>{{ i18n.branches.rebaseOnto }}</span><span class="ctx-hotkey">Ctrl+D</span>
+        </button>
+        <div class="ctx-separator" />
+        <button
+          class="ctx-item ctx-danger"
+          @click="handleDeleteRemoteCtx"
+        >{{ selectedRemoteBranches.length > 1 ? `${i18n.branches.deleteRemoteBranch} (${selectedRemoteBranches.length})` : i18n.branches.deleteRemoteBranch }}</button>
+      </div>
+      <div
+        v-if="remoteCtxMenu"
+        class="ctx-backdrop"
+        @click="closeRemoteCtxMenu"
+        @contextmenu.prevent="closeRemoteCtxMenu"
+      />
+
+      <ConfirmDialog
+        v-if="showDeleteRemoteConfirm && targetRemoteBranches.length"
+        :message="targetRemoteBranches.length > 1
+          ? `Delete ${targetRemoteBranches.length} remote branches?`
+          : `Delete remote branch '${targetRemoteBranches[0].name}'?`"
+        :items="targetRemoteBranches.length > 1 ? targetRemoteBranches.map((b) => b.name) : undefined"
+        confirm-label="Delete"
+        danger
+        @close="showDeleteRemoteConfirm = false; targetRemoteBranches = []"
+        @confirm="confirmDeleteRemote"
       />
 
       <div
@@ -1057,6 +1218,17 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
   height: 0;
   border-top: 1px solid var(--border);
   margin: 0;
+}
+.ctx-item--keyed {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.ctx-hotkey {
+  font-size: var(--font-size-xs, 11px);
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .section-add-btn {

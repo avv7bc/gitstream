@@ -43,6 +43,7 @@ const _ru = {
     delete: "Delete",
     pushTag: "Push Tag",
     deleteTag: "Delete Tag",
+    deleteRemoteBranch: "Удалить remote-ветку",
     apply: "Apply",
     pop: "Pop",
     drop: "Drop",
