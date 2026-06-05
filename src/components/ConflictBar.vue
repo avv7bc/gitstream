@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useConflicts } from "@/composables/useConflicts";
+import { logError } from "@/composables/useProgress";
 import { useFiles } from "@/composables/useFiles";
 import { useI18n } from "@/composables/useI18n";
 
@@ -33,7 +34,7 @@ async function run(fn: () => Promise<void>) {
     await fn();
     emit("changed");
   } catch (e) {
-    window.alert(`Operation failed: ${e}`);
+    logError(`Operation failed: ${e}`);
   } finally {
     busy.value = false;
   }

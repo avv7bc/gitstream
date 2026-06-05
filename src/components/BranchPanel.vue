@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useBranches } from "@/composables/useBranches";
+import { logError } from "@/composables/useProgress";
 import { highlight } from "@/utils/highlight";
 import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 import RenameBranchDialog from "@/components/dialogs/RenameBranchDialog.vue";
@@ -71,7 +72,7 @@ async function triggerRebase() {
   try {
     await rebaseOnto(b.name);
   } catch (e) {
-    window.alert(`Rebase failed (resolve conflicts below if any): ${e}`);
+    logError(`Rebase failed (resolve conflicts below if any): ${e}`);
   } finally {
     emit("branchesChanged");
   }
@@ -90,7 +91,7 @@ async function confirmCreateBranch(payload: {
     if (payload.checkout) emit("checkedOut");
     else emit("branchesChanged");
   } catch (e) {
-    window.alert(`Create branch failed: ${e}`);
+    logError(`Create branch failed: ${e}`);
   }
 }
 
@@ -141,7 +142,7 @@ async function handleCheckoutCtx() {
     await checkout(b.name);
     emit("checkedOut");
   } catch (e) {
-    window.alert(`Checkout failed: ${e}`);
+    logError(`Checkout failed: ${e}`);
   }
 }
 
@@ -158,7 +159,7 @@ async function confirmMerge() {
   try {
     await mergeBranch(b.name);
   } catch (e) {
-    window.alert(`Merge failed (resolve conflicts below if any): ${e}`);
+    logError(`Merge failed (resolve conflicts below if any): ${e}`);
   } finally {
     emit("branchesChanged");
   }
@@ -173,7 +174,7 @@ async function handlePushCtx() {
     await pushBranch(b.name, resolveRemoteFor(b), false);
     emit("branchesChanged");
   } catch (e) {
-    window.alert(`Push failed: ${e}`);
+    logError(`Push failed: ${e}`);
   }
 }
 
@@ -185,7 +186,7 @@ async function handleRebaseCtx() {
   try {
     await rebaseOnto(b.name);
   } catch (e) {
-    window.alert(`Rebase failed (resolve conflicts below if any): ${e}`);
+    logError(`Rebase failed (resolve conflicts below if any): ${e}`);
   } finally {
     emit("branchesChanged");
   }
@@ -205,7 +206,7 @@ async function confirmRename(newName: string) {
     await renameBranch(b.name, newName);
     emit("branchesChanged");
   } catch (e) {
-    window.alert(`Rename failed: ${e}`);
+    logError(`Rename failed: ${e}`);
   }
   targetBranch.value = null;
 }
@@ -231,7 +232,7 @@ async function confirmDelete() {
       else errors.push(`${b.name}: ${e}`);
     }
   }
-  if (errors.length) window.alert(`Delete failed:\n${errors.join("\n")}`);
+  if (errors.length) logError(`Delete failed:\n${errors.join("\n")}`);
   emit("branchesChanged");
   if (notMerged.length) {
     notMergedBranches.value = notMerged;
@@ -253,7 +254,7 @@ async function confirmForceDelete() {
       errors.push(`${b.name}: ${e}`);
     }
   }
-  if (errors.length) window.alert(`Delete failed:\n${errors.join("\n")}`);
+  if (errors.length) logError(`Delete failed:\n${errors.join("\n")}`);
   emit("branchesChanged");
   notMergedBranches.value = [];
   targetBranches.value = [];
@@ -299,7 +300,7 @@ async function handlePushTagCtx() {
       errors.push(`${t.name}: ${e}`);
     }
   }
-  if (errors.length) window.alert(`Push tag failed:\n${errors.join("\n")}`);
+  if (errors.length) logError(`Push tag failed:\n${errors.join("\n")}`);
   emit("tagsChanged");
 }
 
@@ -325,7 +326,7 @@ async function confirmDeleteTag(alsoRemote: boolean) {
       errors.push(`${t.name}: ${e}`);
     }
   }
-  if (errors.length) window.alert(`Delete tag failed:\n${errors.join("\n")}`);
+  if (errors.length) logError(`Delete tag failed:\n${errors.join("\n")}`);
   clearSelection();
   emit("tagsChanged");
   targetTags.value = [];
@@ -388,7 +389,7 @@ async function handleRebaseRemoteCtx() {
   try {
     await rebaseOnto(b.name);
   } catch (e) {
-    window.alert(`Rebase failed (resolve conflicts below if any): ${e}`);
+    logError(`Rebase failed (resolve conflicts below if any): ${e}`);
   } finally {
     emit("branchesChanged");
   }
@@ -414,7 +415,7 @@ async function confirmDeleteRemote() {
       errors.push(`${b.name}: ${e}`);
     }
   }
-  if (errors.length) window.alert(`Delete remote branch failed:\n${errors.join("\n")}`);
+  if (errors.length) logError(`Delete remote branch failed:\n${errors.join("\n")}`);
   clearSelection();
   emit("branchesChanged");
   targetRemoteBranches.value = [];
@@ -447,7 +448,7 @@ async function handleStashApplyCtx() {
     await stashApply(s.index);
     emit("branchesChanged");
   } catch (e) {
-    window.alert(`Apply stash failed: ${e}`);
+    logError(`Apply stash failed: ${e}`);
   }
 }
 
@@ -459,7 +460,7 @@ async function handleStashPopCtx() {
     await stashPop(s.index);
     emit("branchesChanged");
   } catch (e) {
-    window.alert(`Pop stash failed: ${e}`);
+    logError(`Pop stash failed: ${e}`);
   }
 }
 
@@ -480,7 +481,7 @@ async function confirmDropStash() {
     await stashDrop(s.index);
     emit("branchesChanged");
   } catch (e) {
-    window.alert(`Drop stash failed: ${e}`);
+    logError(`Drop stash failed: ${e}`);
   }
   targetStash.value = null;
 }
@@ -494,7 +495,7 @@ async function confirmStashSave(payload: {
     await stashSave(payload.message, payload.includeUntracked);
     emit("branchesChanged");
   } catch (e) {
-    window.alert(`Stash failed: ${e}`);
+    logError(`Stash failed: ${e}`);
   }
 }
 

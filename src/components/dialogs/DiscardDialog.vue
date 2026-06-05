@@ -6,14 +6,19 @@ import { useI18n } from "@/composables/useI18n";
 
 const emit = defineEmits<{ close: [] }>();
 
-const { files, discardFiles, unstageFiles, refresh } = useFiles();
+const { files, selectedPaths: fileListSelection, discardFiles, unstageFiles, refresh } = useFiles();
 const { dragStyle, onDragStart } = useDraggable();
 const { i18n } = useI18n();
 
 const revertTo = ref<"head" | "index">("head");
 
-// Files with changes (not clean)
-const changedFiles = computed(() => files.value.filter((f) => f.state !== "untracked" || f.staged !== "unstaged"));
+// Файлы с изменениями (не чистые). Показываем выбранные в FileList; если
+// выбора нет (или он не пересекается со списком) — все подходящие файлы.
+const changedFiles = computed(() => {
+  const base = files.value.filter((f) => f.state !== "untracked" || f.staged !== "unstaged");
+  const sel = base.filter((f) => fileListSelection.value.includes(f.path));
+  return sel.length > 0 ? sel : base;
+});
 
 // Selection state: file path -> checked
 const selected = ref<Record<string, boolean>>({});

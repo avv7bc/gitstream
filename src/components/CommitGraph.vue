@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import { useLog } from "@/composables/useLog";
+import { logError } from "@/composables/useProgress";
 import { useBranches } from "@/composables/useBranches";
 import RefIcon from "@/components/RefIcon.vue";
 import { useFiles } from "@/composables/useFiles";
@@ -196,7 +197,7 @@ async function ctxReset(mode: "soft" | "mixed" | "hard") {
     await resetTo(oid, mode);
     emit("changed");
   } catch (e) {
-    window.alert(`Reset failed: ${e}`);
+    logError(`Reset failed: ${e}`);
   }
 }
 
@@ -205,7 +206,7 @@ async function runRevert(oid: string | null) {
   try {
     await revertCommit(oid, false);
   } catch (e) {
-    window.alert(`Revert failed (resolve conflicts if any): ${e}`);
+    logError(`Revert failed (resolve conflicts if any): ${e}`);
   } finally {
     emit("changed");
   }
@@ -222,7 +223,7 @@ async function runCherryPick(oid: string | null) {
   try {
     await cherryPick(oid);
   } catch (e) {
-    window.alert(`Cherry-pick failed (resolve conflicts if any): ${e}`);
+    logError(`Cherry-pick failed (resolve conflicts if any): ${e}`);
   } finally {
     emit("changed");
   }

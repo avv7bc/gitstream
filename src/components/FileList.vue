@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
-import { invoke } from "@/composables/useProgress";
+import { invoke, logError } from "@/composables/useProgress";
 import { useFiles } from "@/composables/useFiles";
 import { useI18n } from "@/composables/useI18n";
 import { useLog } from "@/composables/useLog";
@@ -13,7 +13,7 @@ import { highlight } from "@/utils/highlight";
 const emit = defineEmits<{ commit: [] }>();
 
 const { i18n } = useI18n();
-const { files, selectedFile, stageFiles, unstageFiles, discardFiles, removeFiles, deleteFiles } = useFiles();
+const { files, selectedFile, selectedPaths, stageFiles, unstageFiles, discardFiles, removeFiles, deleteFiles } = useFiles();
 const { selectedCommit } = useLog();
 const { repoPath } = useRepo();
 const { diffFile, diffCommit, clearDiff } = useDiff();
@@ -23,7 +23,6 @@ const activeFilter = ref<string>("all");
 const fileFilter = ref("");
 const commitFiles = ref<FileDiff[]>([]);
 
-const selectedPaths = ref<string[]>([]);
 const anchorPath = ref<string | null>(null);
 
 const listBodyRef = ref<HTMLElement | null>(null);
@@ -77,7 +76,7 @@ async function ctxRun(action: "stage" | "unstage" | "commit" | "discard" | "remo
       if (window.confirm(`Delete ${what} from disk?`)) await deleteFiles(paths);
     }
   } catch (err) {
-    window.alert(`Action failed: ${err}`);
+    logError(`Action failed: ${err}`);
   }
 }
 

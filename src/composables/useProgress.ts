@@ -57,7 +57,12 @@ function ensureTicker() {
 }
 
 const networkProgressLine = ref("");
-export const networkProgressLog = ref<string[]>([]);
+// Строка лога Git output: текст + признак ошибки (для красной подсветки).
+export interface LogLine {
+  text: string;
+  isError?: boolean;
+}
+export const networkProgressLog = ref<LogLine[]>([]);
 export const logOpen = ref(false);
 let networkProgressTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -69,12 +74,25 @@ function timestamp(): string {
   return `[${hh}:${mm}:${ss}]`;
 }
 
-function appendLog(...lines: string[]) {
+function pushLines(items: LogLine[]) {
   let log = networkProgressLog.value;
-  for (const line of lines) {
-    log = [...log.slice(-(MAX_LOG_LINES - 1)), line];
+  for (const item of items) {
+    log = [...log.slice(-(MAX_LOG_LINES - 1)), item];
   }
   networkProgressLog.value = log;
+}
+
+function appendLog(...lines: string[]) {
+  pushLines(lines.map((text) => ({ text })));
+}
+
+// Записать ошибку в Git output (красным) и открыть панель — единый канал
+// для всех ошибок git-операций вместо модальных окон.
+export function logError(message: string, detail?: string[]) {
+  const items: LogLine[] = [{ text: `${timestamp()} ${message}`, isError: true }];
+  if (detail) for (const d of detail) if (d) items.push({ text: d, isError: true });
+  pushLines(items);
+  logOpen.value = true;
 }
 
 export function toggleLog() {
@@ -94,12 +112,11 @@ listen<{ op: string; line: string }>("network_progress", (event) => {
 });
 
 listen<{ cmd: string; output: string; success: boolean }>("git_command", (event) => {
-  const { cmd, output } = event.payload;
-  if (output) {
-    appendLog(`${timestamp()} ${cmd}`, output);
-  } else {
-    appendLog(`${timestamp()} ${cmd}`);
-  }
+  const { cmd, output, success } = event.payload;
+  const isError = success === false;
+  const items: LogLine[] = [{ text: `${timestamp()} ${cmd}`, isError }];
+  if (output) items.push({ text: output, isError });
+  pushLines(items);
 });
 
 export const isWorking = computed(() => active.value.size > 0);

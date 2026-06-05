@@ -128,7 +128,7 @@ const { i18n, locale, setLocale } = useI18n();
 
 const systemFonts = ref<string[]>([]);
 
-const timeoutOptions = [5, 10, 30, 60];
+const timeoutOptions = [5, 10, 20, 30, 60];
 const wbFontSizes = Array.from({ length: 10 }, (_, i) => i + 11); // 11..20
 const edFontSizes = Array.from({ length: 15 }, (_, i) => i + 10); // 10..24
 

@@ -22,7 +22,6 @@ import SquashDialog from "./components/dialogs/SquashDialog.vue";
 import RewordDialog from "./components/dialogs/RewordDialog.vue";
 import FileCompareDialog from "./components/dialogs/FileCompareDialog.vue";
 import AddTagDialog from "./components/dialogs/AddTagDialog.vue";
-import NetworkErrorDialog from "./components/dialogs/NetworkErrorDialog.vue";
 import StashSaveDialog from "./components/dialogs/StashSaveDialog.vue";
 import UpdateBanner from "./components/UpdateBanner.vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -36,14 +35,14 @@ import { useLog } from "@/composables/useLog";
 import { useDiff } from "@/composables/useDiff";
 import { useRemote } from "@/composables/useRemote";
 import { useConflicts } from "@/composables/useConflicts";
-import { toggleLog } from "@/composables/useProgress";
+import { toggleLog, logError } from "@/composables/useProgress";
 
 const { repoPath, onRepoOpened, restoreLastRepo } = useRepo();
 const { refresh: refreshFiles, selectedFile, files, stageFiles, unstageFiles } = useFiles();
 const { refresh: refreshBranches, createTag, stashSave } = useBranches();
 const { refresh: refreshLog, selectedCommit, commits, squashCommits, rewordCommit } = useLog();
 const { clearDiff } = useDiff();
-const { pull, push, fetchRemote, networkError, clearNetworkError } = useRemote();
+const { pull, push, fetchRemote } = useRemote();
 const { target: compareTarget } = useFileCompare();
 const { refresh: refreshConflicts } = useConflicts();
 const { updateInfo, checkForUpdate } = useUpdate();
@@ -103,7 +102,6 @@ const showCheckoutDialog = ref(false);
 const checkoutRemoteTarget = ref<string | null>(null);
 const showConfirmDialog = ref(false);
 const showDiscardDialog = ref(false);
-const showErrorDialog = ref(false);
 const showSettingsDialog = ref(false);
 const showStatsDialog = ref(false);
 const showAddTagDialog = ref(false);
@@ -132,7 +130,7 @@ async function doReword(message: string) {
     await refreshAll();
     if (newOid) selectedCommit.value = newOid;
   } catch (e) {
-    showError(String(e));
+    logError(String(e));
   } finally {
     graphRef.value?.focus();
   }
@@ -146,7 +144,7 @@ async function doSquash(message: string) {
     await squashCommits(oids, message);
     await refreshAll();
   } catch (e) {
-    showError(String(e));
+    logError(String(e));
   }
 }
 
@@ -166,7 +164,7 @@ async function handleCreateTag(payload: {
     await createTag(payload.name, payload.message, target, payload.force);
     await refreshAll();
   } catch (e) {
-    showError(String(e));
+    logError(String(e));
   }
   addTagTarget.value = null;
 }
@@ -177,15 +175,8 @@ async function handleStashSave(payload: { message: string | null; includeUntrack
     await stashSave(payload.message, payload.includeUntracked);
     await refreshAll();
   } catch (e) {
-    showError(String(e));
+    logError(String(e));
   }
-}
-
-const errorMessage = ref("");
-
-function showError(msg: string) {
-  errorMessage.value = msg;
-  showErrorDialog.value = true;
 }
 
 function handlePullRequest(remote: string, rebase: boolean) {
@@ -246,12 +237,10 @@ function handleAddGroup() {
 }
 
 // --- Close any open dialog on Esc ---
-const dialogs = [showCommitDialog, showPushDialog, showPullDialog, showCheckoutDialog, showConfirmDialog, showDiscardDialog, showErrorDialog, showSettingsDialog, showStatsDialog];
-// networkError закрывается через clearNetworkError — обрабатывается отдельно в onKeydown
+const dialogs = [showCommitDialog, showPushDialog, showPullDialog, showCheckoutDialog, showConfirmDialog, showDiscardDialog, showSettingsDialog, showStatsDialog];
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") {
-    if (networkError.value) { clearNetworkError(); return; }
     if (checkoutRemoteTarget.value) { checkoutRemoteTarget.value = null; return; }
     if (showAddTagDialog.value) { showAddTagDialog.value = false; addTagTarget.value = null; return; }
     for (const d of dialogs) {
@@ -560,19 +549,6 @@ function onMouseUp() {
       @close="rewordPayload = null"
     />
     <FileCompareDialog v-if="compareTarget" />
-    <ConfirmDialog
-      v-if="showErrorDialog"
-      :message="errorMessage"
-      confirm-label="OK"
-      @close="showErrorDialog = false"
-      @confirm="showErrorDialog = false"
-    />
-    <NetworkErrorDialog
-      v-if="networkError"
-      :message="networkError.message"
-      :log="networkError.log"
-      @close="clearNetworkError()"
-    />
     <UpdateBanner
       v-if="updateInfo"
       :info="updateInfo"

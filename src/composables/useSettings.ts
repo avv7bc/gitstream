@@ -11,7 +11,7 @@ interface AppSettings {
   language: string;
 }
 
-const TIMEOUT_OPTIONS = [5, 10, 30, 60];
+const TIMEOUT_OPTIONS = [5, 10, 20, 30, 60];
 const DEFAULT_TIMEOUT = 10;
 const DEFAULT_WB_FONT_FAMILY = "Ubuntu";
 const DEFAULT_WB_FONT_SIZE = 15;

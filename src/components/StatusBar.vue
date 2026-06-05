@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { useRepo } from "@/composables/useRepo";
-import { useRemote } from "@/composables/useRemote";
 import { useBranches } from "@/composables/useBranches";
 import { useProgress, logOpen, toggleLog, closeLog } from "@/composables/useProgress";
 
 const { repoInfo } = useRepo();
-const { lastError } = useRemote();
 const { isWorking, progressLabel, networkProgressLog } = useProgress();
 const { branches } = useBranches();
 
@@ -21,7 +19,7 @@ function onEscKey(e: KeyboardEvent) {
   }
 }
 
-const logContentRef = ref<HTMLPreElement | null>(null);
+const logContentRef = ref<HTMLElement | null>(null);
 
 watch(logOpen, (open) => {
   if (open) {
@@ -62,9 +60,8 @@ function scrollToBottom() {
     </div>
 
     <div class="statusbar-center">
-      <span v-if="lastError" class="status-message">{{ lastError }}</span>
       <span
-        v-else-if="isWorking || networkProgressLog.length > 0"
+        v-if="isWorking || networkProgressLog.length > 0"
         class="status-message progress"
         :class="{ clickable: networkProgressLog.length > 0 }"
         :title="networkProgressLog.length > 0 ? 'Нажмите для просмотра лога' : undefined"
@@ -94,7 +91,14 @@ function scrollToBottom() {
           <span>Git output</span>
           <button class="progress-log-close" @click="closeLog">✕</button>
         </div>
-        <pre ref="logContentRef" class="progress-log-content">{{ networkProgressLog.join('\n') }}</pre>
+        <div ref="logContentRef" class="progress-log-content">
+          <div
+            v-for="(line, i) in networkProgressLog"
+            :key="i"
+            class="log-line"
+            :class="{ 'log-error': line.isError }"
+          >{{ line.text }}</div>
+        </div>
       </div>
     </Teleport>
   </div>
@@ -281,9 +285,15 @@ function scrollToBottom() {
   line-height: 1.6;
   color: var(--text, #cdd6f4);
   overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
   user-select: text;
   cursor: text;
+}
+
+.log-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.log-line.log-error {
+  color: var(--red);
 }
 </style>

@@ -7,6 +7,9 @@ import { useLog } from "./useLog";
 
 const files = ref<FileStatus[]>([]);
 const selectedFile = ref<string | null>(null);
+// Множественное выделение в FileList (Shift/Ctrl). Общий стейт, чтобы
+// диалоги Commit/Discard могли показывать именно выбранные файлы.
+const selectedPaths = ref<string[]>([]);
 
 // Защита от гонки перекрывающихся refresh: применяем только самый свежий ответ.
 let refreshSeq = 0;
@@ -18,6 +21,7 @@ export function useFiles() {
     if (!repoPath.value) {
       files.value = [];
       selectedFile.value = null;
+      selectedPaths.value = [];
       return;
     }
     const seq = ++refreshSeq;
@@ -118,6 +122,7 @@ export function useFiles() {
   return {
     files,
     selectedFile,
+    selectedPaths,
     refresh,
     stageFiles,
     unstageFiles,

@@ -1,34 +1,22 @@
 import { ref } from "vue";
-import { invoke, networkProgressLog } from "@/composables/useProgress";
+import { invoke, logError } from "@/composables/useProgress";
 import { useRepo } from "./useRepo";
 import { useSettings } from "./useSettings";
 
 const isBusy = ref(false);
-const lastError = ref<string | null>(null);
-
-export interface NetworkError {
-  message: string;
-  log: string[];
-}
-
-const networkError = ref<NetworkError | null>(null);
 
 export function useRemote() {
   const { repoPath } = useRepo();
   const { networkTimeoutSecs } = useSettings();
 
+  // Ошибки сетевых операций уходят в Git output (красным, с авто-открытием
+  // панели) — без модальных окон.
   async function wrapAsync(fn: () => Promise<unknown>) {
     isBusy.value = true;
-    lastError.value = null;
     try {
       await fn();
     } catch (e) {
-      const message = String(e);
-      lastError.value = message;
-      networkError.value = {
-        message,
-        log: [...networkProgressLog.value],
-      };
+      logError(String(e));
     } finally {
       isBusy.value = false;
     }
@@ -69,9 +57,5 @@ export function useRemote() {
     );
   }
 
-  function clearNetworkError() {
-    networkError.value = null;
-  }
-
-  return { isBusy, lastError, networkError, clearNetworkError, fetchRemote, pull, push };
+  return { isBusy, fetchRemote, pull, push };
 }

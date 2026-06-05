@@ -11,7 +11,7 @@ import type { FileStatus } from "@/types";
 const emit = defineEmits<{ close: [] }>();
 
 const { commit: doCommit } = useCommit();
-const { files, stageFiles, unstageFiles, refresh } = useFiles();
+const { files, selectedPaths: fileListSelection, stageFiles, unstageFiles, refresh } = useFiles();
 const { push } = useRemote();
 const { remotes } = useBranches();
 
@@ -22,7 +22,12 @@ const busy = ref(false);
 const { dragStyle, onDragStart } = useDraggable();
 const { i18n } = useI18n();
 
-const changedFiles = computed(() => files.value);
+// Показываем файлы, выбранные в FileList; если выбора нет (или он не
+// пересекается с рабочим деревом — например, выбран коммит) — все файлы.
+const changedFiles = computed(() => {
+  const sel = files.value.filter((f) => fileListSelection.value.includes(f.path));
+  return sel.length > 0 ? sel : files.value;
+});
 
 const selected = ref<Record<string, boolean>>({});
 
@@ -64,11 +69,14 @@ function isStagedLike(f: FileStatus): boolean {
 async function reconcileIndex() {
   const checked = new Set(selectedPaths.value);
 
-  const toUnstage = changedFiles.value
+  // Идём по ВСЕМ файлам, а не только по показанным: git commit фиксирует весь
+  // индекс, поэтому скрытые (не выбранные) staged-файлы нужно снять со stage,
+  // иначе они попадут в коммит.
+  const toUnstage = files.value
     .filter((f) => isStagedLike(f) && !checked.has(f.path))
     .map((f) => f.path);
 
-  const toStage = changedFiles.value
+  const toStage = files.value
     .filter((f) => checked.has(f.path) && !isStagedLike(f))
     .map((f) => f.path);
 
