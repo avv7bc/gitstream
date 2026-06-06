@@ -8,18 +8,18 @@ import { useRepo } from "@/composables/useRepo";
 import { useDiff } from "@/composables/useDiff";
 import { useFileCompare } from "@/composables/useFileCompare";
 import { useSettings } from "@/composables/useSettings";
-import type { FileDiff } from "@/types";
+import type { FileDiff, FileStatus } from "@/types";
 import { highlight } from "@/utils/highlight";
 
 const emit = defineEmits<{ commit: [] }>();
 
 const { i18n } = useI18n();
-const { files, selectedFile, selectedPaths, stageFiles, unstageFiles, discardFiles, removeFiles, deleteFiles } = useFiles();
+const { files, allPaths, selectedFile, selectedPaths, refresh, stageFiles, unstageFiles, discardFiles, removeFiles, deleteFiles } = useFiles();
 const { selectedCommit } = useLog();
 const { repoPath } = useRepo();
 const { diffFile, diffCommit, clearDiff } = useDiff();
 const { open: openCompare } = useFileCompare();
-const { filesTreeView } = useSettings();
+const { filesTreeView, filesShowAll } = useSettings();
 
 const activeFilter = ref<string>("all");
 const fileFilter = ref("");
@@ -157,6 +157,10 @@ onUnmounted(() => {
 // Выключение дерева возвращает список к полному (корень).
 watch(filesTreeView, (on) => { if (!on) selectedDir.value = ""; });
 
+// "Show all files" и дерево требуют полный список файлов рабочей копии —
+// подгружаем/сбрасываем его при переключении любого из режимов.
+watch([filesShowAll, filesTreeView], () => { void refresh(); });
+
 const isWorkingTree = computed(() => !selectedCommit.value || selectedCommit.value === "__worktree__");
 
 // Load commit files when a commit is selected.
@@ -207,9 +211,21 @@ watch([activeFilter, fileFilter], () => {
   selectedDir.value = "";
 });
 
+// "Show all files": к изменённым файлам добавляем неизменённые tracked-файлы
+// (из allPaths, которых нет в status) с состоянием "unchanged".
+const workingFiles = computed<FileStatus[]>(() => {
+  if (!filesShowAll.value || allPaths.value.length === 0) return files.value;
+  const changed = new Set(files.value.map((f) => f.path));
+  const extra: FileStatus[] = allPaths.value
+    .filter((p) => !changed.has(p))
+    .map((p) => ({ path: p, state: "unchanged", staged: "unchanged" }));
+  // Сортируем объединённый список по пути — иначе неизменённые свалятся в конец.
+  return [...files.value, ...extra].sort((a, b) => a.path.localeCompare(b.path));
+});
+
 const filteredFiles = computed(() => {
   if (!isWorkingTree.value) return [];
-  let result = files.value;
+  let result = workingFiles.value;
   if (activeFilter.value === "modified") result = result.filter((f) => f.state === "modified");
   else if (activeFilter.value === "staged") result = result.filter((f) => f.staged === "staged" || f.staged === "partial");
   else if (activeFilter.value === "untracked") result = result.filter((f) => f.state === "untracked");
@@ -258,8 +274,19 @@ interface TreeRow {
   fileCount: number;
 }
 
+// Полный набор путей рабочей копии: tracked (allPaths) ∪ всё из status
+// (untracked и т.п.). Дерево строится из него, поэтому показывает всю
+// структуру папок репозитория, как браузер Files в SmartGit, а не только
+// папки с изменениями.
+const fullWorkingPaths = computed(() => {
+  const set = new Set<string>(allPaths.value);
+  for (const f of files.value) set.add(f.path);
+  return [...set];
+});
+
+// Working tree → полная структура рабочей копии; коммит → файлы коммита.
 const treePaths = computed(() =>
-  (isWorkingTree.value ? filteredFiles.value : filteredCommitFiles.value).map((f) => f.path),
+  isWorkingTree.value ? fullWorkingPaths.value : filteredCommitFiles.value.map((f) => f.path),
 );
 
 const folderRoot = computed<TreeNode>(() => {
@@ -310,6 +337,25 @@ function toggleDir(path: string) {
   collapsedDirs.value = s;
 }
 
+// Все папки с детьми (для collapse all).
+function allDirPaths(): string[] {
+  const out: string[] = [];
+  const walk = (node: TreeNode) => {
+    for (const c of node.children.values()) {
+      if (c.children.size > 0) out.push(c.path);
+      walk(c);
+    }
+  };
+  walk(folderRoot.value);
+  return out;
+}
+function expandAll() {
+  collapsedDirs.value = new Set();
+}
+function collapseAll() {
+  collapsedDirs.value = new Set(allDirPaths());
+}
+
 function selectDir(path: string) {
   selectedDir.value = path;
   // Смена папки делает прежнее выделение/дифф неактуальными для нового списка.
@@ -332,6 +378,7 @@ const stateIcons: Record<string, { color: string; letter: string }> = {
   renamed: { color: "var(--purple)", letter: "R" },
   conflicted: { color: "var(--red)", letter: "C" },
   untracked: { color: "var(--text-muted)", letter: "?" },
+  unchanged: { color: "var(--text-muted)", letter: "·" },
 };
 
 function fileName(path: string): string {
@@ -423,6 +470,17 @@ function compareCommitFile(path: string) {
         />
         <button
           class="tree-toggle"
+          :class="{ active: filesShowAll }"
+          :title="i18n.files.showAllFiles"
+          @click="filesShowAll = !filesShowAll"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+            <path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z" stroke-linejoin="round" />
+            <circle cx="8" cy="8" r="1.8" />
+          </svg>
+        </button>
+        <button
+          class="tree-toggle"
           :class="{ active: filesTreeView }"
           :title="i18n.files.treeView"
           @click="filesTreeView = !filesTreeView"
@@ -451,6 +509,18 @@ function compareCommitFile(path: string) {
       <!-- Дерево папок (слева) -->
       <template v-if="filesTreeView">
         <div class="folder-tree" :style="{ width: treeWidth + 'px' }">
+          <div class="tree-toolbar">
+            <button class="tree-tool-btn" :title="i18n.files.collapseAll" @click="collapseAll">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M4 8h8" stroke-linecap="round" />
+              </svg>
+            </button>
+            <button class="tree-tool-btn" :title="i18n.files.expandAll" @click="expandAll">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M8 4v8M4 8h8" stroke-linecap="round" />
+              </svg>
+            </button>
+          </div>
           <div
             class="tree-row"
             :class="{ selected: selectedDir === '' }"
@@ -458,7 +528,6 @@ function compareCommitFile(path: string) {
           >
             <span class="tree-chevron-spacer" />
             <span class="tree-name">{{ i18n.files.allFiles }}</span>
-            <span class="tree-count">{{ folderRoot.fileCount }}</span>
           </div>
           <div
             v-for="row in visibleTreeRows"
@@ -475,7 +544,6 @@ function compareCommitFile(path: string) {
             >{{ isDirExpanded(row.path) ? '▾' : '▸' }}</span>
             <span v-else class="tree-chevron-spacer" />
             <span class="tree-name" :title="row.path">{{ row.name }}</span>
-            <span class="tree-count">{{ row.fileCount }}</span>
           </div>
         </div>
         <div class="tree-resizer" @mousedown="onResizeStart" />
@@ -686,6 +754,29 @@ function compareCommitFile(path: string) {
   overflow-y: auto;
   overflow-x: hidden;
   border-right: 1px solid var(--border-subtle);
+}
+
+.tree-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  gap: 2px;
+  padding: 2px 4px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.tree-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+}
+.tree-tool-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
 }
 
 .tree-resizer {

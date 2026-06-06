@@ -4,8 +4,11 @@ import type { FileStatus, LineOp, LineHunkSelection } from "@/types";
 import { useRepo } from "./useRepo";
 import { useDiff } from "./useDiff";
 import { useLog } from "./useLog";
+import { useSettings } from "./useSettings";
 
 const files = ref<FileStatus[]>([]);
+// Все отслеживаемые файлы рабочей копии — заполняется только при "Show all files".
+const allPaths = ref<string[]>([]);
 const selectedFile = ref<string | null>(null);
 // Множественное выделение в FileList (Shift/Ctrl). Общий стейт, чтобы
 // диалоги Commit/Discard могли показывать именно выбранные файлы.
@@ -20,15 +23,26 @@ export function useFiles() {
   async function refresh() {
     if (!repoPath.value) {
       files.value = [];
+      allPaths.value = [];
       selectedFile.value = null;
       selectedPaths.value = [];
       return;
     }
+    const { filesShowAll, filesTreeView } = useSettings();
     const seq = ++refreshSeq;
     const data = await invoke<FileStatus[]>("get_status", { repoPath: repoPath.value });
     // Более новый refresh уже стартовал — отбрасываем устаревший ответ.
     if (seq !== refreshSeq) return;
     files.value = data;
+    // Полный список файлов нужен для "Show all files" И для дерева папок
+    // (дерево показывает всю структуру рабочей копии, а не только изменения).
+    if (filesShowAll.value || filesTreeView.value) {
+      const all = await invoke<string[]>("list_all_files", { repoPath: repoPath.value });
+      if (seq !== refreshSeq) return;
+      allPaths.value = all;
+    } else {
+      allPaths.value = [];
+    }
     // В режиме рабочего дерева: если выбранный файл больше не имеет изменений
     // (например, после переключения ветки), сбрасываем устаревший дифф.
     const { selectedCommit } = useLog();
@@ -121,6 +135,7 @@ export function useFiles() {
 
   return {
     files,
+    allPaths,
     selectedFile,
     selectedPaths,
     refresh,

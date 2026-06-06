@@ -58,6 +58,9 @@ export const en: Translations = {
     commitCtx: "Commit…",
     treeView: "Folder tree",
     allFiles: "All files",
+    showAllFiles: "Show all files (including unchanged)",
+    expandAll: "Expand all",
+    collapseAll: "Collapse all",
   },
   repos: {
     title: "Repositories",

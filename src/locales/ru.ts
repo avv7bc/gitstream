@@ -63,6 +63,9 @@ const _ru = {
     commitCtx: "Commit…",
     treeView: "Дерево папок",
     allFiles: "Все файлы",
+    showAllFiles: "Показывать все файлы (включая неизменённые)",
+    expandAll: "Развернуть все",
+    collapseAll: "Свернуть все",
   },
   repos: {
     title: "Repositories",

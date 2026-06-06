@@ -32,6 +32,7 @@ fn main() {
             commands::get_repo_info,
             commands::get_repo_state,
             commands::get_status,
+            commands::list_all_files,
             commands::get_log,
             commands::get_branches,
             commands::get_tags,

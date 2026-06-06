@@ -45,6 +45,8 @@ pub struct AppSettings {
     pub language: String,
     #[serde(default)]
     pub files_tree_view: bool,
+    #[serde(default)]
+    pub files_show_all: bool,
 }
 
 impl Default for AppSettings {
@@ -57,6 +59,7 @@ impl Default for AppSettings {
             editor_font_size: DEFAULT_EDITOR_FONT_SIZE,
             language: DEFAULT_LANGUAGE.to_string(),
             files_tree_view: false,
+            files_show_all: false,
         }
     }
 }

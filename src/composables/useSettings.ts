@@ -10,6 +10,7 @@ interface AppSettings {
   editor_font_size: number;
   language: string;
   files_tree_view: boolean;
+  files_show_all: boolean;
 }
 
 const TIMEOUT_OPTIONS = [5, 10, 20, 30, 60];
@@ -30,6 +31,7 @@ const workbenchFontSize = ref<number>(DEFAULT_WB_FONT_SIZE);
 const editorFontFamily = ref<string>(DEFAULT_ED_FONT_FAMILY);
 const editorFontSize = ref<number>(DEFAULT_ED_FONT_SIZE);
 const filesTreeView = ref<boolean>(false);
+const filesShowAll = ref<boolean>(false);
 
 let loaded = false;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
@@ -73,6 +75,7 @@ function scheduleSave() {
         editor_font_size: editorFontSize.value,
         language: locale.value,
         files_tree_view: filesTreeView.value,
+        files_show_all: filesShowAll.value,
       },
     }).catch(() => {});
   }, 400);
@@ -90,6 +93,7 @@ async function loadSettings() {
     editorFontFamily.value = primaryFont(s.editor_font_family || DEFAULT_ED_FONT_FAMILY);
     editorFontSize.value = clampFontSize(s.editor_font_size, 10, 24, DEFAULT_ED_FONT_SIZE);
     filesTreeView.value = !!s.files_tree_view;
+    filesShowAll.value = !!s.files_show_all;
     if (s.language === "ru" || s.language === "en") {
       setLocale(s.language as Lang);
     }
@@ -118,8 +122,9 @@ watch(editorFontSize, (v) => {
   applyCssFonts(); scheduleSave();
 });
 
-// Дерево папок — простой флаг, без clamp/css-эффектов: сохраняем при изменении.
+// Дерево папок / показ всех файлов — простые флаги: сохраняем при изменении.
 watch(filesTreeView, () => scheduleSave());
+watch(filesShowAll, () => scheduleSave());
 
 void loadSettings();
 
@@ -131,6 +136,7 @@ export function useSettings() {
     editorFontFamily,
     editorFontSize,
     filesTreeView,
+    filesShowAll,
     scheduleSave,
   };
 }

@@ -4,9 +4,12 @@ export type FileState =
   | "deleted"
   | "renamed"
   | "conflicted"
-  | "untracked";
+  | "untracked"
+  // Синтетическое состояние (только на фронте) для режима "Show all files":
+  // tracked-файлы без изменений. Backend такого не присылает.
+  | "unchanged";
 
-export type StagedState = "staged" | "unstaged" | "partial";
+export type StagedState = "staged" | "unstaged" | "partial" | "unchanged";
 
 export interface FileStatus {
   path: string;
