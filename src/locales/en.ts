@@ -61,6 +61,9 @@ export const en: Translations = {
     showAllFiles: "Show all files (including unchanged)",
     expandAll: "Expand all",
     collapseAll: "Collapse all",
+    modified: "Modified",
+    untracked: "Untracked",
+    conflicted: "Conflicted",
   },
   repos: {
     title: "Repositories",

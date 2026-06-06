@@ -28,15 +28,15 @@ export function useFiles() {
       selectedPaths.value = [];
       return;
     }
-    const { filesShowAll, filesTreeView } = useSettings();
+    const { filesShowAll } = useSettings();
     const seq = ++refreshSeq;
     const data = await invoke<FileStatus[]>("get_status", { repoPath: repoPath.value });
     // Более новый refresh уже стартовал — отбрасываем устаревший ответ.
     if (seq !== refreshSeq) return;
     files.value = data;
-    // Полный список файлов нужен для "Show all files" И для дерева папок
-    // (дерево показывает всю структуру рабочей копии, а не только изменения).
-    if (filesShowAll.value || filesTreeView.value) {
+    // Полный список файлов нужен только для "Show all files" (вся структура
+    // рабочей копии). Без него дерево показывает только папки с изменениями.
+    if (filesShowAll.value) {
       const all = await invoke<string[]>("list_all_files", { repoPath: repoPath.value });
       if (seq !== refreshSeq) return;
       allPaths.value = all;

@@ -21,7 +21,26 @@ const { diffFile, diffCommit, clearDiff } = useDiff();
 const { open: openCompare } = useFileCompare();
 const { filesTreeView, filesShowAll } = useSettings();
 
-const activeFilter = ref<string>("all");
+// Фильтры по состоянию файла — независимые тогглы (как в SmartGit).
+// По умолчанию все включены (= показать всё). Состояние персистится в localStorage.
+type StateFilterKey = "modified" | "staged" | "untracked" | "conflicted";
+const STATE_FILTERS_KEY = "gitstream.fileStateFilters";
+function loadStateFilters(): Record<StateFilterKey, boolean> {
+  const def = { modified: true, staged: true, untracked: true, conflicted: true };
+  try {
+    const raw = localStorage.getItem(STATE_FILTERS_KEY);
+    if (raw) return { ...def, ...JSON.parse(raw) };
+  } catch { /* битый JSON → дефолты */ }
+  return def;
+}
+const stateFilters = ref<Record<StateFilterKey, boolean>>(loadStateFilters());
+watch(stateFilters, (v) => {
+  localStorage.setItem(STATE_FILTERS_KEY, JSON.stringify(v));
+}, { deep: true });
+function toggleStateFilter(key: StateFilterKey) {
+  stateFilters.value = { ...stateFilters.value, [key]: !stateFilters.value[key] };
+}
+
 const fileFilter = ref("");
 const commitFiles = ref<FileDiff[]>([]);
 
@@ -30,9 +49,34 @@ const anchorPath = ref<string | null>(null);
 const listBodyRef = ref<HTMLElement | null>(null);
 
 // --- Дерево папок ---
-// Выбранная папка (""=корень/все). Свёрнутые узлы (по умолчанию все раскрыты).
+// Выбранная папка (""=корень/все).
 const selectedDir = ref<string>("");
-const collapsedDirs = ref<Set<string>>(new Set());
+
+// Раскрытые узлы дерева. Модель "expanded" (а не "collapsed"): пустое множество
+// = все папки свёрнуты по умолчанию. Состояние персистится по репозиторию.
+const TREE_EXPANDED_KEY = "gitstream.treeExpanded";
+function loadExpandedDirs(repo: string | null): Set<string> {
+  if (!repo) return new Set();
+  try {
+    const raw = localStorage.getItem(TREE_EXPANDED_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    return new Set<string>(map[repo] || []);
+  } catch {
+    return new Set();
+  }
+}
+const expandedDirs = ref<Set<string>>(loadExpandedDirs(repoPath.value));
+function saveExpandedDirs() {
+  if (!repoPath.value) return;
+  try {
+    const raw = localStorage.getItem(TREE_EXPANDED_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    map[repoPath.value] = [...expandedDirs.value];
+    localStorage.setItem(TREE_EXPANDED_KEY, JSON.stringify(map));
+  } catch { /* localStorage недоступен — не критично */ }
+}
+// Смена репозитория → загрузить сохранённое состояние дерева этого репозитория.
+watch(repoPath, (r) => { expandedDirs.value = loadExpandedDirs(r); });
 
 // Ширина панели дерева — персист в localStorage рядом с layout приложения.
 const TREE_WIDTH_KEY = "gitstream.filesTreeWidth";
@@ -205,11 +249,11 @@ watch(selectedCommit, async (oid) => {
   }
 }, { immediate: true });
 
-watch([activeFilter, fileFilter], () => {
+watch([stateFilters, fileFilter], () => {
   selectedPaths.value = [];
   anchorPath.value = null;
   selectedDir.value = "";
-});
+}, { deep: true });
 
 // "Show all files": к изменённым файлам добавляем неизменённые tracked-файлы
 // (из allPaths, которых нет в status) с состоянием "unchanged".
@@ -223,13 +267,46 @@ const workingFiles = computed<FileStatus[]>(() => {
   return [...files.value, ...extra].sort((a, b) => a.path.localeCompare(b.path));
 });
 
+// Принадлежность файла категории тоггла. modified∪staged покрывают любые
+// tracked-изменения (M/A/D/R), partial попадает в обе категории.
+function fileMatchesCategory(f: FileStatus, key: StateFilterKey): boolean {
+  if (f.state === "unchanged") return false;
+  const isStaged = f.staged === "staged" || f.staged === "partial";
+  const isUnstaged = f.staged === "unstaged" || f.staged === "partial";
+  switch (key) {
+    case "staged": return isStaged;
+    case "modified": return isUnstaged && f.state !== "untracked" && f.state !== "conflicted";
+    case "untracked": return f.state === "untracked";
+    case "conflicted": return f.state === "conflicted";
+  }
+}
+
+function matchesStateFilters(f: FileStatus): boolean {
+  // unchanged-файлы управляются кнопкой "Show all files", а не этими фильтрами.
+  if (f.state === "unchanged") return true;
+  const sf = stateFilters.value;
+  return (sf.staged && fileMatchesCategory(f, "staged"))
+    || (sf.modified && fileMatchesCategory(f, "modified"))
+    || (sf.untracked && fileMatchesCategory(f, "untracked"))
+    || (sf.conflicted && fileMatchesCategory(f, "conflicted"));
+}
+
+// Сколько файлов в каждой категории (по реальным изменениям рабочего дерева) —
+// для disable тогглов, под которые нет файлов.
+const stateCounts = computed<Record<StateFilterKey, number>>(() => {
+  const c: Record<StateFilterKey, number> = { modified: 0, staged: 0, untracked: 0, conflicted: 0 };
+  for (const f of files.value) {
+    if (fileMatchesCategory(f, "staged")) c.staged++;
+    if (fileMatchesCategory(f, "modified")) c.modified++;
+    if (fileMatchesCategory(f, "untracked")) c.untracked++;
+    if (fileMatchesCategory(f, "conflicted")) c.conflicted++;
+  }
+  return c;
+});
+
 const filteredFiles = computed(() => {
   if (!isWorkingTree.value) return [];
-  let result = workingFiles.value;
-  if (activeFilter.value === "modified") result = result.filter((f) => f.state === "modified");
-  else if (activeFilter.value === "staged") result = result.filter((f) => f.staged === "staged" || f.staged === "partial");
-  else if (activeFilter.value === "untracked") result = result.filter((f) => f.state === "untracked");
-  else if (activeFilter.value === "conflicted") result = result.filter((f) => f.state === "conflicted");
+  let result = workingFiles.value.filter(matchesStateFilters);
   const q = fileFilter.value.trim().toLowerCase();
   if (q) {
     result = result.filter((f) => {
@@ -272,22 +349,31 @@ interface TreeRow {
   depth: number;
   hasChildren: boolean;
   fileCount: number;
+  hasChanges: boolean;
 }
 
 // Полный набор путей рабочей копии: tracked (allPaths) ∪ всё из status
-// (untracked и т.п.). Дерево строится из него, поэтому показывает всю
-// структуру папок репозитория, как браузер Files в SmartGit, а не только
-// папки с изменениями.
+// (untracked и т.п.) — вся структура папок репозитория, как браузер Files
+// в SmartGit. Используется, когда включён тоггл "Show all files".
 const fullWorkingPaths = computed(() => {
   const set = new Set<string>(allPaths.value);
   for (const f of files.value) set.add(f.path);
   return [...set];
 });
 
-// Working tree → полная структура рабочей копии; коммит → файлы коммита.
-const treePaths = computed(() =>
-  isWorkingTree.value ? fullWorkingPaths.value : filteredCommitFiles.value.map((f) => f.path),
+// Пути только изменённых файлов (с учётом тогглов состояния) — когда
+// "Show all files" выключен, дерево показывает только папки с изменениями.
+const changedTreePaths = computed(() =>
+  files.value.filter(matchesStateFilters).map((f) => f.path),
 );
+
+// Working tree: "Show all files" вкл → вся структура (структурные папки
+// приглушены), выкл → только папки с изменениями (все подсвечены).
+// Коммит → файлы коммита.
+const treePaths = computed(() => {
+  if (!isWorkingTree.value) return filteredCommitFiles.value.map((f) => f.path);
+  return filesShowAll.value ? fullWorkingPaths.value : changedTreePaths.value;
+});
 
 const folderRoot = computed<TreeNode>(() => {
   const root: TreeNode = { name: "", path: "", children: new Map(), fileCount: 0 };
@@ -311,8 +397,27 @@ const folderRoot = computed<TreeNode>(() => {
   return root;
 });
 
+// Папки, содержащие изменённые файлы (с учётом включённых тогглов состояния) —
+// для подсветки в дереве, как в SmartGit. files.value = реальные изменения
+// рабочего дерева, поэтому добавляем все папки-предки каждого такого файла.
+const changedDirs = computed(() => {
+  const set = new Set<string>();
+  for (const f of files.value) {
+    if (!matchesStateFilters(f)) continue;
+    const parts = f.path.split("/");
+    parts.pop();
+    let acc = "";
+    for (const seg of parts) {
+      acc = acc ? `${acc}/${seg}` : seg;
+      set.add(acc);
+    }
+  }
+  return set;
+});
+const hasAnyChanges = computed(() => files.value.some(matchesStateFilters));
+
 function isDirExpanded(path: string): boolean {
-  return !collapsedDirs.value.has(path);
+  return expandedDirs.value.has(path);
 }
 
 // Плоский список видимых строк дерева (с учётом свёрнутых узлов) — рекурсивный
@@ -322,7 +427,7 @@ const visibleTreeRows = computed<TreeRow[]>(() => {
   const walk = (node: TreeNode, depth: number) => {
     const kids = [...node.children.values()].sort((a, b) => a.name.localeCompare(b.name));
     for (const k of kids) {
-      out.push({ name: k.name, path: k.path, depth, hasChildren: k.children.size > 0, fileCount: k.fileCount });
+      out.push({ name: k.name, path: k.path, depth, hasChildren: k.children.size > 0, fileCount: k.fileCount, hasChanges: changedDirs.value.has(k.path) });
       if (isDirExpanded(k.path)) walk(k, depth + 1);
     }
   };
@@ -331,10 +436,11 @@ const visibleTreeRows = computed<TreeRow[]>(() => {
 });
 
 function toggleDir(path: string) {
-  const s = new Set(collapsedDirs.value);
+  const s = new Set(expandedDirs.value);
   if (s.has(path)) s.delete(path);
   else s.add(path);
-  collapsedDirs.value = s;
+  expandedDirs.value = s;
+  saveExpandedDirs();
 }
 
 // Все папки с детьми (для collapse all).
@@ -350,10 +456,12 @@ function allDirPaths(): string[] {
   return out;
 }
 function expandAll() {
-  collapsedDirs.value = new Set();
+  expandedDirs.value = new Set(allDirPaths());
+  saveExpandedDirs();
 }
 function collapseAll() {
-  collapsedDirs.value = new Set(allDirPaths());
+  expandedDirs.value = new Set();
+  saveExpandedDirs();
 }
 
 function selectDir(path: string) {
@@ -363,13 +471,15 @@ function selectDir(path: string) {
   anchorPath.value = null;
 }
 
-const filters = [
-  { key: "all", label: "All" },
-  { key: "modified", label: "Modified" },
-  { key: "staged", label: "Staged" },
-  { key: "untracked", label: "Untracked" },
-  { key: "conflicted", label: "Conflicted" },
+// Кнопки-тогглы фильтра по состоянию: буквенный бейдж + цвет, как в строках файлов.
+const stateFilterDefs: { key: StateFilterKey; letter: string; color: string; label: string }[] = [
+  { key: "modified", letter: "M", color: "var(--blue)", label: "Modified" },
+  { key: "staged", letter: "S", color: "var(--green)", label: "Staged" },
+  { key: "untracked", letter: "?", color: "var(--text-muted)", label: "Untracked" },
+  { key: "conflicted", letter: "C", color: "var(--red)", label: "Conflicted" },
 ];
+const stateFilterTitle = (key: StateFilterKey, fallback: string): string =>
+  (i18n.value.files as Record<string, string>)[key] || fallback;
 
 const stateIcons: Record<string, { color: string; letter: string }> = {
   modified: { color: "var(--blue)", letter: "M" },
@@ -492,14 +602,16 @@ function compareCommitFile(path: string) {
         </button>
         <div class="filter-tabs">
           <button
-            v-for="f in filters"
+            v-for="f in stateFilterDefs"
             :key="f.key"
-            class="filter-tab"
-            :class="{ active: activeFilter === f.key }"
-            @click="activeFilter = f.key"
-            :title="f.label"
+            class="state-filter"
+            :class="{ active: stateFilters[f.key] }"
+            :style="{ color: f.color }"
+            :disabled="stateCounts[f.key] === 0"
+            @click="toggleStateFilter(f.key)"
+            :title="stateFilterTitle(f.key, f.label)"
           >
-            {{ f.label }}
+            {{ f.letter }}
           </button>
         </div>
       </div>
@@ -523,7 +635,7 @@ function compareCommitFile(path: string) {
           </div>
           <div
             class="tree-row"
-            :class="{ selected: selectedDir === '' }"
+            :class="{ selected: selectedDir === '', 'has-changes': hasAnyChanges }"
             @click="selectDir('')"
           >
             <span class="tree-chevron-spacer" />
@@ -533,7 +645,7 @@ function compareCommitFile(path: string) {
             v-for="row in visibleTreeRows"
             :key="row.path"
             class="tree-row"
-            :class="{ selected: selectedDir === row.path }"
+            :class="{ selected: selectedDir === row.path, 'has-changes': row.hasChanges }"
             :style="{ paddingLeft: row.depth * 14 + 6 + 'px' }"
             @click="selectDir(row.path)"
           >
@@ -702,19 +814,35 @@ function compareCommitFile(path: string) {
   gap: 2px;
 }
 
-.filter-tab {
-  padding: 2px 6px;
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
+/* Тогглы фильтра по состоянию — буквенный бейдж в стиле кнопок тулбара.
+   Выключенный = приглушённый ч/б; включённый = в своём цвете + фон. */
+.state-filter {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
   border-radius: var(--radius);
+  filter: grayscale(1);
+  opacity: 0.4;
 }
-.filter-tab:hover {
+.state-filter:hover {
   background: var(--bg-hover);
-  color: var(--text-secondary);
+  opacity: 0.75;
 }
-.filter-tab.active {
+.state-filter.active {
   background: var(--bg-surface);
-  color: var(--text-primary);
+  filter: none;
+  opacity: 1;
+}
+.state-filter:disabled {
+  opacity: 0.18;
+  cursor: not-allowed;
+  background: none;
+  filter: grayscale(1);
 }
 
 .file-list-main {
@@ -728,6 +856,10 @@ function compareCommitFile(path: string) {
   flex: 1;
   overflow-y: auto;
   outline: none;
+}
+/* В режиме дерева — отступ списка файлов от вертикального разделителя. */
+.file-list-main.split .file-list-body {
+  padding-left: 8px;
 }
 
 /* Folder tree */
@@ -753,7 +885,6 @@ function compareCommitFile(path: string) {
   flex-shrink: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  border-right: 1px solid var(--border-subtle);
 }
 
 .tree-toolbar {
@@ -779,14 +910,18 @@ function compareCommitFile(path: string) {
   color: var(--text-secondary);
 }
 
+/* Видимый вертикальный разделитель + ручка ресайза.
+   Ширина даёт отступ, линия по центру (border) — само разделение. */
 .tree-resizer {
-  width: 4px;
+  width: 9px;
   flex-shrink: 0;
   cursor: col-resize;
   background: transparent;
+  border-left: 1px solid var(--border);
+  margin-left: 8px;
 }
 .tree-resizer:hover {
-  background: var(--bg-hover);
+  border-left-color: var(--accent);
 }
 
 .tree-row {
@@ -815,9 +950,15 @@ function compareCommitFile(path: string) {
 }
 
 .tree-name {
-  color: var(--text-primary);
+  /* "Структурные" папки (без изменений) приглушены... */
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* ...а папки, содержащие изменённые файлы, подсвечены — как в SmartGit. */
+.tree-row.has-changes .tree-name {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .tree-count {

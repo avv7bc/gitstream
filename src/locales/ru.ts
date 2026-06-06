@@ -66,6 +66,9 @@ const _ru = {
     showAllFiles: "Показывать все файлы (включая неизменённые)",
     expandAll: "Развернуть все",
     collapseAll: "Свернуть все",
+    modified: "Изменённые",
+    untracked: "Неотслеживаемые",
+    conflicted: "С конфликтами",
   },
   repos: {
     title: "Repositories",
