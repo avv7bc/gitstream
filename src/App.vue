@@ -43,7 +43,7 @@ const { refresh: refreshBranches, createTag, stashSave } = useBranches();
 const { refresh: refreshLog, selectedCommit, commits, squashCommits, rewordCommit } = useLog();
 const { clearDiff } = useDiff();
 const { pull, push, fetchRemote } = useRemote();
-const { target: compareTarget } = useFileCompare();
+const { target: compareTarget, close: closeFileCompare } = useFileCompare();
 const { refresh: refreshConflicts } = useConflicts();
 const { updateInfo, checkForUpdate } = useUpdate();
 
@@ -236,17 +236,56 @@ function handleAddGroup() {
   repositoriesPanelRef.value?.triggerAddGroup();
 }
 
-// --- Close any open dialog on Esc ---
-const dialogs = [showCommitDialog, showPushDialog, showPullDialog, showCheckoutDialog, showConfirmDialog, showDiscardDialog, showSettingsDialog, showStatsDialog];
+// --- Modal registry + open-order stack: Esc closes the topmost (last opened) ---
+const modalRegistry: { key: string; isOpen: () => boolean; close: () => void }[] = [
+  { key: "commit", isOpen: () => showCommitDialog.value, close: () => { showCommitDialog.value = false; refreshAll(); } },
+  { key: "stashSave", isOpen: () => showStashSaveDialog.value, close: () => { showStashSaveDialog.value = false; } },
+  { key: "push", isOpen: () => showPushDialog.value, close: () => { showPushDialog.value = false; } },
+  { key: "pull", isOpen: () => showPullDialog.value, close: () => { showPullDialog.value = false; } },
+  { key: "checkout", isOpen: () => showCheckoutDialog.value, close: () => { showCheckoutDialog.value = false; } },
+  { key: "checkoutRemote", isOpen: () => !!checkoutRemoteTarget.value, close: () => { checkoutRemoteTarget.value = null; } },
+  { key: "confirm", isOpen: () => showConfirmDialog.value, close: () => { showConfirmDialog.value = false; } },
+  { key: "discard", isOpen: () => showDiscardDialog.value, close: () => { showDiscardDialog.value = false; refreshAll(); } },
+  { key: "settings", isOpen: () => showSettingsDialog.value, close: () => { showSettingsDialog.value = false; } },
+  { key: "stats", isOpen: () => showStatsDialog.value, close: () => { showStatsDialog.value = false; } },
+  { key: "addTag", isOpen: () => showAddTagDialog.value, close: () => { showAddTagDialog.value = false; addTagTarget.value = null; } },
+  { key: "squash", isOpen: () => !!squashPayload.value, close: () => { squashPayload.value = null; } },
+  { key: "reword", isOpen: () => !!rewordPayload.value, close: () => { rewordPayload.value = null; } },
+  { key: "fileCompare", isOpen: () => !!compareTarget.value, close: () => { closeFileCompare(); } },
+];
+
+const modalOpenOrder = ref<string[]>([]);
+watch(
+  () => modalRegistry.map((m) => m.isOpen()),
+  (states) => {
+    modalRegistry.forEach((m, i) => {
+      const idx = modalOpenOrder.value.indexOf(m.key);
+      if (states[i] && idx === -1) modalOpenOrder.value.push(m.key);
+      else if (!states[i] && idx !== -1) modalOpenOrder.value.splice(idx, 1);
+    });
+  },
+);
+
+// Capture phase: runs before per-dialog handlers so the topmost modal swallows Esc.
+function onEscapeCapture(e: KeyboardEvent) {
+  if (e.key !== "Escape") return;
+  // Compute open modals directly — never rely on the tracked stack for the bail-out,
+  // otherwise a stale stack would skip stopPropagation and let every dialog close at once.
+  const open = modalRegistry.filter((m) => m.isOpen());
+  if (open.length === 0) return;
+  // Swallow the event so no other (per-dialog / window) handler closes a second window.
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  // Topmost = most recently opened (tracked order); fall back to last open in registry.
+  let top = open[open.length - 1];
+  for (let i = modalOpenOrder.value.length - 1; i >= 0; i--) {
+    const found = open.find((m) => m.key === modalOpenOrder.value[i]);
+    if (found) { top = found; break; }
+  }
+  top.close();
+}
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === "Escape") {
-    if (checkoutRemoteTarget.value) { checkoutRemoteTarget.value = null; return; }
-    if (showAddTagDialog.value) { showAddTagDialog.value = false; addTagTarget.value = null; return; }
-    for (const d of dialogs) {
-      if (d.value) { d.value = false; return; }
-    }
-  }
   if (e.altKey && e.key === "PageDown") {
     e.preventDefault();
     if (repoPath.value) showPullDialog.value = true;
@@ -255,9 +294,9 @@ function onKeydown(e: KeyboardEvent) {
     e.preventDefault();
     if (repoPath.value) handlePushRequest("origin", false);
   }
-  if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P" || e.code === "KeyP")) {
+  if ((e.ctrlKey || e.metaKey || e.altKey) && !e.shiftKey && e.code === "KeyP") {
     e.preventDefault();
-    showSettingsDialog.value = true;
+    showSettingsDialog.value = !showSettingsDialog.value;
   }
   if (e.key === "F7" && !e.shiftKey) {
     e.preventDefault();
@@ -321,6 +360,7 @@ function onContextMenu(e: MouseEvent) {
 
 onMounted(() => {
   getCurrentWindow().setTitle(`GitStream v${__APP_VERSION__}`);
+  window.addEventListener("keydown", onEscapeCapture, true);
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("contextmenu", onContextMenu);
   restoreLastRepo();
@@ -328,6 +368,7 @@ onMounted(() => {
   checkForUpdate();
 });
 onUnmounted(() => {
+  window.removeEventListener("keydown", onEscapeCapture, true);
   window.removeEventListener("keydown", onKeydown);
   window.removeEventListener("contextmenu", onContextMenu);
   pollStopped = true;
