@@ -236,7 +236,7 @@ function scrollToBottom() {
   bottom: calc(var(--statusbar-height) + 4px);
   left: 50%;
   transform: translateX(-50%);
-  z-index: 9999;
+  z-index: 50;
   width: min(680px, 90vw);
   height: 320px;
   background: var(--panel-bg, #1e1e2e);
