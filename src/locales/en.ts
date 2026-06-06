@@ -56,6 +56,8 @@ export const en: Translations = {
     staged: "Staged",
     partiallyStaged: "Partially staged",
     commitCtx: "Commit…",
+    treeView: "Folder tree",
+    allFiles: "All files",
   },
   repos: {
     title: "Repositories",

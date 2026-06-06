@@ -9,6 +9,7 @@ interface AppSettings {
   editor_font_family: string;
   editor_font_size: number;
   language: string;
+  files_tree_view: boolean;
 }
 
 const TIMEOUT_OPTIONS = [5, 10, 20, 30, 60];
@@ -28,6 +29,7 @@ const workbenchFontFamily = ref<string>(DEFAULT_WB_FONT_FAMILY);
 const workbenchFontSize = ref<number>(DEFAULT_WB_FONT_SIZE);
 const editorFontFamily = ref<string>(DEFAULT_ED_FONT_FAMILY);
 const editorFontSize = ref<number>(DEFAULT_ED_FONT_SIZE);
+const filesTreeView = ref<boolean>(false);
 
 let loaded = false;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
@@ -70,6 +72,7 @@ function scheduleSave() {
         editor_font_family: editorFontFamily.value,
         editor_font_size: editorFontSize.value,
         language: locale.value,
+        files_tree_view: filesTreeView.value,
       },
     }).catch(() => {});
   }, 400);
@@ -86,6 +89,7 @@ async function loadSettings() {
     workbenchFontSize.value = clampFontSize(s.workbench_font_size, 11, 20, DEFAULT_WB_FONT_SIZE);
     editorFontFamily.value = primaryFont(s.editor_font_family || DEFAULT_ED_FONT_FAMILY);
     editorFontSize.value = clampFontSize(s.editor_font_size, 10, 24, DEFAULT_ED_FONT_SIZE);
+    filesTreeView.value = !!s.files_tree_view;
     if (s.language === "ru" || s.language === "en") {
       setLocale(s.language as Lang);
     }
@@ -114,6 +118,9 @@ watch(editorFontSize, (v) => {
   applyCssFonts(); scheduleSave();
 });
 
+// Дерево папок — простой флаг, без clamp/css-эффектов: сохраняем при изменении.
+watch(filesTreeView, () => scheduleSave());
+
 void loadSettings();
 
 export function useSettings() {
@@ -123,6 +130,7 @@ export function useSettings() {
     workbenchFontSize,
     editorFontFamily,
     editorFontSize,
+    filesTreeView,
     scheduleSave,
   };
 }

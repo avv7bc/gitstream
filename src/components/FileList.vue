@@ -7,6 +7,7 @@ import { useLog } from "@/composables/useLog";
 import { useRepo } from "@/composables/useRepo";
 import { useDiff } from "@/composables/useDiff";
 import { useFileCompare } from "@/composables/useFileCompare";
+import { useSettings } from "@/composables/useSettings";
 import type { FileDiff } from "@/types";
 import { highlight } from "@/utils/highlight";
 
@@ -18,6 +19,7 @@ const { selectedCommit } = useLog();
 const { repoPath } = useRepo();
 const { diffFile, diffCommit, clearDiff } = useDiff();
 const { open: openCompare } = useFileCompare();
+const { filesTreeView } = useSettings();
 
 const activeFilter = ref<string>("all");
 const fileFilter = ref("");
@@ -26,6 +28,41 @@ const commitFiles = ref<FileDiff[]>([]);
 const anchorPath = ref<string | null>(null);
 
 const listBodyRef = ref<HTMLElement | null>(null);
+
+// --- Дерево папок ---
+// Выбранная папка (""=корень/все). Свёрнутые узлы (по умолчанию все раскрыты).
+const selectedDir = ref<string>("");
+const collapsedDirs = ref<Set<string>>(new Set());
+
+// Ширина панели дерева — персист в localStorage рядом с layout приложения.
+const TREE_WIDTH_KEY = "gitstream.filesTreeWidth";
+const treeWidth = ref<number>(
+  Math.min(500, Math.max(120, Number(localStorage.getItem(TREE_WIDTH_KEY)) || 200)),
+);
+let resizing = false;
+let resizeStartX = 0;
+let resizeStartW = 0;
+function onResizeMove(e: MouseEvent) {
+  if (!resizing) return;
+  treeWidth.value = Math.max(120, Math.min(500, resizeStartW + (e.clientX - resizeStartX)));
+}
+function onResizeEnd() {
+  resizing = false;
+  document.removeEventListener("mousemove", onResizeMove);
+  document.removeEventListener("mouseup", onResizeEnd);
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+  localStorage.setItem(TREE_WIDTH_KEY, String(treeWidth.value));
+}
+function onResizeStart(e: MouseEvent) {
+  resizing = true;
+  resizeStartX = e.clientX;
+  resizeStartW = treeWidth.value;
+  document.addEventListener("mousemove", onResizeMove);
+  document.addEventListener("mouseup", onResizeEnd);
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+}
 
 const ctxMenu = ref<{ x: number; y: number } | null>(null);
 
@@ -92,8 +129,8 @@ function onListKeydown(e: KeyboardEvent) {
   // (в русской раскладке e.key === "ф", и проверка по букве не сработает).
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.code === "KeyA") {
     const all = isWorkingTree.value
-      ? filteredFiles.value.map((f) => f.path)
-      : filteredCommitFiles.value.map((f) => f.path);
+      ? dirFilteredFiles.value.map((f) => f.path)
+      : dirFilteredCommitFiles.value.map((f) => f.path);
     if (all.length === 0) return;
     e.preventDefault();
     selectedPaths.value = all;
@@ -111,7 +148,14 @@ function onBodyMousedown(e: MouseEvent) {
 }
 
 onMounted(() => window.addEventListener("keydown", onKeydown));
-onUnmounted(() => window.removeEventListener("keydown", onKeydown));
+onUnmounted(() => {
+  window.removeEventListener("keydown", onKeydown);
+  document.removeEventListener("mousemove", onResizeMove);
+  document.removeEventListener("mouseup", onResizeEnd);
+});
+
+// Выключение дерева возвращает список к полному (корень).
+watch(filesTreeView, (on) => { if (!on) selectedDir.value = ""; });
 
 const isWorkingTree = computed(() => !selectedCommit.value || selectedCommit.value === "__worktree__");
 
@@ -126,6 +170,7 @@ let commitFilesSeq = 0;
 watch(selectedCommit, async (oid) => {
   selectedPaths.value = [];
   anchorPath.value = null;
+  selectedDir.value = "";
   // Любая смена выбора в графе (коммит→коммит, коммит→worktree, сброс)
   // делает показанный дифф неактуальным — панель Changes пуста, пока
   // пользователь не кликнет файл нового выбора.
@@ -159,6 +204,7 @@ watch(selectedCommit, async (oid) => {
 watch([activeFilter, fileFilter], () => {
   selectedPaths.value = [];
   anchorPath.value = null;
+  selectedDir.value = "";
 });
 
 const filteredFiles = computed(() => {
@@ -187,7 +233,89 @@ const filteredCommitFiles = computed(() => {
   });
 });
 
-const displayCount = computed(() => isWorkingTree.value ? filteredFiles.value.length : filteredCommitFiles.value.length);
+// --- Фильтрация по выбранной папке (поверх текст-фильтра и табов) ---
+function inSelectedDir(path: string): boolean {
+  if (!filesTreeView.value || !selectedDir.value) return true;
+  return path.startsWith(selectedDir.value + "/");
+}
+const dirFilteredFiles = computed(() => filteredFiles.value.filter((f) => inSelectedDir(f.path)));
+const dirFilteredCommitFiles = computed(() => filteredCommitFiles.value.filter((f) => inSelectedDir(f.path)));
+
+const displayCount = computed(() => isWorkingTree.value ? dirFilteredFiles.value.length : dirFilteredCommitFiles.value.length);
+
+// --- Построение дерева папок из текущего (отфильтрованного) списка ---
+interface TreeNode {
+  name: string;
+  path: string;
+  children: Map<string, TreeNode>;
+  fileCount: number;
+}
+interface TreeRow {
+  name: string;
+  path: string;
+  depth: number;
+  hasChildren: boolean;
+  fileCount: number;
+}
+
+const treePaths = computed(() =>
+  (isWorkingTree.value ? filteredFiles.value : filteredCommitFiles.value).map((f) => f.path),
+);
+
+const folderRoot = computed<TreeNode>(() => {
+  const root: TreeNode = { name: "", path: "", children: new Map(), fileCount: 0 };
+  for (const p of treePaths.value) {
+    const parts = p.split("/");
+    parts.pop(); // имя файла отбрасываем — нужны только директории
+    root.fileCount++;
+    let node = root;
+    let acc = "";
+    for (const seg of parts) {
+      acc = acc ? `${acc}/${seg}` : seg;
+      let child = node.children.get(seg);
+      if (!child) {
+        child = { name: seg, path: acc, children: new Map(), fileCount: 0 };
+        node.children.set(seg, child);
+      }
+      child.fileCount++; // считаем все файлы поддерева (incl. вложенные)
+      node = child;
+    }
+  }
+  return root;
+});
+
+function isDirExpanded(path: string): boolean {
+  return !collapsedDirs.value.has(path);
+}
+
+// Плоский список видимых строк дерева (с учётом свёрнутых узлов) — рекурсивный
+// шаблон не нужен, рендерим flat с отступом по depth.
+const visibleTreeRows = computed<TreeRow[]>(() => {
+  const out: TreeRow[] = [];
+  const walk = (node: TreeNode, depth: number) => {
+    const kids = [...node.children.values()].sort((a, b) => a.name.localeCompare(b.name));
+    for (const k of kids) {
+      out.push({ name: k.name, path: k.path, depth, hasChildren: k.children.size > 0, fileCount: k.fileCount });
+      if (isDirExpanded(k.path)) walk(k, depth + 1);
+    }
+  };
+  walk(folderRoot.value, 1);
+  return out;
+});
+
+function toggleDir(path: string) {
+  const s = new Set(collapsedDirs.value);
+  if (s.has(path)) s.delete(path);
+  else s.add(path);
+  collapsedDirs.value = s;
+}
+
+function selectDir(path: string) {
+  selectedDir.value = path;
+  // Смена папки делает прежнее выделение/дифф неактуальными для нового списка.
+  selectedPaths.value = [];
+  anchorPath.value = null;
+}
 
 const filters = [
   { key: "all", label: "All" },
@@ -217,7 +345,7 @@ function fileDir(path: string): string {
 }
 
 async function selectFile(path: string, e?: MouseEvent) {
-  const list = filteredFiles.value.map((f) => f.path);
+  const list = dirFilteredFiles.value.map((f) => f.path);
   if (e?.shiftKey && anchorPath.value !== null) {
     const a = list.indexOf(anchorPath.value);
     const b = list.indexOf(path);
@@ -245,7 +373,7 @@ async function selectFile(path: string, e?: MouseEvent) {
 }
 
 async function selectCommitFile(path: string, e?: MouseEvent) {
-  const list = filteredCommitFiles.value.map((f) => f.path);
+  const list = dirFilteredCommitFiles.value.map((f) => f.path);
   if (e?.shiftKey && anchorPath.value !== null) {
     const a = list.indexOf(anchorPath.value);
     const b = list.indexOf(path);
@@ -293,6 +421,17 @@ function compareCommitFile(path: string) {
           :placeholder="i18n.files.filter"
           class="file-filter-input"
         />
+        <button
+          class="tree-toggle"
+          :class="{ active: filesTreeView }"
+          :title="i18n.files.treeView"
+          @click="filesTreeView = !filesTreeView"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+            <path d="M2 3h4l1.2 1.5H14V13H2V3z" stroke-linejoin="round" />
+            <path d="M5.5 7.5h6M5.5 10h4" stroke-linecap="round" />
+          </svg>
+        </button>
         <div class="filter-tabs">
           <button
             v-for="f in filters"
@@ -308,20 +447,54 @@ function compareCommitFile(path: string) {
       </div>
     </div>
 
-    <!-- @contextmenu.prevent на контейнере гасит нативное меню браузера на пустой области;
-         меню файла открывается обработчиком на самом .file-item (событие всплывает). -->
-    <div
-      ref="listBodyRef"
-      class="file-list-body"
-      tabindex="-1"
-      @mousedown="onBodyMousedown"
-      @keydown="onListKeydown"
-      @contextmenu.prevent
-    >
+    <div class="file-list-main" :class="{ split: filesTreeView }">
+      <!-- Дерево папок (слева) -->
+      <template v-if="filesTreeView">
+        <div class="folder-tree" :style="{ width: treeWidth + 'px' }">
+          <div
+            class="tree-row"
+            :class="{ selected: selectedDir === '' }"
+            @click="selectDir('')"
+          >
+            <span class="tree-chevron-spacer" />
+            <span class="tree-name">{{ i18n.files.allFiles }}</span>
+            <span class="tree-count">{{ folderRoot.fileCount }}</span>
+          </div>
+          <div
+            v-for="row in visibleTreeRows"
+            :key="row.path"
+            class="tree-row"
+            :class="{ selected: selectedDir === row.path }"
+            :style="{ paddingLeft: row.depth * 14 + 6 + 'px' }"
+            @click="selectDir(row.path)"
+          >
+            <span
+              v-if="row.hasChildren"
+              class="tree-chevron"
+              @click.stop="toggleDir(row.path)"
+            >{{ isDirExpanded(row.path) ? '▾' : '▸' }}</span>
+            <span v-else class="tree-chevron-spacer" />
+            <span class="tree-name" :title="row.path">{{ row.name }}</span>
+            <span class="tree-count">{{ row.fileCount }}</span>
+          </div>
+        </div>
+        <div class="tree-resizer" @mousedown="onResizeStart" />
+      </template>
+
+      <!-- @contextmenu.prevent на контейнере гасит нативное меню браузера на пустой области;
+           меню файла открывается обработчиком на самом .file-item (событие всплывает). -->
+      <div
+        ref="listBodyRef"
+        class="file-list-body"
+        tabindex="-1"
+        @mousedown="onBodyMousedown"
+        @keydown="onListKeydown"
+        @contextmenu.prevent
+      >
       <!-- Working tree files -->
       <template v-if="isWorkingTree">
         <div
-          v-for="file in filteredFiles"
+          v-for="file in dirFilteredFiles"
           :key="file.path"
           class="file-item"
           :class="{ selected: selectedPaths.includes(file.path) }"
@@ -356,7 +529,7 @@ function compareCommitFile(path: string) {
       <!-- Commit files -->
       <template v-else>
         <div
-          v-for="cf in filteredCommitFiles"
+          v-for="cf in dirFilteredCommitFiles"
           :key="cf.path"
           class="file-item"
           :class="{ selected: selectedPaths.includes(cf.path) }"
@@ -372,6 +545,7 @@ function compareCommitFile(path: string) {
           </span>
         </div>
       </template>
+      </div>
     </div>
 
     <Teleport to="body">
@@ -475,10 +649,92 @@ function compareCommitFile(path: string) {
   color: var(--text-primary);
 }
 
+.file-list-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .file-list-body {
   flex: 1;
   overflow-y: auto;
   outline: none;
+}
+
+/* Folder tree */
+.tree-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 5px;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.tree-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+.tree-toggle.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.folder-tree {
+  flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.tree-resizer {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+}
+.tree-resizer:hover {
+  background: var(--bg-hover);
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+.tree-row:hover {
+  background: var(--bg-hover);
+}
+.tree-row.selected {
+  background: var(--bg-surface);
+}
+
+.tree-chevron,
+.tree-chevron-spacer {
+  width: 12px;
+  flex-shrink: 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.tree-name {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-count {
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  flex-shrink: 0;
 }
 
 .file-item {

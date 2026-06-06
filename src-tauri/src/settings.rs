@@ -43,6 +43,8 @@ pub struct AppSettings {
     pub editor_font_size: u8,
     #[serde(default = "default_language")]
     pub language: String,
+    #[serde(default)]
+    pub files_tree_view: bool,
 }
 
 impl Default for AppSettings {
@@ -54,6 +56,7 @@ impl Default for AppSettings {
             editor_font_family: DEFAULT_EDITOR_FONT_FAMILY.to_string(),
             editor_font_size: DEFAULT_EDITOR_FONT_SIZE,
             language: DEFAULT_LANGUAGE.to_string(),
+            files_tree_view: false,
         }
     }
 }

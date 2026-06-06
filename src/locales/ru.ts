@@ -61,6 +61,8 @@ const _ru = {
     staged: "Staged",
     partiallyStaged: "Partially staged",
     commitCtx: "Commit…",
+    treeView: "Дерево папок",
+    allFiles: "Все файлы",
   },
   repos: {
     title: "Repositories",
