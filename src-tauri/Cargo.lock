@@ -1090,7 +1090,7 @@ dependencies = [
 
 [[package]]
 name = "gitstream"
-version = "0.8.13"
+version = "0.8.17"
 dependencies = [
  "base64 0.22.1",
  "reqwest 0.12.28",

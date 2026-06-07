@@ -1,7 +1,7 @@
 import { ref, nextTick } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { RepoStats } from "@/types";
-import { useRepo } from "./useRepo";
+import { useRepo } from "@/composables/useRepo";
 
 export type StatsPeriod = "7d" | "30d" | "1y" | "all";
 

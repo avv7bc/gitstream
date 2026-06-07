@@ -1,7 +1,7 @@
 import { ref } from "vue";
 import { invoke } from "@/composables/useProgress";
 import type { CommitInfo } from "@/types";
-import { useRepo } from "./useRepo";
+import { useRepo } from "@/composables/useRepo";
 
 const PAGE_SIZE = 500;
 

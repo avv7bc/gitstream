@@ -8,8 +8,11 @@ use super::error::{classify_git_error, GitError};
 use super::types::*;
 
 pub fn run_git(repo_path: &Path, args: &[&str]) -> Result<String, GitError> {
+    // core.quotePath=false: иначе git экранирует не-ASCII пути (кириллицу)
+    // октальными escape'ами вида "\320\277...", и они не совпадают с чистым
+    // UTF-8 из `ls-files -z` — ломается список файлов и дерево папок.
     let output = Command::new("git")
-        .arg("-C")
+        .args(["-c", "core.quotePath=false", "-C"])
         .arg(repo_path)
         .args(args)
         .output()
@@ -30,7 +33,7 @@ pub fn run_git(repo_path: &Path, args: &[&str]) -> Result<String, GitError> {
 /// Нужно для `diff --no-index`, который при наличии различий выходит с кодом 1.
 fn run_git_lenient(repo_path: &Path, args: &[&str]) -> String {
     Command::new("git")
-        .arg("-C")
+        .args(["-c", "core.quotePath=false", "-C"])
         .arg(repo_path)
         .args(args)
         .output()
@@ -42,7 +45,7 @@ fn run_git_lenient(repo_path: &Path, args: &[&str]) -> String {
 /// Нужно для бинарных blob'ов (`git show <rev>:<path>`).
 fn run_git_bytes(repo_path: &Path, args: &[&str]) -> Result<Vec<u8>, GitError> {
     let output = Command::new("git")
-        .arg("-C")
+        .args(["-c", "core.quotePath=false", "-C"])
         .arg(repo_path)
         .args(args)
         .output()
@@ -174,7 +177,15 @@ pub fn status(repo_path: &Path) -> Result<Vec<FileStatus>, GitError> {
 /// приходят отдельно через `status` — здесь только tracked, чтобы UI мог
 /// показать неизменённые файлы поверх списка изменений ("Show all files").
 pub fn list_all_files(repo_path: &Path) -> Result<Vec<String>, GitError> {
-    let output = run_git(repo_path, &["ls-files", "-z"])?;
+    // Вся рабочая копия как в браузере Files SmartGit: tracked (--cached) +
+    // untracked (--others), но без игнорируемых (--exclude-standard). Без
+    // --others не видны untracked-файлы внутри untracked-папок — git status
+    // схлопывает такую папку в одну строку `dir/`, и её содержимое в дерево
+    // не попадает, поэтому полная структура папок не строится.
+    let output = run_git(
+        repo_path,
+        &["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+    )?;
     let files = output
         .split('\0')
         .filter(|s| !s.is_empty())
@@ -312,7 +323,7 @@ pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
     // незапушенных коммитов всегда показывает 0.
     let output = Command::new("git")
         .env("LC_ALL", "C")
-        .arg("-C")
+        .args(["-c", "core.quotePath=false", "-C"])
         .arg(repo_path)
         .args(["branch", "-a", &format!("--format={}", format)])
         .output()
@@ -334,17 +345,26 @@ pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
             continue;
         }
         let full_ref = parts[0];
-        let name = parts[1].to_string();
         let symref = parts[2];
         // Любой symbolic ref пропускаем — это alias, не самостоятельная ветка.
         if !symref.is_empty() {
             continue;
         }
+        let is_remote = full_ref.starts_with("refs/remotes/");
+        // Имя берём из полного refname, а не из %(refname:short): для ветки,
+        // чьё имя коллизит с remote (например локальная `origin`), git
+        // дизамбигуирует short-форму в `heads/origin`. Отрезаем известный
+        // префикс сами — так локальная `origin` показывается как `origin`
+        // (поведение SmartGit), а у обычных веток имя не меняется.
+        let name = full_ref
+            .strip_prefix("refs/heads/")
+            .or_else(|| full_ref.strip_prefix("refs/remotes/"))
+            .unwrap_or(parts[1])
+            .to_string();
         // Старая фильтрация на случай вывода `git branch -a` со стрелкой.
         if name.contains("HEAD") && name.contains("->") {
             continue;
         }
-        let is_remote = full_ref.starts_with("refs/remotes/");
         let upstream = if parts[3].is_empty() {
             None
         } else {
@@ -1100,6 +1120,45 @@ mod status_untracked_tests {
         assert!(
             files.iter().all(|f| !f.path.ends_with('/')),
             "каталог не должен попадать в список одной записью: {:?}",
+            paths
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // git status по умолчанию (core.quotePath=true) экранирует не-ASCII пути
+    // октальными escape'ами ("\320\277..."), и они не совпадают с чистым UTF-8
+    // из `ls-files -z` — ломается список файлов и дерево папок в репозиториях
+    // с кириллицей. status() передаёт core.quotePath=false → путь как есть.
+    #[test]
+    fn modified_cyrillic_path_is_verbatim_utf8() {
+        let dir = std::env::temp_dir()
+            .join(format!("gitstream_status_cyr_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "-q"]);
+        git(&dir, &["config", "user.email", "t@t.t"]);
+        git(&dir, &["config", "user.name", "t"]);
+
+        let sub = dir.join("папка").join("вложенная");
+        fs::create_dir_all(&sub).unwrap();
+        let file = sub.join("файл.txt");
+        fs::write(&file, "1\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "seed"]);
+        fs::write(&file, "1\n2\n").unwrap();
+
+        let files = status(&dir).unwrap();
+        let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
+
+        assert!(
+            paths.contains(&"папка/вложенная/файл.txt"),
+            "ожидался чистый UTF-8 путь, получено: {:?}",
+            paths
+        );
+        assert!(
+            files.iter().all(|f| !f.path.contains('\\')),
+            "путь не должен содержать escape'ов: {:?}",
             paths
         );
 

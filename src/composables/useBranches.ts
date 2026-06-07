@@ -1,8 +1,8 @@
 import { ref } from "vue";
 import { invoke } from "@/composables/useProgress";
 import type { BranchInfo, TagInfo, StashEntry } from "@/types";
-import { useRepo } from "./useRepo";
-import { useSettings } from "./useSettings";
+import { useRepo } from "@/composables/useRepo";
+import { useSettings } from "@/composables/useSettings";
 
 const branches = ref<BranchInfo[]>([]);
 const tags = ref<TagInfo[]>([]);

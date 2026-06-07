@@ -1,7 +1,7 @@
 import { ref } from "vue";
 import { invoke, logError } from "@/composables/useProgress";
-import { useRepo } from "./useRepo";
-import { useSettings } from "./useSettings";
+import { useRepo } from "@/composables/useRepo";
+import { useSettings } from "@/composables/useSettings";
 
 const isBusy = ref(false);
 

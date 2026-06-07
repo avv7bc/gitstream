@@ -1,5 +1,5 @@
 import { invoke } from "@/composables/useProgress";
-import { useRepo } from "./useRepo";
+import { useRepo } from "@/composables/useRepo";
 
 export function useCommit() {
   const { repoPath } = useRepo();

@@ -572,23 +572,6 @@ function compareCommitFile(path: string) {
         <span class="files-hidden">{{ displayCount }} files</span>
       </div>
       <div class="header-right">
-        <input
-          v-model="fileFilter"
-          type="text"
-          :placeholder="i18n.files.filter"
-          class="file-filter-input"
-        />
-        <button
-          class="tree-toggle"
-          :class="{ active: filesShowAll }"
-          :title="i18n.files.showAllFiles"
-          @click="filesShowAll = !filesShowAll"
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
-            <path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z" stroke-linejoin="round" />
-            <circle cx="8" cy="8" r="1.8" />
-          </svg>
-        </button>
         <button
           class="tree-toggle"
           :class="{ active: filesTreeView }"
@@ -600,6 +583,23 @@ function compareCommitFile(path: string) {
             <path d="M5.5 7.5h6M5.5 10h4" stroke-linecap="round" />
           </svg>
         </button>
+        <button
+          class="tree-toggle"
+          :class="{ active: filesShowAll }"
+          :title="i18n.files.showAllFiles"
+          @click="filesShowAll = !filesShowAll"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+            <path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z" stroke-linejoin="round" />
+            <circle cx="8" cy="8" r="1.8" />
+          </svg>
+        </button>
+        <input
+          v-model="fileFilter"
+          type="text"
+          :placeholder="i18n.files.filter"
+          class="file-filter-input"
+        />
         <div class="filter-tabs">
           <button
             v-for="f in stateFilterDefs"

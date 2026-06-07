@@ -1,10 +1,10 @@
 import { ref } from "vue";
 import { invoke } from "@/composables/useProgress";
 import type { FileStatus, LineOp, LineHunkSelection } from "@/types";
-import { useRepo } from "./useRepo";
-import { useDiff } from "./useDiff";
-import { useLog } from "./useLog";
-import { useSettings } from "./useSettings";
+import { useRepo } from "@/composables/useRepo";
+import { useDiff } from "@/composables/useDiff";
+import { useLog } from "@/composables/useLog";
+import { useSettings } from "@/composables/useSettings";
 
 const files = ref<FileStatus[]>([]);
 // Все отслеживаемые файлы рабочей копии — заполняется только при "Show all files".

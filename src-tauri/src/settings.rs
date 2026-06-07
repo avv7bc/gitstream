@@ -147,6 +147,8 @@ mod tests {
             editor_font_family: DEFAULT_EDITOR_FONT_FAMILY.to_string(),
             editor_font_size: DEFAULT_EDITOR_FONT_SIZE,
             language: DEFAULT_LANGUAGE.to_string(),
+            files_tree_view: false,
+            files_show_all: false,
         };
         write_settings_at(&p, &s).unwrap();
         let back = read_settings_at(&p);
@@ -197,6 +199,8 @@ mod tests {
             editor_font_family: "Fira Code, monospace".to_string(),
             editor_font_size: 16,
             language: DEFAULT_LANGUAGE.to_string(),
+            files_tree_view: false,
+            files_show_all: false,
         };
         write_settings_at(&p, &s).unwrap();
         let back = read_settings_at(&p);

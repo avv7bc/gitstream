@@ -1,7 +1,7 @@
 import { ref } from "vue";
 import { invoke } from "@/composables/useProgress";
 import type { FileDiff } from "@/types";
-import { useRepo } from "./useRepo";
+import { useRepo } from "@/composables/useRepo";
 
 const currentDiff = ref<FileDiff | null>(null);
 // Контекст текущего диффа — определяет, какие операции с хунками доступны.

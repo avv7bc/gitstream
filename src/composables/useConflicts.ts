@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { invoke } from "@/composables/useProgress";
-import { useRepo } from "./useRepo";
+import { useRepo } from "@/composables/useRepo";
 
 export type RepoState =
   | "clean"
