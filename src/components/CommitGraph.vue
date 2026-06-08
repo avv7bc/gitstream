@@ -424,20 +424,10 @@ function isAboveHead(idx: number): boolean {
   return hi > 0 && idx < hi;
 }
 
-// «Unpushed» — коммиты, которые есть локально на HEAD, но ещё не запушены
-// в upstream. Берём `ahead` из текущей ветки и помечаем подряд идущие
-// коммиты в lane HEAD, начиная с самого HEAD. С `git log --all` старая
-// логика «всё до первого remote-ref-а» больше не работает — remote-ref
-// теперь чаще всего наверху.
-function isUnpushed(idx: number): boolean {
-  const ahead = currentBranch.value?.ahead ?? 0;
-  if (ahead <= 0) return false;
-  const hi = headIdx.value;
-  if (hi < 0) return false;
-  if (idx < hi || idx >= hi + ahead) return false;
-  const headCol = filteredCommits.value[hi]?.column;
-  return headCol !== undefined && filteredCommits.value[idx]?.column === headCol;
-}
+// «Unpushed» (исходящие, не запушенные) коммиты приходят с бэкенда флагом
+// `commit.unpushed` — `git rev-list --branches --not --remotes`. Это надёжнее
+// прежней фронтовой эвристики по `ahead`+колонке: корректно при мержах,
+// нескольких ветках и любом порядке лога.
 
 const maxAuthorLen = computed(() => {
   let m = 0;
@@ -566,7 +556,7 @@ function formatDate(iso: string): string {
 
         <div
           class="graph-row"
-          :class="{ selected: selectedCommit === commit.oid, unpushed: isUnpushed(idx), 'above-head': isAboveHead(idx), 'in-range': selectedOids.includes(commit.oid) && selectedOids.length > 1 }"
+          :class="{ selected: selectedCommit === commit.oid, 'above-head': isAboveHead(idx), 'in-range': selectedOids.includes(commit.oid) && selectedOids.length > 1 }"
           @mousedown.shift.prevent
           @click="handleCommitClick(commit.oid, $event)"
           @contextmenu="onContextMenu($event, commit.oid)"
@@ -596,15 +586,15 @@ function formatDate(iso: string): string {
               stroke-width="2"
               fill="none"
             />
-            <!-- Незапушенный коммит — hollow кружок с контуром --unpushed
-                 (отдельный per-theme токен янтаря). Размер и стиль как у
-                 обычного, отличие только в цвете обводки. -->
+            <!-- Незапушенный («исходящий») коммит — залитый кружок цветом
+                 --unpushed (per-theme янтарь), как в SmartGit. Запушенные —
+                 полые кружки в цвете своего lane. -->
             <circle
               :cx="laneX(commit.column)"
               cy="12"
               r="4"
-              fill="var(--bg-primary)"
-              :stroke="isUnpushed(idx) ? 'var(--unpushed)' : laneColor(commit.column)"
+              :fill="commit.unpushed ? 'var(--unpushed)' : 'var(--bg-primary)'"
+              :stroke="commit.unpushed ? 'var(--unpushed)' : laneColor(commit.column)"
               stroke-width="2"
             />
           </svg>
@@ -780,7 +770,9 @@ function formatDate(iso: string): string {
 .graph-row.in-range {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
-/* Незапушенные коммиты помечаются жёлтым кружком в графе — текст не трогаем. */
+/* Незапушенные («исходящие») коммиты помечаются залитым янтарным кружком
+   в графе (см. <circle> в шаблоне) — фон/текст строки не трогаем. */
+/* Коммиты выше HEAD: история только с remote-ов, приглушаем. */
 /* Коммиты выше HEAD: история только с remote-ов, приглушаем. */
 .graph-row.above-head .commit-message,
 .graph-row.above-head .author-col,

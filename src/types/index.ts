@@ -28,6 +28,7 @@ export interface CommitInfo {
   refs: RefLabel[];
   column: number;
   lines: GraphLine[];
+  unpushed: boolean;
 }
 
 export interface RefLabel {

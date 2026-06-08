@@ -25,6 +25,9 @@ pub struct CommitInfo {
     pub refs: Vec<RefLabel>,
     pub column: u32,
     pub lines: Vec<GraphLine>,
+    /// Коммит достижим из локальных веток, но ещё не из remote-ов — «исходящий»,
+    /// не запушенный. Для подсветки строки в графе (в стиле SmartGit).
+    pub unpushed: bool,
 }
 
 #[derive(Serialize, Clone, Debug)]

@@ -116,6 +116,7 @@ mod tests {
             refs: Vec::new(),
             column: 0,
             lines: Vec::new(),
+            unpushed: false,
         }
     }
 

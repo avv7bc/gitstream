@@ -234,7 +234,10 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
     // живые лишь из-за тега (после squash/amend в ветке), рисуются паразитной
     // отдельной веткой. Теги на достижимых коммитах всё равно показываются
     // как ref-лейблы. HEAD добавляем явно ради detached-режима.
-    // --date-order: согласованный порядок при ветвлении нескольких refs.
+    // --topo-order: коммиты одной ветки идут подряд, не перемешиваясь по дате
+    // с коммитами других веток (как --date-order). Это даёт чистый граф в
+    // стиле SmartGit/gitk: лейн смерженной ветки не «зигзагует» через mainline,
+    // а тянется сплошным столбцом справа до своего мержа.
     let output = run_git(
         repo_path,
         &[
@@ -242,7 +245,7 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
             "--branches",
             "--remotes",
             "HEAD",
-            "--date-order",
+            "--topo-order",
             &format!("--format={}", format),
             &limit_str,
         ],
@@ -250,6 +253,19 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
     // Список remote'ов нужен parse_ref_labels: иначе локальные ветки
     // вида `feature/auth` неотличимы от `origin/main` (в %D обе со слешем).
     let remotes_list = remotes(repo_path).unwrap_or_default();
+    // Незапушенные («исходящие») коммиты: достижимы из локальных веток, но не
+    // из какого-либо remote-tracking ref-а. `rev-list --branches --not
+    // --remotes` отдаёт ровно их (корректно при мержах и нескольких ветках,
+    // в отличие от фронтовой эвристики по ahead). Нет remote'ов → список пуст,
+    // тогда не запушено всё — это и есть правда.
+    let unpushed: std::collections::HashSet<String> =
+        run_git(repo_path, &["rev-list", "--branches", "--not", "--remotes"])
+            .map(|o| {
+                o.split_whitespace()
+                    .map(|s| s.to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
     let mut commits = Vec::new();
     for record in output.split('\x1e') {
         if record.is_empty() {
@@ -273,6 +289,7 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
             refs,
             column: 0,
             lines: Vec::new(),
+            unpushed: unpushed.contains(parts[0]),
         });
     }
     super::graph::assign_lanes(&mut commits);
