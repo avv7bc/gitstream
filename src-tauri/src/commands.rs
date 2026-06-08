@@ -167,6 +167,11 @@ pub fn list_all_files(repo_path: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+pub fn list_files_at(repo_path: String, oid: String) -> Result<Vec<String>, String> {
+    query::list_files_at(Path::new(&repo_path), &oid).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_log(repo_path: String, limit: Option<usize>) -> Result<Vec<CommitInfo>, String> {
     let path = PathBuf::from(repo_path);
     tokio::task::spawn_blocking(move || {

@@ -194,6 +194,31 @@ pub fn list_all_files(repo_path: &Path) -> Result<Vec<String>, GitError> {
     Ok(files)
 }
 
+/// Все файлы дерева конкретного коммита (`git ls-tree -r`). Нужно для тоггла
+/// "Show all files" при выбранном коммите: к изменённым файлам коммита
+/// добавляются неизменённые (присутствовавшие в дереве, но не затронутые им) —
+/// симметрично list_all_files для рабочей копии.
+pub fn list_files_at(repo_path: &Path, oid: &str) -> Result<Vec<String>, GitError> {
+    let output = run_git(
+        repo_path,
+        &[
+            "-c",
+            "core.quotepath=false",
+            "ls-tree",
+            "-r",
+            "--name-only",
+            "-z",
+            oid,
+        ],
+    )?;
+    let files = output
+        .split('\0')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
+    Ok(files)
+}
+
 pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> {
     // Пустой репозиторий (`git init` без коммитов): HEAD ещё не существует,
     // `git log` падает с кодом 128. Это не ошибка — лог просто пуст.

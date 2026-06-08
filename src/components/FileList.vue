@@ -43,6 +43,8 @@ function toggleStateFilter(key: StateFilterKey) {
 
 const fileFilter = ref("");
 const commitFiles = ref<FileDiff[]>([]);
+// Все файлы дерева выбранного коммита — заполняется только при "Show all files".
+const commitAllPaths = ref<string[]>([]);
 
 const anchorPath = ref<string | null>(null);
 
@@ -203,7 +205,30 @@ watch(filesTreeView, (on) => { if (!on) selectedDir.value = ""; });
 
 // "Show all files" и дерево требуют полный список файлов рабочей копии —
 // подгружаем/сбрасываем его при переключении любого из режимов.
-watch([filesShowAll, filesTreeView], () => { void refresh(); });
+watch([filesShowAll, filesTreeView], () => {
+  void refresh();
+  // Для выбранного коммита тоггл тоже переключает полное/изменённое дерево.
+  const oid = selectedCommit.value;
+  if (oid && oid !== "__worktree__") {
+    if (filesShowAll.value) void loadCommitTree(oid, commitFilesSeq);
+    else commitAllPaths.value = [];
+  }
+});
+
+// Загрузка полного дерева файлов коммита (для "Show all files"). seq —
+// текущий commitFilesSeq на момент запроса: применяем результат, только если
+// выбор коммита с тех пор не сменился.
+async function loadCommitTree(oid: string, seq: number) {
+  if (!filesShowAll.value || !repoPath.value) return;
+  try {
+    const all = await invoke<string[]>("list_files_at", { repoPath: repoPath.value, oid });
+    if (seq !== commitFilesSeq) return;
+    commitAllPaths.value = all;
+  } catch {
+    if (seq !== commitFilesSeq) return;
+    commitAllPaths.value = [];
+  }
+}
 
 const isWorkingTree = computed(() => !selectedCommit.value || selectedCommit.value === "__worktree__");
 
@@ -227,9 +252,16 @@ watch(selectedCommit, async (oid) => {
   if (!oid || oid === "__worktree__" || !repoPath.value) {
     commitFilesSeq++;
     commitFiles.value = [];
+    commitAllPaths.value = [];
     return;
   }
   const seq = ++commitFilesSeq;
+  // Полное дерево коммита нужно только для "Show all files". НЕ сбрасываем
+  // commitAllPaths в [] до прихода нового списка: иначе дерево на миг
+  // схлопывается до изменённых файлов и «дёргается». Между соседними
+  // коммитами список файлов почти не меняется — старое дерево держится
+  // стабильным, пока loadCommitTree (с защитой по seq) не заменит его.
+  void loadCommitTree(oid, seq);
   try {
     const data = await invoke<FileDiff[]>("get_diff_commit", { repoPath: repoPath.value, oid });
     if (seq !== commitFilesSeq) return;
@@ -317,10 +349,28 @@ const filteredFiles = computed(() => {
   return result;
 });
 
+// Пути файлов, реально изменённых в коммите — для отличия от неизменённых
+// (добавляемых тогглом "Show all files") при рендере бейджа и статистики.
+const commitChangedPaths = computed(() => new Set(commitFiles.value.map((f) => f.path)));
+
+// "Show all files" для коммита: к изменённым файлам добавляем все остальные
+// файлы дерева коммита как неизменённые (пустой дифф). Симметрично workingFiles.
+const commitFilesDisplay = computed<FileDiff[]>(() => {
+  if (!filesShowAll.value || commitAllPaths.value.length === 0) return commitFiles.value;
+  const changed = commitChangedPaths.value;
+  const extra: FileDiff[] = commitAllPaths.value
+    .filter((p) => !changed.has(p))
+    .map((p) => ({
+      path: p, hunks: [], insertions: 0, deletions: 0, header: "",
+      binary: false, old_image: null, new_image: null, byte_size: null,
+    }));
+  return [...commitFiles.value, ...extra].sort((a, b) => a.path.localeCompare(b.path));
+});
+
 const filteredCommitFiles = computed(() => {
   const q = fileFilter.value.trim().toLowerCase();
-  if (!q) return commitFiles.value;
-  return commitFiles.value.filter((f) => {
+  if (!q) return commitFilesDisplay.value;
+  return commitFilesDisplay.value.filter((f) => {
     const hay = `${f.path} ${f.insertions} ${f.deletions}`.toLowerCase();
     return hay.includes(q);
   });
@@ -716,10 +766,13 @@ function compareCommitFile(path: string) {
           @click="selectCommitFile(cf.path, $event)"
           @dblclick="compareCommitFile(cf.path)"
         >
-          <span class="state-badge" :style="{ color: 'var(--blue)' }">M</span>
+          <span
+            class="state-badge"
+            :style="{ color: commitChangedPaths.has(cf.path) ? 'var(--blue)' : 'var(--text-muted)' }"
+          >{{ commitChangedPaths.has(cf.path) ? 'M' : '·' }}</span>
           <span class="file-name" v-html="highlight(fileName(cf.path), fileFilter)" />
           <span class="file-dir" v-html="highlight(fileDir(cf.path), fileFilter)" />
-          <span class="file-stats">
+          <span v-if="commitChangedPaths.has(cf.path)" class="file-stats">
             <span class="stat-add">+{{ cf.insertions }}</span>
             <span class="stat-del">-{{ cf.deletions }}</span>
           </span>
