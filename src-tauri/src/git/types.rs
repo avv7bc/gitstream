@@ -43,6 +43,8 @@ pub struct BranchInfo {
     pub ahead: u32,
     pub behind: u32,
     pub is_current: bool,
+    /// Автор tip-коммита ветки — ближайшее доступное приближение «кто создал ветку».
+    pub author: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]

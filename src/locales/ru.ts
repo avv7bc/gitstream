@@ -28,6 +28,7 @@ const _ru = {
     title: "Branches",
     localBranches: "Local Branches",
     remoteBranches: "Remote Branches",
+    author: "Автор",
     tags: "Tags",
     stashes: "Stashes",
     filter: "Filter...",

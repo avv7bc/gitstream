@@ -23,6 +23,7 @@ export const en: Translations = {
     title: "Branches",
     localBranches: "Local Branches",
     remoteBranches: "Remote Branches",
+    author: "Author",
     tags: "Tags",
     stashes: "Stashes",
     filter: "Filter...",

@@ -12,6 +12,14 @@ import type { BranchInfo, TagInfo, StashEntry } from "@/types";
 import { useI18n } from "@/composables/useI18n";
 const { i18n } = useI18n();
 
+// Текст подсказки для ветки: имя + автор tip-коммита (ближайшее, что Git даёт
+// о «создателе» ветки).
+function branchTooltip(branch: BranchInfo): string {
+  const lines = [branch.name];
+  if (branch.author) lines.push(`${i18n.value.branches.author}: ${branch.author}`);
+  return lines.join("\n");
+}
+
 const emit = defineEmits<{
   checkoutRemote: [remoteBranch: string];
   checkedOut: [];
@@ -658,6 +666,7 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
             :key="branch.name"
             class="branch-item"
             :class="{ current: branch.is_current, selected: selectedKeys.has(`local:${branch.name}`) }"
+            v-tooltip="branchTooltip(branch)"
             @mousedown="selectItem(`local:${branch.name}`, $event)"
             @dblclick="handleLocalDblClick(branch)"
             @contextmenu="onBranchContextMenu($event, branch)"
@@ -694,6 +703,7 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
             :key="branch.name"
             class="branch-item"
             :class="{ selected: selectedKeys.has(`remote:${branch.name}`) }"
+            v-tooltip="branchTooltip(branch)"
             @mousedown="selectItem(`remote:${branch.name}`, $event)"
             @dblclick="emit('checkoutRemote', branch.name)"
             @contextmenu="onRemoteBranchContextMenu($event, branch)"

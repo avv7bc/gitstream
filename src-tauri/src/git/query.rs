@@ -342,7 +342,10 @@ pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
     // настоящую ветку и засоряют список (а %(refname:short) у них к тому
     // же возвращает просто `origin`, что коллизит с реальной локальной
     // веткой по имени `origin`).
-    let format = "%(refname)%00%(refname:short)%00%(symref)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)";
+    // %(authorname) — автор коммита, на который указывает ветка. Git не хранит
+    // «кто создал ветку», поэтому автора tip-коммита используем как ближайшее
+    // приближение (так же показывают SmartGit/GitKraken).
+    let format = "%(refname)%00%(refname:short)%00%(symref)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)%00%(authorname)";
     // LC_ALL=C: `%(upstream:track)` git локализует ("впереди 1" в ru) —
     // парсер ahead/behind понимает только английский, иначе индикатор
     // незапушенных коммитов всегда показывает 0.
@@ -365,8 +368,8 @@ pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
         if line.is_empty() {
             continue;
         }
-        let parts: Vec<&str> = line.splitn(6, '\0').collect();
-        if parts.len() < 6 {
+        let parts: Vec<&str> = line.splitn(7, '\0').collect();
+        if parts.len() < 7 {
             continue;
         }
         let full_ref = parts[0];
@@ -397,6 +400,11 @@ pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
         };
         let (ahead, behind) = parse_track(parts[4]);
         let is_current = parts[5].trim() == "*";
+        let author = if parts[6].is_empty() {
+            None
+        } else {
+            Some(parts[6].to_string())
+        };
         result.push(BranchInfo {
             name,
             is_remote,
@@ -404,6 +412,7 @@ pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
             ahead,
             behind,
             is_current,
+            author,
         });
     }
     Ok(result)

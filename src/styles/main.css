@@ -390,3 +390,26 @@ mark.hl {
   background: rgba(243, 156, 18, 0.35);
   color: var(--text-primary);
 }
+
+/* VSCode-style tooltip (директива v-tooltip) */
+.vscode-tooltip {
+  position: fixed;
+  z-index: 10000;
+  max-width: 360px;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-primary);
+  background: var(--bg-tooltip, var(--bg-elevated, #252526));
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  white-space: pre-wrap;
+  word-break: break-word;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+.vscode-tooltip.visible {
+  opacity: 1;
+}

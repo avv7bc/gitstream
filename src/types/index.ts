@@ -49,6 +49,7 @@ export interface BranchInfo {
   ahead: number;
   behind: number;
   is_current: boolean;
+  author: string | null;
 }
 
 export interface TagInfo {
