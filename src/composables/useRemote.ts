@@ -22,12 +22,13 @@ export function useRemote() {
     }
   }
 
-  async function fetchRemote(remote: string) {
+  async function fetchRemote(remote: string, prune = false) {
     if (!repoPath.value) return;
     await wrapAsync(() =>
       invoke("do_fetch", {
         repoPath: repoPath.value!,
         remote,
+        prune,
         timeoutSecs: networkTimeoutSecs.value,
       })
     );

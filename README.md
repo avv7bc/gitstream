@@ -40,7 +40,9 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 ### Remote operations
 - **Pull** — merge or rebase, with remote selection; upstream configured automatically
 - **Push** — always sets upstream on first push; force push with confirmation
-- **Fetch** — fetch without integrating
+- **Fetch** — fetch without integrating; **Fetch --prune** to drop deleted remote branches
+- **Remote management** — add / edit URL / rename / remove remotes (Remotes section in the Branches panel)
+- **Set upstream** — pick the tracking branch for a local branch (or unset it)
 - Network progress indicator with remote name and timeout countdown
 - Configurable network timeout
 

@@ -207,6 +207,36 @@ pub fn get_remote_urls(repo_path: String) -> Result<Vec<RemoteInfo>, String> {
 }
 
 #[tauri::command]
+pub fn add_remote(repo_path: String, name: String, url: String) -> Result<(), String> {
+    mutation::add_remote(Path::new(&repo_path), &name, &url).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn remove_remote(repo_path: String, name: String) -> Result<(), String> {
+    mutation::remove_remote(Path::new(&repo_path), &name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn rename_remote(repo_path: String, old_name: String, new_name: String) -> Result<(), String> {
+    mutation::rename_remote(Path::new(&repo_path), &old_name, &new_name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_remote_url(repo_path: String, name: String, url: String) -> Result<(), String> {
+    mutation::set_remote_url(Path::new(&repo_path), &name, &url).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_branch_upstream(
+    repo_path: String,
+    branch: String,
+    upstream: Option<String>,
+) -> Result<(), String> {
+    mutation::set_branch_upstream(Path::new(&repo_path), &branch, upstream.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_diff_file(
     repo_path: String,
     file: String,
@@ -386,9 +416,10 @@ pub async fn do_fetch(
     app: tauri::AppHandle,
     repo_path: String,
     remote: String,
+    prune: Option<bool>,
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
-    let args = mutation::fetch_args(&remote);
+    let args = mutation::fetch_args(&remote, prune.unwrap_or(false));
     run_network_git(
         &app,
         Some(Path::new(&repo_path)),

@@ -120,7 +120,9 @@ src-tauri/src/                # Rust backend
 - **Ctrl+A** — выделить все файлы в FileList (working tree и commit-файлы)
 - Commit (с amend), Reword (HEAD — amend; не-HEAD — rebase -i со сценарным редактором)
 - Squash нескольких коммитов в один
-- Push / Pull / Fetch (с диалогами выбора remote, таймаут сетевых операций, индикатор remote + обратный отсчёт)
+- Push / Pull / Fetch (с диалогами выбора remote, таймаут сетевых операций, индикатор remote + обратный отсчёт); Fetch --prune
+- **Управление remote** — add / edit-url / rename / remove (секция Remotes в BranchPanel + контекстное меню)
+- **Set upstream** — выбор tracking-ветки для локальной ветки (или снятие трекинга)
 - Checkout branch (локальная + remote-ветка с созданием локальной)
 - Merge ветки
 - Rebase ветки на ветку (с continue/abort через ConflictBar)

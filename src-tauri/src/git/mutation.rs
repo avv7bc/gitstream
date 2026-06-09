@@ -62,6 +62,39 @@ fn validate_ref_name(name: &str) -> Result<(), GitError> {
     Ok(())
 }
 
+fn validate_remote_name(name: &str) -> Result<(), GitError> {
+    if name.is_empty() {
+        return Err(GitError::CommandFailed {
+            message: "Remote name cannot be empty".into(),
+            hint: None,
+        });
+    }
+    if name.starts_with('-') || name.contains(|c: char| c.is_whitespace() || c == '/') {
+        return Err(GitError::CommandFailed {
+            message: format!("Invalid remote name: '{}'", name),
+            hint: Some("Имя remote не должно начинаться с '-' или содержать пробелы/'/'".into()),
+        });
+    }
+    Ok(())
+}
+
+/// Защита от argv flag smuggling: URL не должен начинаться с '-'.
+fn validate_url(url: &str) -> Result<(), GitError> {
+    if url.is_empty() {
+        return Err(GitError::CommandFailed {
+            message: "URL cannot be empty".into(),
+            hint: None,
+        });
+    }
+    if url.starts_with('-') {
+        return Err(GitError::CommandFailed {
+            message: format!("Invalid URL: '{}'", url),
+            hint: Some("URL не может начинаться с '-'".into()),
+        });
+    }
+    Ok(())
+}
+
 /// Передаёт `patch` в stdin `git apply`. `reverse` — откат, `cached` — в индекс.
 fn apply_patch(repo_path: &Path, patch: &str, reverse: bool, cached: bool) -> Result<(), GitError> {
     let mut args: Vec<&str> = vec!["apply", "--recount", "--whitespace=nowarn"];
@@ -563,8 +596,59 @@ pub fn delete_tag(repo_path: &Path, name: &str) -> Result<(), GitError> {
     Ok(())
 }
 
-pub fn fetch_args(remote: &str) -> Vec<String> {
-    vec!["fetch".into(), "--tags".into(), remote.into()]
+pub fn fetch_args(remote: &str, prune: bool) -> Vec<String> {
+    let mut args = vec!["fetch".to_string(), "--tags".to_string()];
+    if prune {
+        args.push("--prune".to_string());
+    }
+    args.push(remote.to_string());
+    args
+}
+
+pub fn add_remote(repo_path: &Path, name: &str, url: &str) -> Result<(), GitError> {
+    validate_remote_name(name)?;
+    validate_url(url)?;
+    run_git_mut(repo_path, &["remote", "add", name, url])?;
+    Ok(())
+}
+
+pub fn remove_remote(repo_path: &Path, name: &str) -> Result<(), GitError> {
+    validate_remote_name(name)?;
+    run_git_mut(repo_path, &["remote", "remove", name])?;
+    Ok(())
+}
+
+pub fn rename_remote(repo_path: &Path, old_name: &str, new_name: &str) -> Result<(), GitError> {
+    validate_remote_name(old_name)?;
+    validate_remote_name(new_name)?;
+    run_git_mut(repo_path, &["remote", "rename", old_name, new_name])?;
+    Ok(())
+}
+
+pub fn set_remote_url(repo_path: &Path, name: &str, url: &str) -> Result<(), GitError> {
+    validate_remote_name(name)?;
+    validate_url(url)?;
+    run_git_mut(repo_path, &["remote", "set-url", name, url])?;
+    Ok(())
+}
+
+/// Устанавливает upstream для ветки; `upstream = None`/пусто — снимает трекинг.
+pub fn set_branch_upstream(
+    repo_path: &Path,
+    branch: &str,
+    upstream: Option<&str>,
+) -> Result<(), GitError> {
+    validate_ref_name(branch)?;
+    match upstream {
+        Some(u) if !u.is_empty() => {
+            validate_ref_name(u)?;
+            run_git_mut(repo_path, &["branch", "--set-upstream-to", u, branch])?;
+        }
+        _ => {
+            run_git_mut(repo_path, &["branch", "--unset-upstream", branch])?;
+        }
+    }
+    Ok(())
 }
 
 pub fn pull_args(remote: &str, branch: &str, rebase: bool) -> Vec<String> {
@@ -935,7 +1019,11 @@ mod tag_tests {
 
     #[test]
     fn fetch_args_basic() {
-        assert_eq!(fetch_args("origin"), vec!["fetch", "--tags", "origin"]);
+        assert_eq!(fetch_args("origin", false), vec!["fetch", "--tags", "origin"]);
+        assert_eq!(
+            fetch_args("origin", true),
+            vec!["fetch", "--tags", "--prune", "origin"]
+        );
     }
 
     #[test]
@@ -1170,5 +1258,39 @@ mod init_tests {
     fn clone_args_shape() {
         let args = clone_args("https://example.com/r.git", "/dest/r");
         assert_eq!(args, vec!["clone", "--", "https://example.com/r.git", "/dest/r"]);
+    }
+
+    #[test]
+    fn remote_lifecycle() {
+        let dir = empty_dir();
+        init(&dir).unwrap();
+
+        add_remote(&dir, "origin", "https://example.com/a.git").unwrap();
+        let urls = super::super::query::remote_urls(&dir).unwrap();
+        assert_eq!(urls.len(), 1);
+        assert_eq!(urls[0].name, "origin");
+        assert_eq!(urls[0].url, "https://example.com/a.git");
+
+        set_remote_url(&dir, "origin", "https://example.com/b.git").unwrap();
+        let urls = super::super::query::remote_urls(&dir).unwrap();
+        assert_eq!(urls[0].url, "https://example.com/b.git");
+
+        rename_remote(&dir, "origin", "upstream").unwrap();
+        let names = super::super::query::remotes(&dir).unwrap();
+        assert_eq!(names, vec!["upstream"]);
+
+        remove_remote(&dir, "upstream").unwrap();
+        assert!(super::super::query::remotes(&dir).unwrap().is_empty());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn remote_name_rejects_flag() {
+        let dir = empty_dir();
+        init(&dir).unwrap();
+        assert!(add_remote(&dir, "-x", "https://example.com/a.git").is_err());
+        assert!(add_remote(&dir, "origin", "--upload-pack=evil").is_err());
+        fs::remove_dir_all(&dir).ok();
     }
 }

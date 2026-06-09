@@ -13,11 +13,11 @@
 - ✅ Open folder → проверка `.git` (`check_repo_path`), добавление в treeview
 - ✅ Clone (`git clone <url>` с прогрессом, выбор папки) — `do_clone` + `CloneRepositoryDialog`
 
-### 2. Управление remote — 0.9.7
-- add / remove / set-url / rename remote
-- Установка upstream-трекинга для ветки (`--set-upstream`)
-- `fetch --prune`
-- UI: секция Remotes в BranchPanel + диалог
+### 2. Управление remote — 0.9.7 ✅ (сделано)
+- ✅ add / remove / set-url / rename remote (`add_remote`/`remove_remote`/`rename_remote`/`set_remote_url`)
+- ✅ Установка upstream-трекинга для ветки (`set_branch_upstream`, диалог с выбором remote-ветки)
+- ✅ `fetch --prune` (флаг `prune` в `do_fetch`)
+- ✅ UI: секция Remotes в BranchPanel + контекстное меню + `RemoteDialog`/`SetUpstreamDialog`
 
 ### 3. Аутентификация — 0.9.8
 Без этого push/pull по HTTPS/SSH ломается «молча».
@@ -58,7 +58,7 @@
 | Версия    | Содержание                          | Тип  |
 |-----------|-------------------------------------|------|
 | 0.9.6     | git init / open / clone             | ✅ done |
-| 0.9.7     | Управление remote + upstream        | must |
+| 0.9.7     | Управление remote + upstream        | ✅ done |
 | 0.9.8     | Аутентификация (creds/SSH/cache)    | must |
 | 0.9.9     | Тесты (Vitest) + CI + аудит ошибок  | must |
 | 1.0.0-rc  | File history + Blame                | nice |

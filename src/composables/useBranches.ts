@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { invoke } from "@/composables/useProgress";
-import type { BranchInfo, TagInfo, StashEntry } from "@/types";
+import type { BranchInfo, TagInfo, StashEntry, RemoteInfo } from "@/types";
 import { useRepo } from "@/composables/useRepo";
 import { useSettings } from "@/composables/useSettings";
 
@@ -8,6 +8,7 @@ const branches = ref<BranchInfo[]>([]);
 const tags = ref<TagInfo[]>([]);
 const stashes = ref<StashEntry[]>([]);
 const remotes = ref<string[]>([]);
+const remoteUrls = ref<RemoteInfo[]>([]);
 
 // Защита от гонки перекрывающихся refresh: применяем только самый свежий ответ.
 let refreshSeq = 0;
@@ -25,14 +26,16 @@ export function useBranches() {
       tags.value = [];
       stashes.value = [];
       remotes.value = [];
+      remoteUrls.value = [];
       return;
     }
     const seq = ++refreshSeq;
-    const [b, t, s, r] = await Promise.all([
+    const [b, t, s, r, ru] = await Promise.all([
       invoke<BranchInfo[]>("get_branches", { repoPath: repoPath.value }),
       invoke<TagInfo[]>("get_tags", { repoPath: repoPath.value }),
       invoke<StashEntry[]>("get_stashes", { repoPath: repoPath.value }),
       invoke<string[]>("get_remotes", { repoPath: repoPath.value }),
+      invoke<RemoteInfo[]>("get_remote_urls", { repoPath: repoPath.value }),
     ]);
     // Более новый refresh уже стартовал — отбрасываем устаревший ответ.
     if (seq !== refreshSeq) return;
@@ -40,6 +43,32 @@ export function useBranches() {
     tags.value = t;
     stashes.value = s;
     remotes.value = r;
+    remoteUrls.value = ru;
+  }
+
+  async function addRemote(name: string, url: string) {
+    if (!repoPath.value) return;
+    await invoke("add_remote", { repoPath: repoPath.value, name, url });
+  }
+
+  async function removeRemote(name: string) {
+    if (!repoPath.value) return;
+    await invoke("remove_remote", { repoPath: repoPath.value, name });
+  }
+
+  async function renameRemote(oldName: string, newName: string) {
+    if (!repoPath.value) return;
+    await invoke("rename_remote", { repoPath: repoPath.value, oldName, newName });
+  }
+
+  async function setRemoteUrl(name: string, url: string) {
+    if (!repoPath.value) return;
+    await invoke("set_remote_url", { repoPath: repoPath.value, name, url });
+  }
+
+  async function setBranchUpstream(branch: string, upstream: string | null) {
+    if (!repoPath.value) return;
+    await invoke("set_branch_upstream", { repoPath: repoPath.value, branch, upstream });
   }
 
   async function checkout(branch: string) {
@@ -168,10 +197,11 @@ export function useBranches() {
   }
 
   return {
-    branches, tags, stashes, remotes,
+    branches, tags, stashes, remotes, remoteUrls,
     refresh, checkout, checkoutRemote,
     createBranch, mergeBranch, rebaseOnto, renameBranch, deleteBranch, deleteRemoteBranch, pushBranch,
     createTag, deleteTag, pushTag,
     stashSave, stashApply, stashPop, stashDrop,
+    addRemote, removeRemote, renameRemote, setRemoteUrl, setBranchUpstream,
   };
 }

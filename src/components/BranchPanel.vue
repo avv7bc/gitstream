@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useBranches } from "@/composables/useBranches";
+import { useRemote } from "@/composables/useRemote";
 import { logError } from "@/composables/useProgress";
 import { highlight } from "@/utils/highlight";
 import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 import RenameBranchDialog from "@/components/dialogs/RenameBranchDialog.vue";
 import StashSaveDialog from "@/components/dialogs/StashSaveDialog.vue";
 import CreateBranchDialog from "@/components/dialogs/CreateBranchDialog.vue";
+import RemoteDialog from "@/components/dialogs/RemoteDialog.vue";
+import SetUpstreamDialog from "@/components/dialogs/SetUpstreamDialog.vue";
 import RefIcon from "@/components/RefIcon.vue";
-import type { BranchInfo, TagInfo, StashEntry } from "@/types";
+import type { BranchInfo, TagInfo, StashEntry, RemoteInfo } from "@/types";
 import { useI18n } from "@/composables/useI18n";
 const { i18n } = useI18n();
 
@@ -35,11 +38,13 @@ async function handleLocalDblClick(branch: { name: string; is_current: boolean }
 }
 
 const {
-  branches, tags, stashes, remotes,
+  branches, tags, stashes, remotes, remoteUrls,
   checkout, createBranch, mergeBranch, rebaseOnto, renameBranch, deleteBranch, deleteRemoteBranch, pushBranch,
   deleteTag, pushTag,
   stashSave, stashApply, stashPop, stashDrop,
+  addRemote, removeRemote, renameRemote, setRemoteUrl, setBranchUpstream,
 } = useBranches();
+const { fetchRemote } = useRemote();
 
 // --- Create branch ---
 const showCreateBranchDialog = ref(false);
@@ -340,6 +345,123 @@ async function confirmDeleteTag(alsoRemote: boolean) {
   targetTags.value = [];
 }
 
+// --- Remotes (управление: add/edit-url/rename/remove + fetch) ---
+const remoteMgmtCtxMenu = ref<{ x: number; y: number } | null>(null);
+const ctxRemote = ref<RemoteInfo | null>(null);
+const showRemoteDialog = ref(false);
+const remoteDialogMode = ref<"add" | "editUrl" | "rename">("add");
+const remoteDialogTarget = ref<RemoteInfo | null>(null);
+const showRemoveRemoteConfirm = ref(false);
+
+function onRemoteMgmtContextMenu(e: MouseEvent, remote: RemoteInfo) {
+  e.preventDefault();
+  e.stopPropagation();
+  remoteMgmtCtxMenu.value = { x: e.clientX, y: e.clientY };
+  ctxRemote.value = remote;
+}
+
+function closeRemoteMgmtCtxMenu() {
+  remoteMgmtCtxMenu.value = null;
+  ctxRemote.value = null;
+}
+
+function openAddRemote() {
+  remoteDialogMode.value = "add";
+  remoteDialogTarget.value = null;
+  showRemoteDialog.value = true;
+}
+
+function openEditRemoteUrl() {
+  remoteDialogTarget.value = ctxRemote.value;
+  remoteDialogMode.value = "editUrl";
+  closeRemoteMgmtCtxMenu();
+  showRemoteDialog.value = true;
+}
+
+function openRenameRemote() {
+  remoteDialogTarget.value = ctxRemote.value;
+  remoteDialogMode.value = "rename";
+  closeRemoteMgmtCtxMenu();
+  showRemoteDialog.value = true;
+}
+
+async function confirmRemoteDialog(name: string, url: string) {
+  const mode = remoteDialogMode.value;
+  const target = remoteDialogTarget.value;
+  showRemoteDialog.value = false;
+  try {
+    if (mode === "add") await addRemote(name, url);
+    else if (mode === "editUrl" && target) await setRemoteUrl(target.name, url);
+    else if (mode === "rename" && target) await renameRemote(target.name, name);
+    emit("branchesChanged");
+  } catch (e) {
+    logError(`Remote operation failed: ${e}`);
+  }
+  remoteDialogTarget.value = null;
+}
+
+function handleRemoveRemoteCtx() {
+  remoteDialogTarget.value = ctxRemote.value;
+  closeRemoteMgmtCtxMenu();
+  if (!remoteDialogTarget.value) return;
+  showRemoveRemoteConfirm.value = true;
+}
+
+async function confirmRemoveRemote() {
+  const target = remoteDialogTarget.value;
+  showRemoveRemoteConfirm.value = false;
+  if (!target) return;
+  try {
+    await removeRemote(target.name);
+    emit("branchesChanged");
+  } catch (e) {
+    logError(`Remove remote failed: ${e}`);
+  }
+  remoteDialogTarget.value = null;
+}
+
+async function handleFetchRemoteCtx(prune: boolean) {
+  const r = ctxRemote.value;
+  closeRemoteMgmtCtxMenu();
+  if (!r) return;
+  await fetchRemote(r.name, prune);
+  emit("branchesChanged");
+}
+
+// --- Set upstream for a local branch ---
+const showSetUpstreamDialog = ref(false);
+const upstreamBranch = ref<BranchInfo | null>(null);
+
+function handleSetUpstreamCtx() {
+  upstreamBranch.value = ctxBranch.value;
+  closeCtxMenu();
+  if (!upstreamBranch.value) return;
+  showSetUpstreamDialog.value = true;
+}
+
+async function confirmSetUpstream(upstream: string | null) {
+  const b = upstreamBranch.value;
+  showSetUpstreamDialog.value = false;
+  if (!b) return;
+  try {
+    await setBranchUpstream(b.name, upstream);
+    emit("branchesChanged");
+  } catch (e) {
+    logError(`Set upstream failed: ${e}`);
+  }
+  upstreamBranch.value = null;
+}
+
+// Имена remote-веток для выбора upstream (origin/main, ...).
+const remoteBranchNames = computed(() => remoteBranches.value.map((b) => b.name));
+
+const filteredRemotes = computed(() => {
+  if (!q.value) return remoteUrls.value;
+  return remoteUrls.value.filter(
+    (r) => r.name.toLowerCase().includes(q.value) || r.url.toLowerCase().includes(q.value),
+  );
+});
+
 // --- Remote branch context menu ---
 const remoteCtxMenu = ref<{ x: number; y: number } | null>(null);
 const remoteCtxBranch = ref<BranchInfo | null>(null);
@@ -511,6 +633,7 @@ const filter = ref("");
 const expandedSections = ref({
   local: true,
   remote: true,
+  remotes: false,
   tags: false,
   stashes: false,
 });
@@ -714,6 +837,39 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
         </div>
       </div>
 
+      <!-- Remotes (управление) -->
+      <div class="section">
+        <div class="section-header" @click="toggleSection('remotes')">
+          <svg
+            class="chevron"
+            :class="{ expanded: expandedSections.remotes }"
+            width="12" height="12" viewBox="0 0 12 12"
+          >
+            <path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          <span class="section-title">{{ i18n.branches.remotes }}</span>
+          <span class="section-count">{{ filteredRemotes.length }}</span>
+          <button
+            class="section-add-btn"
+            :title="i18n.branches.addRemote"
+            @click.stop="openAddRemote"
+          >+</button>
+        </div>
+        <div v-if="expandedSections.remotes && filteredRemotes.length" class="section-items">
+          <div
+            v-for="remote in filteredRemotes"
+            :key="remote.name"
+            class="branch-item remote-mgmt-item"
+            v-tooltip="`${remote.name}\n${remote.url}`"
+            @contextmenu="onRemoteMgmtContextMenu($event, remote)"
+          >
+            <RefIcon kind="remote-branch" class="bp-icon bp-icon--remote" />
+            <span class="branch-name" v-html="highlight(remote.name, filter)" />
+            <span class="remote-url">{{ remote.url }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Tags -->
       <div class="section">
         <div class="section-header" @click="toggleSection('tags')">
@@ -824,6 +980,11 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
           :disabled="multiBranch"
           @click="handleRenameCtx"
         >{{ i18n.branches.rename }}</button>
+        <button
+          class="ctx-item"
+          :disabled="multiBranch || !hasRemote"
+          @click="handleSetUpstreamCtx"
+        >{{ i18n.branches.setUpstream }}</button>
         <button
           class="ctx-item ctx-danger"
           :disabled="!deletableBranches.length"
@@ -952,6 +1113,55 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
         danger
         @close="showDeleteRemoteConfirm = false; targetRemoteBranches = []"
         @confirm="confirmDeleteRemote"
+      />
+
+      <!-- Remote management context menu -->
+      <div
+        v-if="remoteMgmtCtxMenu"
+        class="ctx-menu"
+        :style="{ left: remoteMgmtCtxMenu.x + 'px', top: remoteMgmtCtxMenu.y + 'px' }"
+        @click.stop
+      >
+        <button class="ctx-item" @click="handleFetchRemoteCtx(false)">{{ i18n.branches.fetchRemote }}</button>
+        <button class="ctx-item" @click="handleFetchRemoteCtx(true)">{{ i18n.branches.fetchPrune }}</button>
+        <div class="ctx-separator" />
+        <button class="ctx-item" @click="openEditRemoteUrl">{{ i18n.branches.editRemoteUrl }}</button>
+        <button class="ctx-item" @click="openRenameRemote">{{ i18n.branches.renameRemote }}</button>
+        <div class="ctx-separator" />
+        <button class="ctx-item ctx-danger" @click="handleRemoveRemoteCtx">{{ i18n.branches.removeRemote }}</button>
+      </div>
+      <div
+        v-if="remoteMgmtCtxMenu"
+        class="ctx-backdrop"
+        @click="closeRemoteMgmtCtxMenu"
+        @contextmenu.prevent="closeRemoteMgmtCtxMenu"
+      />
+
+      <RemoteDialog
+        v-if="showRemoteDialog"
+        :mode="remoteDialogMode"
+        :name="remoteDialogTarget?.name"
+        :url="remoteDialogTarget?.url"
+        @close="showRemoteDialog = false; remoteDialogTarget = null"
+        @confirm="confirmRemoteDialog"
+      />
+
+      <ConfirmDialog
+        v-if="showRemoveRemoteConfirm && remoteDialogTarget"
+        :message="`Remove remote '${remoteDialogTarget.name}'?`"
+        confirm-label="Remove"
+        danger
+        @close="showRemoveRemoteConfirm = false; remoteDialogTarget = null"
+        @confirm="confirmRemoveRemote"
+      />
+
+      <SetUpstreamDialog
+        v-if="showSetUpstreamDialog && upstreamBranch"
+        :branch="upstreamBranch.name"
+        :current="upstreamBranch.upstream"
+        :remote-branches="remoteBranchNames"
+        @close="showSetUpstreamDialog = false; upstreamBranch = null"
+        @confirm="confirmSetUpstream"
       />
 
       <div
@@ -1153,6 +1363,22 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Remotes-секция: имя remote не растягивается, URL приглушённо справа */
+.remote-mgmt-item .branch-name {
+  flex: 0 0 auto;
+}
+.remote-url {
+  flex: 1;
+  min-width: 0;
+  margin-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  text-align: right;
 }
 
 .ahead-badge, .behind-badge {
