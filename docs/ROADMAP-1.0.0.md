@@ -40,9 +40,7 @@
 
 ### 5. File history + Blame — 1.0.0-rc
 - ✅ **File history** (0.9.13) — `file_log` (`git log --follow -- <path>`), `get_file_log`; `FileHistoryDialog` + `useFileHistory`; diff файла на коммите, фильтр, переход к коммиту в графе; пункт «File History» в контекстном меню FileList. Backend-тест на `--follow` через rename
-- ⏳ **Blame view** — авторы по строкам (`git blame --porcelain`), переход к коммиту строки
-
-Можно вынести в 1.1, если поджимает время — на статус 1.0 не влияют.
+- ✅ **Blame view** (0.9.14) — `blame`/`get_blame` (`git blame --porcelain`), `BlameDialog`/`useBlame`; gutter (sha/автор/дата на старте группы), клик по строке → переход к коммиту; пункт «Blame» в контекстном меню FileList. Юнит-тест парсера porcelain (кэш метаданных для повторных коммитов)
 
 ---
 
@@ -62,7 +60,7 @@
 | 0.9.7     | Управление remote + upstream        | ✅ done |
 | 0.9.8     | Аутентификация (creds/SSH/cache)    | ✅ done |
 | 0.9.9     | Тесты (Vitest) + CI + аудит ошибок  | 🟡 в работе |
-| 1.0.0-rc  | File history + Blame                | nice |
+| 1.0.0-rc  | File history + Blame                | ✅ done |
 | **1.0.0** | Полировка, docs, скриншоты, релиз   | —    |
 
 ---

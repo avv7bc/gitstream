@@ -242,6 +242,20 @@ pub async fn get_file_log(
 }
 
 #[tauri::command]
+pub async fn get_blame(
+    repo_path: String,
+    path: String,
+    rev: Option<String>,
+) -> Result<Vec<BlameLine>, String> {
+    let repo = PathBuf::from(repo_path);
+    tokio::task::spawn_blocking(move || {
+        query::blame(&repo, &path, rev.as_deref()).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub fn get_branches(repo_path: String) -> Result<Vec<BranchInfo>, String> {
     query::branches(Path::new(&repo_path)).map_err(|e| e.to_string())
 }

@@ -330,6 +330,83 @@ pub fn file_log(repo_path: &Path, path: &str, limit: usize) -> Result<Vec<Commit
     Ok(commits)
 }
 
+// Blame: автор каждой строки файла. `--porcelain` отдаёт по группе строк
+// заголовок `<sha> <orig> <final> [n]`, затем метаданные коммита (один раз на
+// sha) и строки контента с ведущим TAB. Повторный коммит — только заголовок.
+pub fn blame(repo_path: &Path, path: &str, rev: Option<&str>) -> Result<Vec<BlameLine>, GitError> {
+    let mut args = vec!["blame", "--porcelain"];
+    if let Some(r) = rev {
+        args.push(r);
+    }
+    args.push("--");
+    args.push(path);
+    let output = run_git(repo_path, &args)?;
+    Ok(parse_blame_porcelain(&output))
+}
+
+fn parse_blame_porcelain(output: &str) -> Vec<BlameLine> {
+    // sha → (author, author_time, summary): метаданные приходят раз на коммит.
+    let mut cache: HashMap<String, (String, i64, String)> = HashMap::new();
+    let mut out = Vec::new();
+
+    let mut oid = String::new();
+    let mut final_line: u32 = 0;
+    let mut author: Option<String> = None;
+    let mut time: Option<i64> = None;
+    let mut summary: Option<String> = None;
+
+    for raw in output.split('\n') {
+        if let Some(content) = raw.strip_prefix('\t') {
+            // Строка контента завершает запись. Если по ходу собрали метаданные
+            // — кэшируем их под текущим sha.
+            if author.is_some() || time.is_some() || summary.is_some() {
+                cache.insert(
+                    oid.clone(),
+                    (
+                        author.take().unwrap_or_default(),
+                        time.take().unwrap_or_default(),
+                        summary.take().unwrap_or_default(),
+                    ),
+                );
+            }
+            let (a, t, s) = cache.get(&oid).cloned().unwrap_or_default();
+            out.push(BlameLine {
+                short_oid: oid.chars().take(8).collect(),
+                oid: oid.clone(),
+                author: a,
+                author_time: t,
+                summary: s,
+                line_no: final_line,
+                content: content.to_string(),
+            });
+        } else {
+            let mut parts = raw.splitn(2, ' ');
+            let key = parts.next().unwrap_or("");
+            let val = parts.next().unwrap_or("");
+            if key.len() == 40 && key.bytes().all(|b| b.is_ascii_hexdigit()) {
+                // Заголовок группы: `<sha> <orig> <final> [n]`.
+                oid = key.to_string();
+                final_line = val
+                    .split(' ')
+                    .nth(1)
+                    .and_then(|n| n.parse().ok())
+                    .unwrap_or(0);
+                author = None;
+                time = None;
+                summary = None;
+            } else {
+                match key {
+                    "author" => author = Some(val.to_string()),
+                    "author-time" => time = val.parse().ok(),
+                    "summary" => summary = Some(val.to_string()),
+                    _ => {}
+                }
+            }
+        }
+    }
+    out
+}
+
 fn parse_ref_labels(raw: &str, remotes: &[String]) -> Vec<RefLabel> {
     if raw.trim().is_empty() {
         return Vec::new();
@@ -1609,5 +1686,67 @@ mod edge_case_tests {
         );
 
         let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod blame_parser_tests {
+    use super::*;
+
+    // Порционный --porcelain: метаданные коммита идут раз, повтор того же sha —
+    // только заголовок + контент. Парсер обязан брать автора/время из кэша.
+    #[test]
+    fn parses_porcelain_with_cached_repeats() {
+        let a = "a".repeat(40);
+        let b = "b".repeat(40);
+        let out = format!(
+            "{a} 1 1 1\n\
+author Alice\n\
+author-mail <a@a>\n\
+author-time 1700000000\n\
+author-tz +0000\n\
+summary first\n\
+filename f.txt\n\
+\tline one\n\
+{b} 2 2 1\n\
+author Bob\n\
+author-mail <b@b>\n\
+author-time 1700000100\n\
+author-tz +0000\n\
+summary second\n\
+filename f.txt\n\
+\tline two\n\
+{a} 1 3 1\n\
+\tline three (same commit as 1)\n",
+            a = a,
+            b = b
+        );
+
+        let lines = parse_blame_porcelain(&out);
+        assert_eq!(lines.len(), 3);
+
+        assert_eq!(lines[0].author, "Alice");
+        assert_eq!(lines[0].author_time, 1700000000);
+        assert_eq!(lines[0].line_no, 1);
+        assert_eq!(lines[0].content, "line one");
+        assert_eq!(lines[0].short_oid, "aaaaaaaa");
+        assert_eq!(lines[0].summary, "first");
+
+        assert_eq!(lines[1].author, "Bob");
+        assert_eq!(lines[1].author_time, 1700000100);
+        assert_eq!(lines[1].line_no, 2);
+        assert_eq!(lines[1].content, "line two");
+
+        // Третья строка — тот же коммит, что и первая: метаданные из кэша.
+        assert_eq!(lines[2].oid, a);
+        assert_eq!(lines[2].author, "Alice");
+        assert_eq!(lines[2].author_time, 1700000000);
+        assert_eq!(lines[2].line_no, 3);
+        assert_eq!(lines[2].content, "line three (same commit as 1)");
+    }
+
+    #[test]
+    fn empty_output_yields_no_lines() {
+        assert!(parse_blame_porcelain("").is_empty());
     }
 }

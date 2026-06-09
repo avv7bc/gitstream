@@ -8,6 +8,7 @@ import { useRepo } from "@/composables/useRepo";
 import { useDiff } from "@/composables/useDiff";
 import { useFileCompare } from "@/composables/useFileCompare";
 import { useFileHistory } from "@/composables/useFileHistory";
+import { useBlame } from "@/composables/useBlame";
 import { useSettings } from "@/composables/useSettings";
 import type { FileDiff, FileStatus } from "@/types";
 import { highlight } from "@/utils/highlight";
@@ -169,6 +170,13 @@ function ctxHistory() {
   const path = selectedPaths.value[0];
   closeCtxMenu();
   if (path) openFileHistory(path);
+}
+
+const { openFor: openBlame } = useBlame();
+function ctxBlame() {
+  const path = selectedPaths.value[0];
+  closeCtxMenu();
+  if (path) openBlame(path);
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -808,6 +816,9 @@ function compareCommitFile(path: string) {
         </button>
         <button class="ctx-item" :disabled="selectedPaths.length !== 1" @click="ctxHistory">
           <span class="ctx-label">{{ i18n.files.historyCtx }}</span>
+        </button>
+        <button class="ctx-item" :disabled="selectedPaths.length !== 1" @click="ctxBlame">
+          <span class="ctx-label">{{ i18n.files.blameCtx }}</span>
         </button>
         <div class="ctx-separator" />
         <button class="ctx-item ctx-danger" @click="ctxRun('discard')">

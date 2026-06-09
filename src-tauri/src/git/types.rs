@@ -71,6 +71,18 @@ pub struct StashEntry {
 }
 
 #[derive(Serialize, Clone, Debug)]
+pub struct BlameLine {
+    pub oid: String,
+    pub short_oid: String,
+    pub author: String,
+    /// Author time, Unix-эпоха (сек). Фронтенд форматирует через `new Date`.
+    pub author_time: i64,
+    pub summary: String,
+    pub line_no: u32,
+    pub content: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
 pub struct DiffLine {
     pub kind: String,
     pub old_lineno: Option<u32>,

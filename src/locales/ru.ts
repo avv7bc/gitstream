@@ -71,6 +71,7 @@ const _ru = {
     partiallyStaged: "Partially staged",
     commitCtx: "Commit…",
     historyCtx: "История файла…",
+    blameCtx: "Blame…",
     treeView: "Дерево папок",
     allFiles: "Все файлы",
     showAllFiles: "Показывать все файлы (включая неизменённые)",
@@ -251,6 +252,12 @@ const _ru = {
       noChanges: "В этом коммите файл не менялся",
       binary: "Бинарный файл",
       goToCommit: "Перейти к коммиту",
+      close: "Закрыть",
+    },
+    blame: {
+      title: "Blame",
+      empty: "Нет данных blame (файл untracked или бинарный)",
+      goHint: "Клик по коммиту строки — переход к нему в графе",
       close: "Закрыть",
     },
     setUpstream: {

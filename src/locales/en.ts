@@ -66,6 +66,7 @@ export const en: Translations = {
     partiallyStaged: "Partially staged",
     commitCtx: "Commit…",
     historyCtx: "File History…",
+    blameCtx: "Blame…",
     treeView: "Folder tree",
     allFiles: "All files",
     showAllFiles: "Show all files (including unchanged)",
@@ -246,6 +247,12 @@ export const en: Translations = {
       noChanges: "No changes in this commit",
       binary: "Binary file",
       goToCommit: "Go to commit",
+      close: "Close",
+    },
+    blame: {
+      title: "Blame",
+      empty: "No blame data (file untracked or binary)",
+      goHint: "Click a line's commit to jump to it in the graph",
       close: "Close",
     },
     setUpstream: {

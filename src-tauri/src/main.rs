@@ -49,6 +49,7 @@ fn main() {
             commands::list_files_at,
             commands::get_log,
             commands::get_file_log,
+            commands::get_blame,
             commands::get_branches,
             commands::get_tags,
             commands::get_stashes,

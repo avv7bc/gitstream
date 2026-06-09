@@ -64,6 +64,15 @@ export interface StashEntry {
   message: string;
   date: string;
 }
+export interface BlameLine {
+  oid: string;
+  short_oid: string;
+  author: string;
+  author_time: number;
+  summary: string;
+  line_no: number;
+  content: string;
+}
 
 export interface RemoteInfo {
   name: string;
