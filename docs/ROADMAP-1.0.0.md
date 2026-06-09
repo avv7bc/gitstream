@@ -39,8 +39,8 @@
 ## Желательно к 1.0.0 (nice-to-have, по времени)
 
 ### 5. File history + Blame — 1.0.0-rc
-- **File history** — лог коммитов конкретного файла (`git log --follow -- <path>`), переход к коммиту
-- **Blame view** — авторы по строкам, переход к коммиту строки
+- ✅ **File history** (0.9.13) — `file_log` (`git log --follow -- <path>`), `get_file_log`; `FileHistoryDialog` + `useFileHistory`; diff файла на коммите, фильтр, переход к коммиту в графе; пункт «File History» в контекстном меню FileList. Backend-тест на `--follow` через rename
+- ⏳ **Blame view** — авторы по строкам (`git blame --porcelain`), переход к коммиту строки
 
 Можно вынести в 1.1, если поджимает время — на статус 1.0 не влияют.
 

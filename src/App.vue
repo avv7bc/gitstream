@@ -18,6 +18,8 @@ import ConfirmDialog from "./components/dialogs/ConfirmDialog.vue";
 import DiscardDialog from "./components/dialogs/DiscardDialog.vue";
 import SettingsDialog from "./components/dialogs/SettingsDialog.vue";
 import CredentialDialog from "./components/dialogs/CredentialDialog.vue";
+import FileHistoryDialog from "./components/dialogs/FileHistoryDialog.vue";
+import { useFileHistory } from "./composables/useFileHistory";
 import StatsDialog from "./components/dialogs/StatsDialog.vue";
 import SquashDialog from "./components/dialogs/SquashDialog.vue";
 import RewordDialog from "./components/dialogs/RewordDialog.vue";
@@ -103,6 +105,7 @@ watch(repoPath, (val) => {
   }
 });
 
+const { open: fileHistoryOpen, close: closeFileHistory } = useFileHistory();
 const showCommitDialog = ref(false);
 const showStashSaveDialog = ref(false);
 const showPushDialog = ref(false);
@@ -261,6 +264,7 @@ const modalRegistry: { key: string; isOpen: () => boolean; close: () => void }[]
   { key: "squash", isOpen: () => !!squashPayload.value, close: () => { squashPayload.value = null; } },
   { key: "reword", isOpen: () => !!rewordPayload.value, close: () => { rewordPayload.value = null; } },
   { key: "fileCompare", isOpen: () => !!compareTarget.value, close: () => { closeFileCompare(); } },
+  { key: "fileHistory", isOpen: () => fileHistoryOpen.value, close: () => { closeFileHistory(); } },
 ];
 
 const modalOpenOrder = ref<string[]>([]);
@@ -599,6 +603,7 @@ function onMouseUp() {
       @close="rewordPayload = null"
     />
     <FileCompareDialog v-if="compareTarget" />
+    <FileHistoryDialog v-if="fileHistoryOpen" />
     <CredentialDialog />
     <UpdateBanner
       v-if="updateInfo"

@@ -48,6 +48,7 @@ fn main() {
             commands::list_all_files,
             commands::list_files_at,
             commands::get_log,
+            commands::get_file_log,
             commands::get_branches,
             commands::get_tags,
             commands::get_stashes,

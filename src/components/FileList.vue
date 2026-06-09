@@ -7,6 +7,7 @@ import { useLog } from "@/composables/useLog";
 import { useRepo } from "@/composables/useRepo";
 import { useDiff } from "@/composables/useDiff";
 import { useFileCompare } from "@/composables/useFileCompare";
+import { useFileHistory } from "@/composables/useFileHistory";
 import { useSettings } from "@/composables/useSettings";
 import type { FileDiff, FileStatus } from "@/types";
 import { highlight } from "@/utils/highlight";
@@ -161,6 +162,13 @@ async function ctxRun(action: "stage" | "unstage" | "commit" | "discard" | "remo
   } catch (err) {
     logError(`Action failed: ${err}`);
   }
+}
+
+const { openFor: openFileHistory } = useFileHistory();
+function ctxHistory() {
+  const path = selectedPaths.value[0];
+  closeCtxMenu();
+  if (path) openFileHistory(path);
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -797,6 +805,9 @@ function compareCommitFile(path: string) {
         <div class="ctx-separator" />
         <button class="ctx-item" @click="ctxRun('commit')">
           <span class="ctx-label">{{ i18n.files.commitCtx }}</span>
+        </button>
+        <button class="ctx-item" :disabled="selectedPaths.length !== 1" @click="ctxHistory">
+          <span class="ctx-label">{{ i18n.files.historyCtx }}</span>
         </button>
         <div class="ctx-separator" />
         <button class="ctx-item ctx-danger" @click="ctxRun('discard')">

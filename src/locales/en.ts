@@ -65,6 +65,7 @@ export const en: Translations = {
     staged: "Staged",
     partiallyStaged: "Partially staged",
     commitCtx: "Commit…",
+    historyCtx: "File History…",
     treeView: "Folder tree",
     allFiles: "All files",
     showAllFiles: "Show all files (including unchanged)",
@@ -237,6 +238,15 @@ export const en: Translations = {
       no: "No",
       ok: "OK",
       cancel: "Cancel",
+    },
+    fileHistory: {
+      title: "File History",
+      filter: "Filter",
+      empty: "No history for this file",
+      noChanges: "No changes in this commit",
+      binary: "Binary file",
+      goToCommit: "Go to commit",
+      close: "Close",
     },
     setUpstream: {
       title: "Set Upstream",

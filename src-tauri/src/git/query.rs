@@ -219,6 +219,48 @@ pub fn list_files_at(repo_path: &Path, oid: &str) -> Result<Vec<String>, GitErro
     Ok(files)
 }
 
+// \x1e разделяет записи коммитов; %B — полное сообщение (может содержать \n).
+const LOG_FORMAT: &str = "%x1e%H%x00%h%x00%an%x00%ae%x00%aI%x00%P%x00%D%x00%B";
+
+// Разбирает одну запись формата LOG_FORMAT в CommitInfo. Общий для log/file_log.
+fn parse_commit_record(
+    record: &str,
+    remotes_list: &[String],
+    unpushed: &std::collections::HashSet<String>,
+) -> Option<CommitInfo> {
+    if record.is_empty() {
+        return None;
+    }
+    let parts: Vec<&str> = record.splitn(8, '\0').collect();
+    if parts.len() < 8 {
+        return None;
+    }
+    let refs = parse_ref_labels(parts[6], remotes_list);
+    let parents: Vec<String> = parts[5].split_whitespace().map(|s| s.to_string()).collect();
+    let message = parts[7].trim_end_matches('\n').to_string();
+    Some(CommitInfo {
+        oid: parts[0].to_string(),
+        short_oid: parts[1].to_string(),
+        message,
+        author: parts[2].to_string(),
+        author_email: parts[3].to_string(),
+        date: parts[4].to_string(),
+        parents,
+        refs,
+        column: 0,
+        lines: Vec::new(),
+        unpushed: unpushed.contains(parts[0]),
+    })
+}
+
+// Незапушенные («исходящие») коммиты: достижимы из локальных веток, но не из
+// какого-либо remote-tracking ref-а. Нет remote'ов → не запушено всё.
+fn unpushed_set(repo_path: &Path) -> std::collections::HashSet<String> {
+    run_git(repo_path, &["rev-list", "--branches", "--not", "--remotes"])
+        .map(|o| o.split_whitespace().map(|s| s.to_string()).collect())
+        .unwrap_or_default()
+}
+
 pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> {
     // Пустой репозиторий (`git init` без коммитов): HEAD ещё не существует,
     // `git log` падает с кодом 128. Это не ошибка — лог просто пуст.
@@ -226,8 +268,6 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
     if run_git(repo_path, &["rev-parse", "--verify", "--quiet", "HEAD"]).is_err() {
         return Ok(Vec::new());
     }
-    // \x1e separates commit records; %B is the full message (may contain newlines)
-    let format = "%x1e%H%x00%h%x00%an%x00%ae%x00%aI%x00%P%x00%D%x00%B";
     let limit_str = format!("-{}", limit);
     // --branches --remotes: видны все локальные и remote-ветки (после fetch
     // тоже). Теги намеренно НЕ включаем (в отличие от --all), иначе коммиты,
@@ -246,53 +286,47 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
             "--remotes",
             "HEAD",
             "--topo-order",
-            &format!("--format={}", format),
+            &format!("--format={}", LOG_FORMAT),
             &limit_str,
         ],
     )?;
     // Список remote'ов нужен parse_ref_labels: иначе локальные ветки
     // вида `feature/auth` неотличимы от `origin/main` (в %D обе со слешем).
     let remotes_list = remotes(repo_path).unwrap_or_default();
-    // Незапушенные («исходящие») коммиты: достижимы из локальных веток, но не
-    // из какого-либо remote-tracking ref-а. `rev-list --branches --not
-    // --remotes` отдаёт ровно их (корректно при мержах и нескольких ветках,
-    // в отличие от фронтовой эвристики по ahead). Нет remote'ов → список пуст,
-    // тогда не запушено всё — это и есть правда.
-    let unpushed: std::collections::HashSet<String> =
-        run_git(repo_path, &["rev-list", "--branches", "--not", "--remotes"])
-            .map(|o| {
-                o.split_whitespace()
-                    .map(|s| s.to_string())
-                    .collect()
-            })
-            .unwrap_or_default();
-    let mut commits = Vec::new();
-    for record in output.split('\x1e') {
-        if record.is_empty() {
-            continue;
-        }
-        let parts: Vec<&str> = record.splitn(8, '\0').collect();
-        if parts.len() < 8 {
-            continue;
-        }
-        let refs = parse_ref_labels(parts[6], &remotes_list);
-        let parents: Vec<String> = parts[5].split_whitespace().map(|s| s.to_string()).collect();
-        let message = parts[7].trim_end_matches('\n').to_string();
-        commits.push(CommitInfo {
-            oid: parts[0].to_string(),
-            short_oid: parts[1].to_string(),
-            message,
-            author: parts[2].to_string(),
-            author_email: parts[3].to_string(),
-            date: parts[4].to_string(),
-            parents,
-            refs,
-            column: 0,
-            lines: Vec::new(),
-            unpushed: unpushed.contains(parts[0]),
-        });
-    }
+    let unpushed = unpushed_set(repo_path);
+    let mut commits: Vec<CommitInfo> = output
+        .split('\x1e')
+        .filter_map(|r| parse_commit_record(r, &remotes_list, &unpushed))
+        .collect();
     super::graph::assign_lanes(&mut commits);
+    Ok(commits)
+}
+
+// История одного файла: `git log --follow -- <path>` (отслеживает переименования).
+// Плоский список (без lane-графа). Пустой репозиторий / файл без истории → пусто.
+pub fn file_log(repo_path: &Path, path: &str, limit: usize) -> Result<Vec<CommitInfo>, GitError> {
+    if run_git(repo_path, &["rev-parse", "--verify", "--quiet", "HEAD"]).is_err() {
+        return Ok(Vec::new());
+    }
+    let limit_str = format!("-{}", limit);
+    let output = run_git(
+        repo_path,
+        &[
+            "log",
+            "--follow",
+            "--topo-order",
+            &format!("--format={}", LOG_FORMAT),
+            &limit_str,
+            "--",
+            path,
+        ],
+    )?;
+    let remotes_list = remotes(repo_path).unwrap_or_default();
+    let unpushed = unpushed_set(repo_path);
+    let commits = output
+        .split('\x1e')
+        .filter_map(|r| parse_commit_record(r, &remotes_list, &unpushed))
+        .collect();
     Ok(commits)
 }
 
@@ -1534,6 +1568,29 @@ mod edge_case_tests {
         assert_eq!(info.head_oid, first, "HEAD указывает на выбранный коммит");
         assert!(!log(&dir, 100).unwrap().is_empty(), "лог доступен в detached HEAD");
         assert_eq!(repo_state(&dir).unwrap(), "clean");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // file_log: история одного файла, --follow находит её и до переименования.
+    #[test]
+    fn file_log_follows_rename() {
+        let dir = empty_repo("file_log");
+        fs::write(dir.join("old.txt"), "a\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "add old"]);
+        git(&dir, &["mv", "old.txt", "new.txt"]);
+        git(&dir, &["commit", "-qm", "rename to new"]);
+        fs::write(dir.join("new.txt"), "a\nb\n").unwrap();
+        git(&dir, &["commit", "-aqm", "edit new"]);
+
+        // По новому имени с --follow видны все три коммита (включая до rename).
+        let commits = file_log(&dir, "new.txt", 100).unwrap();
+        assert_eq!(commits.len(), 3, "--follow должен пройти через переименование");
+        assert_eq!(commits[0].message, "edit new", "новейший — первым");
+
+        // Несуществующий файл → пустая история, не ошибка.
+        assert!(file_log(&dir, "ghost.txt", 100).unwrap().is_empty());
 
         let _ = fs::remove_dir_all(&dir);
     }

@@ -70,6 +70,7 @@ const _ru = {
     staged: "Staged",
     partiallyStaged: "Partially staged",
     commitCtx: "Commit…",
+    historyCtx: "История файла…",
     treeView: "Дерево папок",
     allFiles: "Все файлы",
     showAllFiles: "Показывать все файлы (включая неизменённые)",
@@ -242,6 +243,15 @@ const _ru = {
       no: "Нет",
       ok: "OK",
       cancel: "Cancel",
+    },
+    fileHistory: {
+      title: "История файла",
+      filter: "Фильтр",
+      empty: "Для файла нет истории",
+      noChanges: "В этом коммите файл не менялся",
+      binary: "Бинарный файл",
+      goToCommit: "Перейти к коммиту",
+      close: "Закрыть",
     },
     setUpstream: {
       title: "Set Upstream",

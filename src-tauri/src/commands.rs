@@ -228,6 +228,20 @@ pub async fn get_log(repo_path: String, limit: Option<usize>) -> Result<Vec<Comm
 }
 
 #[tauri::command]
+pub async fn get_file_log(
+    repo_path: String,
+    path: String,
+    limit: Option<usize>,
+) -> Result<Vec<CommitInfo>, String> {
+    let repo = PathBuf::from(repo_path);
+    tokio::task::spawn_blocking(move || {
+        query::file_log(&repo, &path, limit.unwrap_or(500)).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub fn get_branches(repo_path: String) -> Result<Vec<BranchInfo>, String> {
     query::branches(Path::new(&repo_path)).map_err(|e| e.to_string())
 }

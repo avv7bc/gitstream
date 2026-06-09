@@ -61,6 +61,7 @@ src/                          # Vue.js frontend
 │   ├── useCommit.ts          # Создание коммитов, squash, reword
 │   ├── useRemote.ts          # Fetch, pull, push
 │   ├── useAuth.ts            # Запрос credentials (askpass) — login/token/passphrase
+│   ├── useFileHistory.ts     # История файла (git log --follow), diff на коммите
 │   ├── useConflicts.ts       # Состояние merge/rebase + accept ours/theirs
 │   ├── useFileCompare.ts     # File Compare (diff произвольных ревизий)
 │   ├── useStats.ts           # Статистика репозитория
@@ -82,7 +83,7 @@ src-tauri/src/                # Rust backend
     ├── types.rs              # Serialize-структуры
     ├── error.rs              # GitError, classify_git_error
     ├── query.rs              # run_git, status, log, branches, tags,
-    │                         # stashes, remotes, repo_info, diff, ls-tree
+    │                         # stashes, remotes, repo_info, diff, ls-tree, file_log
     ├── graph.rs              # assign_lanes — колонки и линии lane-графа
     └── mutation.rs           # stage, unstage, discard, commit, checkout,
                               # merge, branch/tag ops, fetch, pull, push
@@ -186,6 +187,7 @@ src-tauri/src/                # Rust backend
 - **Add Repository / Add Group / Rename Node** — управление treeview
 - **Confirm** — универсальный диалог подтверждения, опц. список затрагиваемых объектов
 - **Credential** — запрос логина/пароля/токена/SSH-passphrase (askpass), host-key confirm, чекбокс «Запомнить»
+- **File History** — история коммитов файла (`git log --follow`), diff файла на выбранном коммите, фильтр, переход к коммиту в графе (из контекстного меню FileList)
 - Все диалоги draggable за header и закрываются по Esc
 
 ### Архитектура
