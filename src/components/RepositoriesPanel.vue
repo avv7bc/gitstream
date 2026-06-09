@@ -111,6 +111,35 @@ function insertAt(nodes: TreeNode[], targetId: string, node: TreeNode, pos: "bef
   return false;
 }
 
+// Папки всегда отображаются по алфавиту. Сортируем рекурсивно и in-place, не
+// трогая позиции репозиториев: переставляем только узлы-папки в занятых ими
+// слотах. Ссылки на объекты узлов сохраняются — expanded/выбор/реактивность
+// не ломаются.
+function sortFolders(nodes: TreeNode[]) {
+  for (const n of nodes) {
+    if (n.type === "folder") sortFolders(n.children);
+  }
+  const slots: number[] = [];
+  const folders: FolderNode[] = [];
+  nodes.forEach((n, i) => {
+    if (n.type === "folder") {
+      slots.push(i);
+      folders.push(n);
+    }
+  });
+  folders.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
+  slots.forEach((idx, k) => {
+    nodes[idx] = folders[k];
+  });
+}
+
+function applyFolderSort() {
+  sortFolders(tree.value);
+  saveTree();
+}
+
 // --- Toggle folder ---
 function toggleFolder(node: FolderNode) {
   node.expanded = !node.expanded;
@@ -194,6 +223,7 @@ function onDrop(e: DragEvent, targetNode: TreeNode) {
     insertAt(tree.value, targetNode.id, dragged, dropPosition.value);
   }
 
+  applyFolderSort();
   draggedId.value = null;
   dropTargetId.value = null;
   dropPosition.value = null;
@@ -207,6 +237,7 @@ function onDropRoot(e: DragEvent) {
   if (dragged) {
     tree.value.push(dragged);
   }
+  applyFolderSort();
   draggedId.value = null;
   dropTargetId.value = null;
   dropPosition.value = null;
@@ -355,6 +386,7 @@ function confirmAddGroup(name: string) {
     tree.value.push(node);
   }
   selectedId.value = id;
+  applyFolderSort();
   showAddGroupDialog.value = false;
   addGroupTargetId.value = null;
 }
@@ -375,6 +407,7 @@ async function refreshRepoNodes(nodes: TreeNode[]) {
 
 onMounted(() => {
   if (tree.value.length > 0) {
+    applyFolderSort();
     refreshRepoNodes(tree.value);
   }
   // Select the active repo in treeview
@@ -421,6 +454,8 @@ function confirmRename(newName: string) {
     const node = findNode(tree.value, renameTargetId.value);
     if (node) {
       node.name = newName;
+      // Rename may change a folder's alphabetical position.
+      applyFolderSort();
       // Trigger reactivity
       tree.value = [...tree.value];
       saveTree();

@@ -67,6 +67,7 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 
 ### Repository manager
 - Treeview of open repositories with folder grouping
+- Folders (groups) kept sorted alphabetically; repositories keep their order
 - Drag-and-drop: repos into groups, groups into groups
 - Double-click to switch repository
 - **Open / init** — add an existing repository or initialize a new one in an empty/non-Git folder (`git init`)
@@ -108,16 +109,16 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 
 ## Download
 
-Latest release with binaries for all platforms: **v1.0.0**
+Latest release with binaries for all platforms: **v1.0.1**
 
 | Platform | Package | Link |
 |----------|---------|------|
-| Linux | `.deb` (Debian / Ubuntu) | [GitStream_1.0.0_amd64.deb](https://github.com/avv7bc/gitstream/releases/download/v1.0.0/GitStream_1.0.0_amd64.deb) |
-| Linux | `.rpm` (Fedora / RHEL) | [GitStream-1.0.0-1.x86_64.rpm](https://github.com/avv7bc/gitstream/releases/download/v1.0.0/GitStream-1.0.0-1.x86_64.rpm) |
-| Linux | `.AppImage` | [GitStream_1.0.0_amd64.AppImage](https://github.com/avv7bc/gitstream/releases/download/v1.0.0/GitStream_1.0.0_amd64.AppImage) |
-| macOS | `.dmg` (Apple Silicon) | [GitStream_1.0.0_aarch64.dmg](https://github.com/avv7bc/gitstream/releases/download/v1.0.0/GitStream_1.0.0_aarch64.dmg) |
-| Windows | `.exe` installer | [GitStream_1.0.0_x64-setup.exe](https://github.com/avv7bc/gitstream/releases/download/v1.0.0/GitStream_1.0.0_x64-setup.exe) |
-| Windows | `.msi` | [GitStream_1.0.0_x64_en-US.msi](https://github.com/avv7bc/gitstream/releases/download/v1.0.0/GitStream_1.0.0_x64_en-US.msi) |
+| Linux | `.deb` (Debian / Ubuntu) | [GitStream_1.0.1_amd64.deb](https://github.com/avv7bc/gitstream/releases/download/v1.0.1/GitStream_1.0.1_amd64.deb) |
+| Linux | `.rpm` (Fedora / RHEL) | [GitStream-1.0.1-1.x86_64.rpm](https://github.com/avv7bc/gitstream/releases/download/v1.0.1/GitStream-1.0.1-1.x86_64.rpm) |
+| Linux | `.AppImage` | [GitStream_1.0.1_amd64.AppImage](https://github.com/avv7bc/gitstream/releases/download/v1.0.1/GitStream_1.0.1_amd64.AppImage) |
+| macOS | `.dmg` (Apple Silicon) | [GitStream_1.0.1_aarch64.dmg](https://github.com/avv7bc/gitstream/releases/download/v1.0.1/GitStream_1.0.1_aarch64.dmg) |
+| Windows | `.exe` installer | [GitStream_1.0.1_x64-setup.exe](https://github.com/avv7bc/gitstream/releases/download/v1.0.1/GitStream_1.0.1_x64-setup.exe) |
+| Windows | `.msi` | [GitStream_1.0.1_x64_en-US.msi](https://github.com/avv7bc/gitstream/releases/download/v1.0.1/GitStream_1.0.1_x64_en-US.msi) |
 
 All releases: [github.com/avv7bc/gitstream/releases](https://github.com/avv7bc/gitstream/releases)
 
