@@ -8,7 +8,7 @@ import type { RepoPathCheck } from "@/types";
 
 const emit = defineEmits<{
   close: [];
-  confirm: [path: string, name: string];
+  confirm: [path: string, name: string, isGitRepo: boolean];
 }>();
 
 const lastPath = localStorage.getItem("gitstream:last-repo-path") ?? "";
@@ -67,7 +67,7 @@ async function browseFolder() {
 function submit() {
   if (!canAdd.value || !pathCheck.value) return;
   localStorage.setItem("gitstream:last-repo-path", repoPath.value.trim());
-  emit("confirm", repoPath.value.trim(), pathCheck.value.display_name);
+  emit("confirm", repoPath.value.trim(), pathCheck.value.display_name, pathCheck.value.is_git_repo);
 }
 
 onMounted(() => {

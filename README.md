@@ -57,7 +57,9 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 - Treeview of open repositories with folder grouping
 - Drag-and-drop: repos into groups, groups into groups
 - Double-click to switch repository
-- Context menu: Add Repository, Create Group, Delete
+- **Open / init** — add an existing repository or initialize a new one in an empty/non-Git folder (`git init`)
+- **Clone** — clone a remote repository by URL into a chosen directory, with live progress
+- Context menu: Add Repository, Clone Repository, Create Group, Delete
 
 ### Keyboard shortcuts
 - **Ctrl+K** — open commit dialog

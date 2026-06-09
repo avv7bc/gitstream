@@ -161,7 +161,9 @@ src-tauri/src/                # Rust backend
 ### Repositories (treeview)
 - Drag-and-drop: репозитории в папки, папки в папки, на верхний уровень
 - Двойной клик — переключение на репозиторий
-- Контекстное меню: Add Repository, Add Group, Delete
+- **Open / init** — добавление существующего репозитория или `git init` в пустой/не-git папке (`do_init`)
+- **Clone** — клонирование по URL в выбранную папку с прогрессом (`do_clone`, async через `run_network_git`)
+- Контекстное меню: Add Repository, Clone Repository, Add Group, Delete
 
 ### Диалоги
 - **Commit** — сообщение, amend, индикатор длины строки, Commit & Push

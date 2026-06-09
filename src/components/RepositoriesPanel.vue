@@ -4,11 +4,15 @@ import { invoke } from "@/composables/useProgress";
 import { useRepo } from "@/composables/useRepo";
 import { useI18n } from "@/composables/useI18n";
 import type { RepoInfo } from "@/types";
+import { useSettings } from "@/composables/useSettings";
+import { logError } from "@/composables/useProgress";
 import AddGroupDialog from "@/components/dialogs/AddGroupDialog.vue";
 import AddRepositoryDialog from "@/components/dialogs/AddRepositoryDialog.vue";
+import CloneRepositoryDialog from "@/components/dialogs/CloneRepositoryDialog.vue";
 import RenameNodeDialog from "@/components/dialogs/RenameNodeDialog.vue";
 
 const { i18n } = useI18n();
+const { networkTimeoutSecs } = useSettings();
 
 // --- Tree node types ---
 interface RepoNode {
@@ -246,6 +250,31 @@ function addRepository() {
   showAddRepoDialog.value = true;
 }
 
+const showCloneDialog = ref(false);
+const cloneTargetId = ref<string | null>(null);
+
+function cloneRepository() {
+  cloneTargetId.value = ctxTargetId.value;
+  closeCtxMenu();
+  showCloneDialog.value = true;
+}
+
+async function confirmClone(url: string, dest: string, name: string) {
+  const target = cloneTargetId.value;
+  showCloneDialog.value = false;
+  cloneTargetId.value = null;
+
+  // Клон может идти минуты — поднимаем нижний порог таймаута до 5 минут.
+  const timeoutSecs = Math.max(networkTimeoutSecs.value, 300);
+  try {
+    await invoke<string>("do_clone", { url, dest, timeoutSecs });
+  } catch (e) {
+    logError(String(e));
+    return;
+  }
+  selectedId.value = await addRepoToTree(dest, name, target);
+}
+
 function findAllRepos(nodes: TreeNode[]): RepoNode[] {
   const result: RepoNode[] = [];
   for (const n of nodes) {
@@ -255,15 +284,12 @@ function findAllRepos(nodes: TreeNode[]): RepoNode[] {
   return result;
 }
 
-async function confirmAddRepository(path: string, name: string) {
-  // Prevent duplicates
+// Добавляет узел репозитория в дерево (в целевую папку targetId или в корень),
+// подгружает текущую ветку. Возвращает id добавленного узла или существующего
+// при дубликате пути.
+async function addRepoToTree(path: string, name: string, targetId: string | null): Promise<string> {
   const existing = findAllRepos(tree.value).find((r) => r.path === path);
-  if (existing) {
-    selectedId.value = existing.id;
-    showAddRepoDialog.value = false;
-    addRepoTargetId.value = null;
-    return;
-  }
+  if (existing) return existing.id;
 
   const id = `r${nextId++}`;
   const node: RepoNode = { id, type: "repo", name, path, branch: "", hasChanges: false };
@@ -274,20 +300,32 @@ async function confirmAddRepository(path: string, name: string) {
     node.branch = info.current_branch;
   } catch { /* leave empty */ }
 
-  if (addRepoTargetId.value) {
-    const target = findNode(tree.value, addRepoTargetId.value);
-    if (target?.type === "folder") {
-      target.children.push(node);
-      target.expanded = true;
-    } else {
-      tree.value.push(node);
-    }
+  const target = targetId ? findNode(tree.value, targetId) : null;
+  if (target?.type === "folder") {
+    target.children.push(node);
+    target.expanded = true;
   } else {
     tree.value.push(node);
   }
-  selectedId.value = id;
+  return id;
+}
+
+async function confirmAddRepository(path: string, name: string, isGitRepo: boolean) {
+  const target = addRepoTargetId.value;
   showAddRepoDialog.value = false;
   addRepoTargetId.value = null;
+
+  // Пустая/не-git папка → инициализируем новый репозиторий
+  if (!isGitRepo) {
+    try {
+      await invoke<RepoInfo>("do_init", { path });
+    } catch (e) {
+      logError(String(e));
+      return;
+    }
+  }
+
+  selectedId.value = await addRepoToTree(path, name, target);
 }
 
 const showAddGroupDialog = ref(false);
@@ -550,6 +588,7 @@ defineExpose({
         @click.stop
       >
         <button class="ctx-item" @click="addRepository">{{ i18n.repos.addRepository }}</button>
+        <button class="ctx-item" @click="cloneRepository">{{ i18n.repos.cloneRepository }}</button>
         <button class="ctx-item" @click="addGroup">{{ i18n.repos.addGroup }}</button>
         <button v-if="ctxTargetId" class="ctx-item" @click="renameNode">{{ i18n.repos.rename }}</button>
         <div v-if="ctxTargetId" class="ctx-separator" />
@@ -567,6 +606,12 @@ defineExpose({
         v-if="showAddRepoDialog"
         @close="showAddRepoDialog = false"
         @confirm="confirmAddRepository"
+      />
+
+      <CloneRepositoryDialog
+        v-if="showCloneDialog"
+        @close="showCloneDialog = false"
+        @confirm="confirmClone"
       />
 
       <RenameNodeDialog

@@ -84,6 +84,8 @@ fn main() {
             settings::get_settings,
             settings::set_settings,
             commands::check_repo_path,
+            commands::do_init,
+            commands::do_clone,
             commands::get_repo_stats,
             commands::check_for_update,
             commands::open_url,

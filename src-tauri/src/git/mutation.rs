@@ -779,6 +779,24 @@ pub fn apply_lines(
     apply_patch(repo_path, &patch, reverse, cached)
 }
 
+/// Инициализирует новый git-репозиторий в указанной (существующей) папке.
+pub fn init(repo_path: &Path) -> Result<(), GitError> {
+    run_git_mut(repo_path, &["init"])?;
+    Ok(())
+}
+
+/// Аргументы для `git clone -- <url> <dest>`. `--` отделяет опции от
+/// позиционных аргументов, чтобы url/dest не могли протащить флаг
+/// (argv flag smuggling). Прогресс стримится через `run_network_git`.
+pub fn clone_args(url: &str, dest: &str) -> Vec<String> {
+    vec![
+        "clone".to_string(),
+        "--".to_string(),
+        url.to_string(),
+        dest.to_string(),
+    ]
+}
+
 #[cfg(test)]
 mod tag_tests {
     use super::*;
@@ -1119,5 +1137,38 @@ mod partial_line_tests {
         apply_lines(&dir, file_header, &hunks, LineOp::Stage).unwrap();
         assert_eq!(staged_content(&dir), "l1\nl2\nNEW\nl3\n");
         fs::remove_dir_all(&dir).ok();
+    }
+}
+
+#[cfg(test)]
+mod init_tests {
+    use super::*;
+    use std::fs;
+
+    fn empty_dir() -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "gitstream_init_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn init_creates_git_dir() {
+        let dir = empty_dir();
+        init(&dir).unwrap();
+        assert!(dir.join(".git").exists());
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn clone_args_shape() {
+        let args = clone_args("https://example.com/r.git", "/dest/r");
+        assert_eq!(args, vec!["clone", "--", "https://example.com/r.git", "/dest/r"]);
     }
 }

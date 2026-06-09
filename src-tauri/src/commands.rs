@@ -563,6 +563,28 @@ pub async fn do_squash(
 }
 
 #[tauri::command]
+pub fn do_init(path: String) -> Result<RepoInfo, String> {
+    let p = Path::new(&path);
+    mutation::init(p).map_err(|e| e.to_string())?;
+    query::repo_info(p).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn do_clone(
+    app: tauri::AppHandle,
+    url: String,
+    dest: String,
+    timeout_secs: Option<u64>,
+) -> Result<String, String> {
+    // Защита от argv flag smuggling (вдобавок к `--` в clone_args).
+    if url.starts_with('-') || dest.starts_with('-') {
+        return Err("invalid argument: url/dest must not start with '-'".into());
+    }
+    let args = mutation::clone_args(&url, &dest);
+    run_network_git(&app, None, &args, timeout_secs, "clone").await
+}
+
+#[tauri::command]
 pub fn check_repo_path(path: String) -> Result<RepoPathCheck, String> {
     let p = PathBuf::from(&path);
     if !p.exists() {

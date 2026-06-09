@@ -69,6 +69,7 @@ export const en: Translations = {
   repos: {
     title: "Repositories",
     addRepository: "Add Repository",
+    cloneRepository: "Clone Repository",
     addGroup: "Add Group",
     rename: "Rename",
     delete: "Delete",
@@ -192,6 +193,16 @@ export const en: Translations = {
       gitFound: "Git repository found",
       notGitWillInit: "Not a Git repository — will be initialized",
       ok: "OK",
+      cancel: "Cancel",
+    },
+    clone: {
+      title: "Clone Repository",
+      hint: "Clone a remote repository",
+      subhint: "Enter the repository URL and a destination directory. A subfolder will be created.",
+      urlLabel: "Repository URL:",
+      dirLabel: "Destination directory:",
+      nameLabel: "Folder name:",
+      ok: "Clone",
       cancel: "Cancel",
     },
     addGroup: {
