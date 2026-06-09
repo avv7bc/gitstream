@@ -22,7 +22,7 @@ const LINE_H = 20;
 interface SideRow {
   no: number | null;
   content: string;
-  kind: "context" | "removed" | "added";
+  kind: "context" | "removed" | "added" | "filler";
 }
 interface ChangeGroup {
   leftStart: number;
@@ -52,8 +52,9 @@ function prepare(hunk: DiffHunk, baseIndex: number): { h: PreparedHunk; nextInde
       right.push({ no: ln.new_lineno, content: ln.content, kind: "context" });
       i++;
     } else {
-      const leftStart = left.length;
-      const rightStart = right.length;
+      // Контекст держит left.length == right.length, поэтому начало группы
+      // совпадает для обеих сторон.
+      const start = left.length;
       while (i < hunk.lines.length && hunk.lines[i].kind === "removed") {
         const l = hunk.lines[i];
         left.push({ no: l.old_lineno, content: l.content, kind: "removed" });
@@ -64,10 +65,14 @@ function prepare(hunk: DiffHunk, baseIndex: number): { h: PreparedHunk; nextInde
         right.push({ no: a.new_lineno, content: a.content, kind: "added" });
         i++;
       }
+      // Паддинг короткой стороны пустыми строками — иначе контекст после
+      // изменения уезжает по вертикали на полном файле.
+      while (left.length < right.length) left.push({ no: null, content: "", kind: "filler" });
+      while (right.length < left.length) right.push({ no: null, content: "", kind: "filler" });
       groups.push({
-        leftStart,
+        leftStart: start,
         leftEnd: left.length,
-        rightStart,
+        rightStart: start,
         rightEnd: right.length,
         index: idx++,
       });
@@ -115,17 +120,22 @@ async function load() {
   error.value = null;
   diff.value = null;
   try {
+    // File Compare показывает файл целиком: запрашиваем дифф с контекстом на
+    // весь файл (-U), чтобы неизменённые строки тоже отрисовались.
+    const FULL_CONTEXT = 1_000_000;
     if (target.value.oid) {
-      const diffs = await invoke<FileDiff[]>("get_diff_commit", {
+      diff.value = await invoke<FileDiff>("get_diff_commit_file", {
         repoPath: repoPath.value,
         oid: target.value.oid,
+        file: target.value.path,
+        context: FULL_CONTEXT,
       });
-      diff.value = diffs.find((d) => d.path === target.value!.path) ?? null;
     } else {
       diff.value = await invoke<FileDiff>("get_diff_file", {
         repoPath: repoPath.value,
         file: target.value.path,
         staged: target.value.staged ?? false,
+        context: FULL_CONTEXT,
       });
     }
     currentChange.value = 0;
@@ -463,6 +473,15 @@ function curvePath(g: ChangeGroup): string {
 }
 .fc-row.removed { background: var(--diff-removed-bg); }
 .fc-row.added { background: var(--diff-added-bg); }
+.fc-row.filler {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--bg-secondary),
+    var(--bg-secondary) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
 
 .fc-lno {
   width: 36px;

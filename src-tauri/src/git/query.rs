@@ -577,23 +577,36 @@ pub fn repo_info(repo_path: &Path) -> Result<RepoInfo, GitError> {
     })
 }
 
-pub fn diff_file(repo_path: &Path, file: &str, staged: bool) -> Result<FileDiff, GitError> {
+pub fn diff_file(
+    repo_path: &Path,
+    file: &str,
+    staged: bool,
+    context: Option<u32>,
+) -> Result<FileDiff, GitError> {
+    // `-U<n>` управляет числом строк контекста: File Compare запрашивает весь
+    // файл (большое n), основная diff-панель — обычные хунки (None).
+    let ctx = context.map(|n| format!("-U{}", n));
     // Untracked-файл отсутствует в индексе/HEAD — обычный `git diff` пуст.
     // Синтезируем дифф «всё добавлено» сравнением с /dev/null.
     if !staged && is_untracked(repo_path, file) {
-        let output = run_git_lenient(
-            repo_path,
-            &["-c", "core.quotepath=false", "diff", "--no-index", "--", "/dev/null", file],
-        );
+        let mut args = vec!["-c", "core.quotepath=false", "diff", "--no-index"];
+        if let Some(c) = &ctx {
+            args.push(c);
+        }
+        args.extend(["--", "/dev/null", file]);
+        let output = run_git_lenient(repo_path, &args);
         let mut diff = parse_diff_single(&output, file);
         fill_binary(repo_path, &mut diff, None, BlobSrc::Disk);
         return Ok(diff);
     }
-    let args = if staged {
-        vec!["-c", "core.quotepath=false", "diff", "--cached", "--", file]
-    } else {
-        vec!["-c", "core.quotepath=false", "diff", "--", file]
-    };
+    let mut args = vec!["-c", "core.quotepath=false", "diff"];
+    if staged {
+        args.push("--cached");
+    }
+    if let Some(c) = &ctx {
+        args.push(c);
+    }
+    args.extend(["--", file]);
     let output = run_git(repo_path, &args).unwrap_or_default();
     let mut diff = parse_diff_single(&output, file);
     // staged: новая версия — индекс (`:path`); unstaged — рабочее дерево.
@@ -639,32 +652,34 @@ pub fn diff_commit(repo_path: &Path, oid: &str) -> Result<Vec<FileDiff>, GitErro
 /// откатываемся к `git show`.
 /// Пайспек `-- file` убирает детектирование переименований, поэтому
 /// переименованный файл всегда показывается как полное добавление.
-pub fn diff_commit_file(repo_path: &Path, oid: &str, file: &str) -> Result<FileDiff, GitError> {
+pub fn diff_commit_file(
+    repo_path: &Path,
+    oid: &str,
+    file: &str,
+    context: Option<u32>,
+) -> Result<FileDiff, GitError> {
+    let ctx = context.map(|n| format!("-U{}", n));
     let has_parent = run_git(
         repo_path,
         &["rev-parse", "--verify", "--quiet", &format!("{}^", oid)],
     )
     .is_ok();
 
+    let range = format!("{}^..{}", oid, oid);
     let output = if has_parent {
-        let range = format!("{}^..{}", oid, oid);
-        run_git(
-            repo_path,
-            &["-c", "core.quotepath=false", "diff", &range, "--", file],
-        )?
+        let mut args = vec!["-c", "core.quotepath=false", "diff", &range];
+        if let Some(c) = &ctx {
+            args.push(c);
+        }
+        args.extend(["--", file]);
+        run_git(repo_path, &args)?
     } else {
-        run_git(
-            repo_path,
-            &[
-                "-c",
-                "core.quotepath=false",
-                "show",
-                oid,
-                "--format=",
-                "--",
-                file,
-            ],
-        )?
+        let mut args = vec!["-c", "core.quotepath=false", "show", oid, "--format="];
+        if let Some(c) = &ctx {
+            args.push(c);
+        }
+        args.extend(["--", file]);
+        run_git(repo_path, &args)?
     };
 
     let mut diff = parse_diff_single(&output, file);
@@ -1098,7 +1113,7 @@ mod diff_untracked_tests {
         git(&dir, &["init", "-q"]);
         fs::write(dir.join("new.txt"), "alpha\nbeta\ngamma\n").unwrap();
 
-        let diff = diff_file(&dir, "new.txt", false).unwrap();
+        let diff = diff_file(&dir, "new.txt", false, None).unwrap();
 
         let added: Vec<&str> = diff
             .hunks
@@ -1282,7 +1297,7 @@ mod diff_commit_tests {
         git(&dir, &["add", "."]);
         git(&dir, &["commit", "-qm", "spaced"]);
 
-        let d = diff_commit_file(&dir, &head(&dir), "new file.txt").unwrap();
+        let d = diff_commit_file(&dir, &head(&dir), "new file.txt", None).unwrap();
         assert_eq!(d.path, "new file.txt");
         assert!(!d.hunks.is_empty());
 
@@ -1297,7 +1312,7 @@ mod diff_commit_tests {
         git(&dir, &["add", "."]);
         git(&dir, &["commit", "-qm", "bin"]);
 
-        let d = diff_commit_file(&dir, &head(&dir), "blob.bin").unwrap();
+        let d = diff_commit_file(&dir, &head(&dir), "blob.bin", None).unwrap();
         assert!(d.binary, "бинарный файл должен быть помечен");
         assert_eq!(d.byte_size, Some(6));
         assert!(d.hunks.is_empty());
@@ -1328,7 +1343,7 @@ mod diff_commit_tests {
 
         // diff_commit_file ограничен пайспеком `-- new/m.rs`: git не видит
         // удалённый old/m.rs и показывает файл как добавление с содержимым.
-        let renamed = diff_commit_file(&dir, &oid, "new/m.rs").unwrap();
+        let renamed = diff_commit_file(&dir, &oid, "new/m.rs", None).unwrap();
         assert!(
             !renamed.hunks.is_empty(),
             "diff_commit_file показывает содержимое переименованного файла"
@@ -1395,7 +1410,7 @@ mod diff_commit_tests {
         // diff_commit_file на merge-коммите должен показывать содержимое файла
         // (diff vs первого родителя), а не пустой combined diff.
         // Регрессия: git show отдавал бы пустой combined-diff для чистых слияний.
-        let file_diff = diff_commit_file(&dir, &merge_oid, "b.txt")
+        let file_diff = diff_commit_file(&dir, &merge_oid, "b.txt", None)
             .expect("diff_commit_file для merge не должен падать");
         assert!(
             !file_diff.hunks.is_empty(),
