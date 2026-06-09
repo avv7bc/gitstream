@@ -207,8 +207,20 @@ pub fn get_remote_urls(repo_path: String) -> Result<Vec<RemoteInfo>, String> {
 }
 
 #[tauri::command]
-pub fn get_diff_file(repo_path: String, file: String, staged: bool) -> Result<FileDiff, String> {
-    query::diff_file(Path::new(&repo_path), &file, staged).map_err(|e| e.to_string())
+pub async fn get_diff_file(
+    repo_path: String,
+    file: String,
+    staged: bool,
+) -> Result<FileDiff, String> {
+    // Sync-команда блокировала бы главный поток Tauri: `git diff` большого файла
+    // (например, File Compare для почти полностью переписанного файла) замораживает
+    // UI до «GitStream не отвечает».
+    let path = PathBuf::from(repo_path);
+    tokio::task::spawn_blocking(move || {
+        query::diff_file(&path, &file, staged).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
