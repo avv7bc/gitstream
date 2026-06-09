@@ -265,7 +265,7 @@ pub fn checkout(repo_path: &Path, branch: &str) -> Result<(), GitError> {
         try_set_upstream(repo_path, branch);
         return Ok(());
     }
-    if let Some(local) = branch.split('/').last() {
+    if let Some(local) = branch.split('/').next_back() {
         run_git_mut(repo_path, &["switch", "-c", local, branch])?;
         return Ok(());
     }
@@ -610,6 +610,47 @@ pub fn add_remote(repo_path: &Path, name: &str, url: &str) -> Result<(), GitErro
     validate_url(url)?;
     run_git_mut(repo_path, &["remote", "add", name, url])?;
     Ok(())
+}
+
+/// Включает git credential helper глобально, если он ещё не настроен. Идемпотентно:
+/// существующий helper не трогаем. Дефолт зависит от платформы. Нужно, чтобы
+/// введённые через askpass credentials сохранялись между операциями (git сам
+/// вызывает helper'у `store`/`approve` после успеха).
+pub fn ensure_credential_helper() -> Result<(), GitError> {
+    let run = |args: &[&str]| {
+        Command::new("git")
+            .args(args)
+            .output()
+            .map_err(|e| GitError::CommandFailed {
+                message: format!("Failed to run git: {}", e),
+                hint: Some("Is git installed and in PATH?".into()),
+            })
+    };
+
+    let existing = run(&["config", "--global", "--get", "credential.helper"])?;
+    // `git config --get` выходит с кодом 1, если ключа нет — это не ошибка.
+    if existing.status.success()
+        && !String::from_utf8_lossy(&existing.stdout).trim().is_empty()
+    {
+        return Ok(());
+    }
+
+    let helper = if cfg!(target_os = "macos") {
+        "osxkeychain"
+    } else if cfg!(target_os = "windows") {
+        "manager"
+    } else {
+        // Linux: cache держит секрет в памяти демона (по умолчанию ~15 мин).
+        // Постоянное хранилище (libsecret) — за рамками 0.9.8.
+        "cache"
+    };
+
+    let out = run(&["config", "--global", "credential.helper", helper])?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(classify_git_error(&String::from_utf8_lossy(&out.stderr)))
+    }
 }
 
 pub fn remove_remote(repo_path: &Path, name: &str) -> Result<(), GitError> {

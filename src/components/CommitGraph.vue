@@ -8,6 +8,7 @@ import { useFiles } from "@/composables/useFiles";
 import { useRepo } from "@/composables/useRepo";
 import type { RefLabel, GraphLine } from "@/types";
 import { highlight } from "@/utils/highlight";
+import { filterCommits } from "@/utils/commitFilter";
 
 const emit = defineEmits<{
   commit: [];
@@ -437,19 +438,7 @@ const maxAuthorLen = computed(() => {
   return m;
 });
 
-const filteredCommits = computed(() => {
-  const q = graphFilter.value.toLowerCase();
-  if (!q) return commits.value;
-  return commits.value.filter((c) =>
-    c.message.toLowerCase().includes(q) ||
-    c.author.toLowerCase().includes(q) ||
-    c.author_email.toLowerCase().includes(q) ||
-    c.oid.toLowerCase().includes(q) ||
-    c.short_oid.toLowerCase().includes(q) ||
-    c.date.toLowerCase().includes(q) ||
-    c.refs.some((r) => r.name.toLowerCase().includes(q))
-  );
-});
+const filteredCommits = computed(() => filterCommits(commits.value, graphFilter.value));
 
 function refClass(r: RefLabel): string {
   return `ref-label ref-${r.kind}`;

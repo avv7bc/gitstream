@@ -19,19 +19,20 @@
 - ✅ `fetch --prune` (флаг `prune` в `do_fetch`)
 - ✅ UI: секция Remotes в BranchPanel + контекстное меню + `RemoteDialog`/`SetUpstreamDialog`
 
-### 3. Аутентификация — 0.9.8
+### 3. Аутентификация — 0.9.8 ✅ (сделано)
 Без этого push/pull по HTTPS/SSH ломается «молча».
-- Перехват запроса credentials (login/password / token)
-- SSH passphrase prompt
-- Интеграция с git credential helper / cache
-- Внятные ошибки auth (частично уже есть в `classify_git_error`)
+- ✅ Перехват запроса credentials (login/password / token) — askpass-мост (self-exec, `askpass.rs`)
+- ✅ SSH passphrase prompt (`SSH_ASKPASS` + `SSH_ASKPASS_REQUIRE=force`)
+- ✅ Интеграция с git credential helper / cache (`ensure_credential_helper`, чекбокс «Запомнить»)
+- ✅ Внятные ошибки auth + `AuthCancelled` (отмена диалога); таймаут на паузе во время prompt'а
 
-### 4. Качество и стабильность — 0.9.9
+### 4. Качество и стабильность — 0.9.9 🟡 (в работе)
 Водораздел между 0.x и 1.0.
-- **Фронтенд-тесты**: добавить Vitest, покрыть composables (`useFiles`, `useLog`, `useDiff`, парсинг porcelain/format-вывода — самое хрупкое)
-- **CI**: добавить workflow `ci.yml` — `vue-tsc --noEmit`, `vitest run`, `cargo test`, `cargo clippy` на каждый PR (сейчас только `release.yml`)
-- Граничные случаи: пустой репозиторий, detached HEAD, репо без коммитов, репо без remote, огромный лог
-- Аудит обработки ошибок: ни одна git-команда не должна падать без сообщения в Git output
+- ✅ **CI**: `ci.yml` — `vue-tsc --noEmit`, `vitest run`, `cargo test`, `cargo clippy --all-targets -D warnings` на каждый PR/push в main; clippy-преды вычищены
+- ✅ **Vitest поднят** (config + scripts `test`/`test:watch`); первое покрытие — `highlight.ts` (escaping/v-html safety)
+- ✅ Вынесена хрупкая чистая логика в `utils/` + тесты: `wordDiff` (word-level diff, парность строк, лимит), `commitFilter` (фильтр лога по message/author/SHA/date/refs); `useSideBySideDiff` теперь тонкая обёртка. Покрытие — 31 тест (3 файла)
+- ✅ Аудит обработки ошибок: глобальная сеть `unhandledrejection` → Git output (никакой git-reject не пропадает молча); `console.error` в Side-by-side diff заменён на `logError`. Аудит 62 call-site проведён (agent)
+- 🟡 Граничные случаи: backend-регрессы (`edge_case_tests`) — пустой репо/unborn-ветка (status/log/branches/remotes/repo_info/repo_state), staged-файл в unborn, detached HEAD, репо без remote. Остаётся ручной прогон UI (огромный лог, рендеринг этих состояний)
 
 ---
 
@@ -59,8 +60,8 @@
 |-----------|-------------------------------------|------|
 | 0.9.6     | git init / open / clone             | ✅ done |
 | 0.9.7     | Управление remote + upstream        | ✅ done |
-| 0.9.8     | Аутентификация (creds/SSH/cache)    | must |
-| 0.9.9     | Тесты (Vitest) + CI + аудит ошибок  | must |
+| 0.9.8     | Аутентификация (creds/SSH/cache)    | ✅ done |
+| 0.9.9     | Тесты (Vitest) + CI + аудит ошибок  | 🟡 в работе |
 | 1.0.0-rc  | File history + Blame                | nice |
 | **1.0.0** | Полировка, docs, скриншоты, релиз   | —    |
 

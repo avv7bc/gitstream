@@ -2,7 +2,9 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
-use tauri::Emitter;
+use std::sync::atomic::Ordering;
+
+use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
 
@@ -63,6 +65,22 @@ async fn run_network_git(
     cmd.stderr(Stdio::piped());
     cmd.kill_on_drop(true);
 
+    // Указываем git'у/ssh на нас как на askpass: при запросе credentials git
+    // запустит этот бинарь, который покажет диалог в GUI (см. askpass.rs).
+    let askpass = app.try_state::<crate::askpass::AskpassState>();
+    if let Some(state) = &askpass {
+        if let Ok(exe) = std::env::current_exe() {
+            cmd.env("GIT_ASKPASS", &exe);
+            cmd.env("SSH_ASKPASS", &exe);
+            cmd.env("SSH_ASKPASS_REQUIRE", "force");
+            cmd.env("GITSTREAM_ASKPASS_PIPE", &state.addr);
+            cmd.env("GITSTREAM_ASKPASS_NONCE", &state.nonce);
+        }
+    }
+    // Никогда не падаем на интерактивный TTY-prompt (его нет — зависли бы).
+    cmd.env("GIT_TERMINAL_PROMPT", "0");
+    let active = askpass.map(|s| s.active.clone());
+
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to run git: {} (Is git installed and in PATH?)", e))?;
@@ -82,7 +100,7 @@ async fn run_network_git(
                     Ok(0) | Err(_) => break,
                     Ok(_) => {
                         // git пишет прогресс с \r внутри строки — берём последний сегмент
-                        let stripped = line.trim_end_matches(|c| c == '\r' || c == '\n');
+                        let stripped = line.trim_end_matches(['\r', '\n']);
                         let trimmed = stripped.rsplit('\r').find(|s| !s.trim().is_empty())
                             .unwrap_or(stripped)
                             .trim();
@@ -104,26 +122,54 @@ async fn run_network_git(
         collected
     });
 
-    match tokio::time::timeout(Duration::from_secs(secs), child.wait()).await {
-        Ok(Ok(status)) => {
-            let stderr_text = stderr_task.await.unwrap_or_default();
-            let mut stdout = String::new();
-            if let Some(mut o) = child.stdout.take() {
-                let _ = o.read_to_string(&mut stdout).await;
-            }
-            if status.success() {
-                Ok(stdout)
-            } else {
-                Err(crate::git::error::classify_git_error(&stderr_text).to_string())
-            }
+    // Опрашиваем процесс вместо единого таймаута: бюджет таймаута расходуется
+    // только когда нет открытого askpass-диалога — иначе git убивался бы, пока
+    // пользователь печатает пароль.
+    let poll = Duration::from_millis(150);
+    let mut remaining = Duration::from_secs(secs);
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {}
+            Err(e) => return Err(format!("git wait failed: {}", e)),
         }
-        Ok(Err(e)) => Err(format!("git wait failed: {}", e)),
-        Err(_) => {
-            let _ = child.start_kill();
-            let _ = child.wait().await;
-            Err(format!("Network timeout: {} превысил {} сек", label, secs))
+        let prompting = active.as_ref().is_some_and(|a| a.load(Ordering::SeqCst) > 0);
+        if !prompting {
+            if remaining <= poll {
+                let _ = child.start_kill();
+                let _ = child.wait().await;
+                let _ = stderr_task.await;
+                return Err(format!("Network timeout: {} превысил {} сек", label, secs));
+            }
+            remaining -= poll;
         }
+        tokio::time::sleep(poll).await;
+    };
+
+    let stderr_text = stderr_task.await.unwrap_or_default();
+    let mut stdout = String::new();
+    if let Some(mut o) = child.stdout.take() {
+        let _ = o.read_to_string(&mut stdout).await;
     }
+    if status.success() {
+        Ok(stdout)
+    } else {
+        Err(crate::git::error::classify_git_error(&stderr_text).to_string())
+    }
+}
+
+/// Ответ GUI на запрос askpass: проводит введённое значение в git (или отмена).
+#[tauri::command]
+pub fn askpass_respond(app: tauri::AppHandle, id: u64, value: String, cancel: bool) {
+    if let Some(state) = app.try_state::<crate::askpass::AskpassState>() {
+        state.respond(id, if cancel { None } else { Some(value) });
+    }
+}
+
+/// Включает git credential helper, если он ещё не настроен (чекбокс «Запомнить»).
+#[tauri::command]
+pub fn ensure_credential_helper() -> Result<(), String> {
+    mutation::ensure_credential_helper().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -707,7 +753,7 @@ pub fn list_system_fonts() -> Vec<String> {
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .collect();
-    families.sort_unstable_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+    families.sort_unstable_by_key(|s| s.to_lowercase());
     families.dedup();
     families
 }
@@ -730,6 +776,8 @@ mod network_timeout_tests {
     use std::fs;
     use std::process::Command as StdCommand;
 
+    // Используется закомментированным fetch_times_out_and_kills_process (см. ниже).
+    #[allow(dead_code)]
     fn temp_repo_with_dead_remote() -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!(
             "gitstream_net_test_{}_{}",

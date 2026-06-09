@@ -9,6 +9,8 @@ pub enum GitError {
     },
     #[error("Authentication failed: {0}")]
     AuthenticationFailed(String),
+    #[error("Authentication cancelled")]
+    AuthCancelled,
     #[error("Merge conflict")]
     MergeConflict,
     #[error("Nothing to commit")]
@@ -28,7 +30,14 @@ impl Serialize for GitError {
 
 pub fn classify_git_error(stderr: &str) -> GitError {
     let s = stderr.to_lowercase();
-    if s.contains("authentication failed") {
+    if s.contains("could not read username")
+        || s.contains("could not read password")
+        || s.contains("unable to read askpass")
+        || s.contains("authentication was canceled")
+    {
+        // askpass-helper вернул ненулевой код — пользователь закрыл диалог.
+        GitError::AuthCancelled
+    } else if s.contains("authentication failed") {
         GitError::AuthenticationFailed(
             "Check credentials: run `git config credential.helper`".into(),
         )

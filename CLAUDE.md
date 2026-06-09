@@ -60,6 +60,7 @@ src/                          # Vue.js frontend
 │   ├── useSyncScroll.ts      # Синхронный скролл двух колонок diff
 │   ├── useCommit.ts          # Создание коммитов, squash, reword
 │   ├── useRemote.ts          # Fetch, pull, push
+│   ├── useAuth.ts            # Запрос credentials (askpass) — login/token/passphrase
 │   ├── useConflicts.ts       # Состояние merge/rebase + accept ours/theirs
 │   ├── useFileCompare.ts     # File Compare (diff произвольных ревизий)
 │   ├── useStats.ts           # Статистика репозитория
@@ -73,6 +74,7 @@ src/                          # Vue.js frontend
 src-tauri/src/                # Rust backend
 ├── main.rs                   # Tauri bootstrap, регистрация commands
 ├── commands.rs               # #[tauri::command] — IPC endpoints
+├── askpass.rs                # Askpass-мост: self-exec helper для GIT_ASKPASS/SSH_ASKPASS
 ├── settings.rs               # Чтение/запись настроек приложения
 ├── app_log.rs                # Логирование git-команд (Git output)
 └── git/
@@ -121,6 +123,7 @@ src-tauri/src/                # Rust backend
 - Commit (с amend), Reword (HEAD — amend; не-HEAD — rebase -i со сценарным редактором)
 - Squash нескольких коммитов в один
 - Push / Pull / Fetch (с диалогами выбора remote, таймаут сетевых операций, индикатор remote + обратный отсчёт); Fetch --prune
+- **Аутентификация** — перехват запроса credentials через askpass-мост (self-exec helper): HTTPS login/token, SSH passphrase, host-key confirm; `CredentialDialog` в GUI; чекбокс «Запомнить» включает git credential helper; таймаут сети на паузе, пока открыт диалог; отмена → `AuthCancelled`
 - **Управление remote** — add / edit-url / rename / remove (секция Remotes в BranchPanel + контекстное меню)
 - **Set upstream** — выбор tracking-ветки для локальной ветки (или снятие трекинга)
 - Checkout branch (локальная + remote-ветка с созданием локальной)
@@ -182,6 +185,7 @@ src-tauri/src/                # Rust backend
 - **Settings** — тема, шрифты, таймаут сети, язык
 - **Add Repository / Add Group / Rename Node** — управление treeview
 - **Confirm** — универсальный диалог подтверждения, опц. список затрагиваемых объектов
+- **Credential** — запрос логина/пароля/токена/SSH-passphrase (askpass), host-key confirm, чекбокс «Запомнить»
 - Все диалоги draggable за header и закрываются по Esc
 
 ### Архитектура
@@ -191,6 +195,7 @@ src-tauri/src/                # Rust backend
 - **ConflictBar** — реагирует на состояние репозитория (merge/rebase/cherry-pick/revert), accept ours/theirs, continue/abort
 - **Обработка ошибок** — classify_git_error: auth, network, conflict, hint-подсказки
 - **Сетевые операции** — async + spawn_blocking, настраиваемый таймаут (см. memory)
+- **Аутентификация (askpass-мост)** — GitStream выставляет себя как `GIT_ASKPASS`/`SSH_ASKPASS`; git запускает этот же бинарь, тот по TCP+nonce запрашивает значение у GUI (`askpass.rs`); таймаут расходуется только когда нет открытого prompt'а; персистентность — через `credential.helper`
 - **i18n** — кастомный composable `useI18n`, словари RU/EN
 
 ---

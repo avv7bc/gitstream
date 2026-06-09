@@ -17,6 +17,7 @@ import CheckoutRemoteDialog from "./components/dialogs/CheckoutRemoteDialog.vue"
 import ConfirmDialog from "./components/dialogs/ConfirmDialog.vue";
 import DiscardDialog from "./components/dialogs/DiscardDialog.vue";
 import SettingsDialog from "./components/dialogs/SettingsDialog.vue";
+import CredentialDialog from "./components/dialogs/CredentialDialog.vue";
 import StatsDialog from "./components/dialogs/StatsDialog.vue";
 import SquashDialog from "./components/dialogs/SquashDialog.vue";
 import RewordDialog from "./components/dialogs/RewordDialog.vue";
@@ -598,6 +599,7 @@ function onMouseUp() {
       @close="rewordPayload = null"
     />
     <FileCompareDialog v-if="compareTarget" />
+    <CredentialDialog />
     <UpdateBanner
       v-if="updateInfo"
       :info="updateInfo"

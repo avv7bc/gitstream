@@ -1,11 +1,18 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app_log;
+mod askpass;
 mod commands;
 mod git;
 mod settings;
 
 fn main() {
+    // Если нас запустил git как GIT_ASKPASS/SSH_ASKPASS — обрабатываем запрос и
+    // выходим, не поднимая Tauri.
+    if askpass::maybe_run_askpass() {
+        return;
+    }
+
     #[cfg(target_os = "linux")]
     {
         // WebKitGTK 2.44+ DMA-buf renderer fails to init EGL via GBM on some systems
@@ -20,6 +27,12 @@ fn main() {
         .setup(|app| {
             use tauri::Manager;
             crate::app_log::init(app.handle().clone());
+            match crate::askpass::start(app.handle().clone()) {
+                Ok(state) => {
+                    app.manage(state);
+                }
+                Err(e) => eprintln!("askpass server failed to start: {e}"),
+            }
             if let Some(window) = app.get_webview_window("main") {
                 let icon_bytes = include_bytes!("../icons/icon.png");
                 if let Ok(image) = tauri::image::Image::from_bytes(icon_bytes) {
@@ -45,6 +58,8 @@ fn main() {
             commands::rename_remote,
             commands::set_remote_url,
             commands::set_branch_upstream,
+            commands::askpass_respond,
+            commands::ensure_credential_helper,
             commands::get_diff_file,
             commands::get_diff_commit,
             commands::get_diff_commit_file,

@@ -6,6 +6,7 @@ import { useSyncScroll } from "@/composables/useSyncScroll";
 import { useSideBySideDiff, type DiffHunkWithWordDiff, type DiffLineWithWordDiff } from "@/composables/useSideBySideDiff";
 import { useVirtualList } from "@/composables/useVirtualList";
 import { useI18n } from "@/composables/useI18n";
+import { logError } from "@/composables/useProgress";
 
 const LINE_HEIGHT = 20;
 
@@ -106,7 +107,7 @@ async function onSelectionAction(action: "stage" | "unstage" | "discard") {
     await applyLines(action, currentDiff.value?.header ?? "", payload);
     clearSelection();
   } catch (e) {
-    console.error("Selection action failed:", e);
+    logError(`Selection ${action} failed: ${e}`);
   } finally {
     busyHunk.value = null;
   }
@@ -142,7 +143,7 @@ async function onHunkAction(
     else if (action === "unstage") await unstageHunk(patch);
     else await discardHunk(patch);
   } catch (e) {
-    console.error("Hunk action failed:", e);
+    logError(`Hunk ${action} failed: ${e}`);
   } finally {
     busyHunk.value = null;
   }

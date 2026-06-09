@@ -440,10 +440,10 @@ fn parse_track(track: &str) -> (u32, u32) {
     let mut behind = 0u32;
     for part in track.split(", ") {
         let part = part.trim();
-        if part.starts_with("ahead ") {
-            ahead = part[6..].parse().unwrap_or(0);
-        } else if part.starts_with("behind ") {
-            behind = part[7..].parse().unwrap_or(0);
+        if let Some(n) = part.strip_prefix("ahead ") {
+            ahead = n.parse().unwrap_or(0);
+        } else if let Some(n) = part.strip_prefix("behind ") {
+            behind = n.parse().unwrap_or(0);
         }
     }
     (ahead, behind)
@@ -721,9 +721,9 @@ fn parse_diff_single(diff_text: &str, fallback_path: &str) -> FileDiff {
         };
 
     for line in diff_text.lines() {
-        if line.starts_with("+++ b/") {
+        if let Some(rest) = line.strip_prefix("+++ b/") {
             // git дописывает хвостовой TAB, если имя содержит пробелы/спецсимволы.
-            path = line[6..].split('\t').next().unwrap_or("").to_string();
+            path = rest.split('\t').next().unwrap_or("").to_string();
         } else if let Some(rest) = line.strip_prefix("rename to ") {
             // У чистого переименования нет строки `+++` — берём путь отсюда.
             path = rest.split('\t').next().unwrap_or("").to_string();
@@ -787,12 +787,12 @@ fn parse_diff_single(diff_text: &str, fallback_path: &str) -> FileDiff {
             old_line += 1;
             current_raw.push_str(line);
             current_raw.push('\n');
-        } else if line.starts_with(' ') {
+        } else if let Some(rest) = line.strip_prefix(' ') {
             current_lines.push(DiffLine {
                 kind: "context".to_string(),
                 old_lineno: Some(old_line),
                 new_lineno: Some(new_line),
-                content: line[1..].to_string(),
+                content: rest.to_string(),
             });
             old_line += 1;
             new_line += 1;
@@ -946,7 +946,7 @@ pub fn repo_stats(repo_path: &Path, since_days: Option<u32>) -> Result<RepoStats
     }
 
     let mut authors: Vec<AuthorStat> = author_map.into_values().collect();
-    authors.sort_by(|a, b| b.commits.cmp(&a.commits));
+    authors.sort_by_key(|a| std::cmp::Reverse(a.commits));
 
     let mut months: Vec<MonthEntry> = by_month
         .into_iter()
@@ -1431,6 +1431,125 @@ mod diff_commit_tests {
 
         let commits = log(&dir, 500).expect("пустой репозиторий не должен давать ошибку");
         assert!(commits.is_empty(), "лог пустого репозитория должен быть пуст");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+// Граничные состояния репозитория: пустой (без коммитов), detached HEAD, без
+// remote. Read-only запросы обязаны отдавать вменяемый результат, а не падать.
+#[cfg(test)]
+mod edge_case_tests {
+    use super::*;
+    use std::fs;
+
+    fn git(dir: &Path, args: &[&str]) {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+
+    fn empty_repo(tag: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("gitstream_edge_{}_{}", tag, std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "-q"]);
+        git(&dir, &["config", "user.email", "t@t.t"]);
+        git(&dir, &["config", "user.name", "t"]);
+        dir
+    }
+
+    fn with_commits(tag: &str) -> std::path::PathBuf {
+        let dir = empty_repo(tag);
+        fs::write(dir.join("a.txt"), "1\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "c1"]);
+        fs::write(dir.join("a.txt"), "2\n").unwrap();
+        git(&dir, &["commit", "-aqm", "c2"]);
+        dir
+    }
+
+    // Пустой репозиторий: все основные запросы — Ok без паники.
+    #[test]
+    fn empty_repo_queries_are_graceful() {
+        let dir = empty_repo("empty_all");
+
+        assert!(status(&dir).unwrap().is_empty(), "status пуст");
+        assert!(log(&dir, 100).unwrap().is_empty(), "log пуст");
+        assert!(branches(&dir).unwrap().is_empty(), "веток ещё нет");
+        assert!(tags(&dir).unwrap().is_empty(), "тегов нет");
+        assert!(stashes(&dir).unwrap().is_empty(), "stash нет");
+        assert!(remotes(&dir).unwrap().is_empty(), "remote нет");
+        assert_eq!(repo_state(&dir).unwrap(), "clean");
+
+        // repo_info не должен падать: HEAD ещё не существует (unborn-ветка),
+        // head_oid пуст, но ветка по умолчанию уже выбрана.
+        let info = repo_info(&dir).unwrap();
+        assert!(info.head_oid.is_empty(), "у unborn-ветки нет HEAD-oid");
+        assert!(!info.current_branch.is_empty(), "имя unborn-ветки доступно");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // Пустой репозиторий со staged-файлом: status его видит.
+    #[test]
+    fn empty_repo_with_staged_file_shows_in_status() {
+        let dir = empty_repo("empty_staged");
+        fs::write(dir.join("new.txt"), "x\n").unwrap();
+        git(&dir, &["add", "."]);
+
+        let st = status(&dir).unwrap();
+        assert!(
+            st.iter().any(|f| f.path == "new.txt"),
+            "staged-файл в unborn-ветке должен попасть в status"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // Detached HEAD: current_branch пуст, но лог и состояние читаются.
+    #[test]
+    fn detached_head_is_handled() {
+        let dir = with_commits("detached");
+        let first = run_git(&dir, &["rev-list", "--max-parents=0", "HEAD"])
+            .unwrap()
+            .trim()
+            .to_string();
+        git(&dir, &["checkout", "-q", &first]);
+
+        let info = repo_info(&dir).unwrap();
+        assert!(
+            info.current_branch.is_empty(),
+            "в detached HEAD имени текущей ветки нет"
+        );
+        assert_eq!(info.head_oid, first, "HEAD указывает на выбранный коммит");
+        assert!(!log(&dir, 100).unwrap().is_empty(), "лог доступен в detached HEAD");
+        assert_eq!(repo_state(&dir).unwrap(), "clean");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // Репозиторий без remote: remotes пуст, всё незапушено (лог это отражает).
+    #[test]
+    fn repo_without_remote_marks_commits_unpushed() {
+        let dir = with_commits("no_remote");
+
+        assert!(remotes(&dir).unwrap().is_empty(), "remote не настроен");
+        let commits = log(&dir, 100).unwrap();
+        assert!(!commits.is_empty());
+        assert!(
+            commits.iter().all(|c| c.unpushed),
+            "без remote все коммиты считаются незапушенными"
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
