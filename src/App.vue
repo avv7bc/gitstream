@@ -91,7 +91,15 @@ onRepoOpened(async () => {
 });
 
 watch(repoPath, (val) => {
-  if (!val) refreshAll();
+  if (!val) {
+    // Репозиторий закрыт/удалён: чистим выделение и дифф (модульные
+    // синглтоны от предыдущего репо), иначе панель Changes показывает
+    // старый дифф. refreshAll сбросит списки файлов/веток/лога.
+    selectedCommit.value = null;
+    selectedFile.value = null;
+    clearDiff();
+    refreshAll();
+  }
 });
 
 const showCommitDialog = ref(false);

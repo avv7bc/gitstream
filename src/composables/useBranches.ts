@@ -17,7 +17,16 @@ export function useBranches() {
   const { networkTimeoutSecs } = useSettings();
 
   async function refresh() {
-    if (!repoPath.value) return;
+    if (!repoPath.value) {
+      // Репозиторий закрыт/удалён — сбрасываем состояние, иначе панель
+      // BRANCHES сохраняет ветки/теги/stashes предыдущего репо (артефакты).
+      ++refreshSeq;
+      branches.value = [];
+      tags.value = [];
+      stashes.value = [];
+      remotes.value = [];
+      return;
+    }
     const seq = ++refreshSeq;
     const [b, t, s, r] = await Promise.all([
       invoke<BranchInfo[]>("get_branches", { repoPath: repoPath.value }),
