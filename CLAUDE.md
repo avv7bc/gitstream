@@ -39,23 +39,31 @@ src/                          # Vue.js frontend
 │   ├── AppToolbar.vue        # Тулбар: Repository▾/Local▾/Branch▾ + Pull/Push/Fetch
 │   ├── RepositoriesPanel.vue # Treeview репозиториев (drag-and-drop)
 │   ├── BranchPanel.vue       # Ветки, теги, stashes
-│   ├── CommitGraph.vue       # Лог коммитов
+│   ├── CommitGraph.vue       # Лог коммитов + lane-граф (графические линии)
 │   ├── CommitDetails.vue     # Детали выбранного коммита
-│   ├── FileList.vue          # Список файлов со статусами
+│   ├── FileList.vue          # Список файлов со статусами; древовидный режим
 │   ├── DiffPanel.vue         # Unified diff
 │   ├── SideBySideDiffView.vue # Side-by-side diff + выбор строк
+│   ├── DiffLinesPair.vue     # Пара строк (старая/новая) для side-by-side
 │   ├── ConflictBar.vue       # Управление merge/rebase/cherry-pick/revert
 │   ├── StatusBar.vue         # Строка состояния
+│   ├── RefIcon.vue           # Иконки веток/тегов/HEAD
+│   ├── UpdateBanner.vue      # Баннер доступного обновления
 │   └── dialogs/              # Модальные диалоги (см. ниже)
 ├── composables/              # State management
 │   ├── useRepo.ts            # Текущий репозиторий
-│   ├── useFiles.ts           # Статус файлов, stage/unstage/discard, частичный stage
+│   ├── useFiles.ts           # Статус файлов, stage/unstage/discard, частичный stage, дерево
 │   ├── useBranches.ts        # Ветки, теги, stashes, remotes
 │   ├── useLog.ts             # Лог коммитов, reset/revert/cherry-pick
 │   ├── useDiff.ts            # Diff файлов и коммитов
+│   ├── useSideBySideDiff.ts  # Состояние side-by-side diff, выбор строк/хунков
+│   ├── useSyncScroll.ts      # Синхронный скролл двух колонок diff
 │   ├── useCommit.ts          # Создание коммитов, squash, reword
 │   ├── useRemote.ts          # Fetch, pull, push
 │   ├── useConflicts.ts       # Состояние merge/rebase + accept ours/theirs
+│   ├── useFileCompare.ts     # File Compare (diff произвольных ревизий)
+│   ├── useStats.ts           # Статистика репозитория
+│   ├── useProgress.ts        # Прогресс/лог git-команд (Git output)
 │   ├── useI18n.ts            # Локализация RU/EN
 │   ├── useSettings.ts        # Настройки приложения
 │   └── ...                   # useDraggable, useTheme, useUpdate, useVirtualList и др.
@@ -65,11 +73,15 @@ src/                          # Vue.js frontend
 src-tauri/src/                # Rust backend
 ├── main.rs                   # Tauri bootstrap, регистрация commands
 ├── commands.rs               # #[tauri::command] — IPC endpoints
+├── settings.rs               # Чтение/запись настроек приложения
+├── app_log.rs                # Логирование git-команд (Git output)
 └── git/
+    ├── mod.rs                # Реэкспорт модулей git
     ├── types.rs              # Serialize-структуры
     ├── error.rs              # GitError, classify_git_error
     ├── query.rs              # run_git, status, log, branches, tags,
-    │                         # stashes, remotes, repo_info, diff
+    │                         # stashes, remotes, repo_info, diff, ls-tree
+    ├── graph.rs              # assign_lanes — колонки и линии lane-графа
     └── mutation.rs           # stage, unstage, discard, commit, checkout,
                               # merge, branch/tag ops, fetch, pull, push
 ```
@@ -128,15 +140,20 @@ src-tauri/src/                # Rust backend
 - **Ctrl+D** — rebase onto выделенной ветки (local или remote)
 - **F7** — открыть Create Branch
 - **Shift+F7** — открыть Create Tag
+- **Alt+O / Ctrl+O** — открыть/закрыть окно Git output (лог git-команд)
+- **Alt+P** — тоггл панели параметров (любая раскладка)
+- **Esc** — закрыть только верхнее окно/диалог
 
 ### Просмотр
+- **Lane-граф коммитов** — графические линии веток/мержей с цветными колонками (`assign_lanes`), полный обзор репозитория (`--topo-order`), залитые кружки незапушенных коммитов
 - Unified + Side-by-side diff с переключателем, синхронным скроллом, виртуальным списком
 - Превью бинарных файлов и изображений в diff-панели
-- Лог коммитов с деталями (виртуальный список, бесконечная подгрузка при скролле)
+- Лог коммитов с деталями (виртуальный список, бесконечная подгрузка при скролле); фильтр коммитов по сообщению / автору / SHA / дате / refs
 - Поддержка root-коммитов (без родителей) в diff, деталях и списке файлов
-- Список веток / тегов / stash с поиском; шеврон-индикатор текущей ветки
-- Панель файлов со статусами; автовыбор первого файла при загрузке коммита
-- File compare диалог (произвольные ревизии)
+- Список веток / тегов / stash с поиском; шеврон-индикатор текущей ветки; тултип с автором ветки в стиле VSCode (директива `v-tooltip`)
+- **Панель файлов**: статусы, древовидный режим (свёртка папок, expand/collapse all, сохранение раскрытия по репо), фильтры состояния как тогглы-кнопки, подсветка папок с изменениями, тоггл «показать все файлы» (включая неизменённые, через `ls-tree`); корректные кириллические пути (`core.quotePath=false`); автовыбор первого файла
+- **Git output** — окно лога выполненных git-команд с таймстампами и текстом ошибок
+- File compare диалог (произвольные ревизии; показ файла целиком с выравниванием колонок)
 - Stats — статистика репозитория
 - i18n (русский / английский)
 - Авто-обновление приложения; заголовок окна `GitStream v{version}`
@@ -183,10 +200,9 @@ src-tauri/src/                # Rust backend
 - **File history** — лог коммитов конкретного файла
 - **Reflog** — просмотр reflog с возможностью восстановления
 - **Управление remote** — add/remove/set-url, upstream-трекинг, prune
-- **Поиск/фильтрация в логе** — по сообщению, автору, файлу, хэшу
+- **Поиск/фильтрация в логе по файлу** (фильтр по сообщению/автору/SHA/дате/refs уже есть — клиентский, по загруженным коммитам)
 - **git init / open** — инициализация репозитория, открытие локальной папки
 - **Syntax highlighting в diff**, word-level diff
-- **Commit graph с визуальными линиями** (lane allocation)
 - **Interactive rebase UI**, 3-way conflict resolver
 - **Аутентификация** — login/password, SSH passphrase, credentials cache
 - **Прочее** — GPG signing, Git-Flow, Submodules, LFS, bisect, patches, bundles, archive

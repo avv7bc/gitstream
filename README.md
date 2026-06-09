@@ -7,7 +7,11 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 ### File operations
 - **Stage / Unstage / Discard** with a single click or via context menu
 - File statuses: modified, added, deleted, renamed, untracked, conflicted
-- **Unified** and **side-by-side** diff views with a toggle
+- **Tree view** of changed files with collapsible folders, expand/collapse all, and per-repo expansion memory
+- **Show all files** toggle — list the entire working tree (including unchanged files) via `ls-tree`, with changed folders highlighted
+- State filters as toggle buttons (modified / staged / untracked / …)
+- Correct Cyrillic / non-ASCII paths (`core.quotePath=false`)
+- **Unified** and **side-by-side** diff views with a toggle, synced scroll, and virtual list
 
 ### Commits
 - Commit dialog with a file table and checkboxes — pick what to commit without manually touching the index
@@ -18,11 +22,12 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 - **Multi-select** (Shift/Ctrl+click) for batch stage, unstage, commit, discard, or delete
 
 ### History
-- Commit graph with branches, tags, HEAD, and remote tracking
-- Highlights unpushed commits
+- Commit graph with **lane-allocated branch/merge lines** in colored columns (full-repo, topological order)
+- Branches, tags, HEAD, and remote tracking shown on the graph
+- Highlights unpushed commits (filled circles)
 - Working Tree / Index row above the graph — double-click opens the commit dialog
 - Selected commit details: author, date, message, changed files
-- Filter commits by message, author, SHA, date, or branch
+- Filter commits by message, author, SHA, date, or ref name
 
 ### Branches, tags, stash
 - Local and remote branch list with ahead/behind indicators
@@ -60,16 +65,25 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 - **Shift+Ctrl+T** — unstage selected files
 - **Ctrl+M** — merge branch
 - **Ctrl+D** — rebase branch
+- **Ctrl+G** — checkout the selected remote branch
 - **F7** — create branch
 - **Shift+F7** — create tag
 - **Ctrl+A** — select all files in the file panel
+- **Alt+O / Ctrl+O** — toggle the Git output window
+- **Alt+P** — toggle the parameters panel (layout-independent)
+- **Esc** — close only the topmost dialog/window
 
 ### Interface
 - Toolbar with **Repository▾**, **Local▾**, **Branch▾** dropdown menus and Pull/Push/Fetch buttons in the center
+- **Git output** window — timestamped log of executed git commands and their errors
+- **Settings**, **Stats**, and **File Compare** (diff any two revisions of a file) dialogs
+- Branch author tooltip (VSCode-style) on hover
+- Binary-file and image preview in the diff panel
 - Dark theme (Catppuccin-inspired)
 - Draggable modal dialogs
 - Resizable panels
 - Status bar: current branch, ahead/behind, operation progress
+- Auto-update with an in-app banner
 - i18n: Russian / English
 
 ## Tech stack
@@ -80,16 +94,16 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 
 ## Download
 
-Latest release: **v0.6.3**
+Latest release with binaries for all platforms: **v0.9.0**
 
 | Platform | Package | Link |
 |----------|---------|------|
-| Linux | `.deb` (Debian / Ubuntu) | [GitStream_0.6.3_amd64.deb](https://github.com/avv7bc/gitstream/releases/download/v0.6.3/GitStream_0.6.3_amd64.deb) |
-| Linux | `.rpm` (Fedora / RHEL) | [GitStream-0.6.3-1.x86_64.rpm](https://github.com/avv7bc/gitstream/releases/download/v0.6.3/GitStream-0.6.3-1.x86_64.rpm) |
-| Linux | `.AppImage` | [GitStream_0.6.3_amd64.AppImage](https://github.com/avv7bc/gitstream/releases/download/v0.6.3/GitStream_0.6.3_amd64.AppImage) |
-| macOS | `.dmg` (Apple Silicon) | [GitStream_0.6.3_aarch64.dmg](https://github.com/avv7bc/gitstream/releases/download/v0.6.3/GitStream_0.6.3_aarch64.dmg) |
-| Windows | `.exe` installer | [GitStream_0.6.3_x64-setup.exe](https://github.com/avv7bc/gitstream/releases/download/v0.6.3/GitStream_0.6.3_x64-setup.exe) |
-| Windows | `.msi` | [GitStream_0.6.3_x64_en-US.msi](https://github.com/avv7bc/gitstream/releases/download/v0.6.3/GitStream_0.6.3_x64_en-US.msi) |
+| Linux | `.deb` (Debian / Ubuntu) | [GitStream_0.9.0_amd64.deb](https://github.com/avv7bc/gitstream/releases/download/v0.9.0/GitStream_0.9.0_amd64.deb) |
+| Linux | `.rpm` (Fedora / RHEL) | [GitStream-0.9.0-1.x86_64.rpm](https://github.com/avv7bc/gitstream/releases/download/v0.9.0/GitStream-0.9.0-1.x86_64.rpm) |
+| Linux | `.AppImage` | [GitStream_0.9.0_amd64.AppImage](https://github.com/avv7bc/gitstream/releases/download/v0.9.0/GitStream_0.9.0_amd64.AppImage) |
+| macOS | `.dmg` (Apple Silicon) | [GitStream_0.9.0_aarch64.dmg](https://github.com/avv7bc/gitstream/releases/download/v0.9.0/GitStream_0.9.0_aarch64.dmg) |
+| Windows | `.exe` installer | [GitStream_0.9.0_x64-setup.exe](https://github.com/avv7bc/gitstream/releases/download/v0.9.0/GitStream_0.9.0_x64-setup.exe) |
+| Windows | `.msi` | [GitStream_0.9.0_x64_en-US.msi](https://github.com/avv7bc/gitstream/releases/download/v0.9.0/GitStream_0.9.0_x64_en-US.msi) |
 
 All releases: [github.com/avv7bc/gitstream/releases](https://github.com/avv7bc/gitstream/releases)
 
