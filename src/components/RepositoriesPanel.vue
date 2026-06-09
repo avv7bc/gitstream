@@ -440,6 +440,11 @@ function triggerAddGroup() {
   showAddGroupDialog.value = true;
 }
 
+function triggerCloneRepository() {
+  cloneTargetId.value = selectedId.value;
+  showCloneDialog.value = true;
+}
+
 function triggerDeleteNode() {
   if (selectedId.value) {
     ctxTargetId.value = selectedId.value;
@@ -450,6 +455,7 @@ function triggerDeleteNode() {
 defineExpose({
   selectedId,
   triggerAddRepository,
+  triggerCloneRepository,
   triggerAddGroup,
   triggerDeleteNode,
 });

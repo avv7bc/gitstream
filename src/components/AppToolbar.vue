@@ -12,6 +12,7 @@ defineEmits<{
   settings: [];
   stats: [];
   addRepository: [];
+  cloneRepository: [];
   addGroup: [];
   discard: [];
   merge: [];
@@ -89,17 +90,25 @@ function closeBranchMenu() {
         </button>
 
         <div v-if="showRepoMenu" class="dropdown-menu" @click.stop>
-          <button class="dropdown-item" @click="$emit('addRepository'); closeMenu()">
+          <button class="dropdown-item" @click="$emit('cloneRepository'); closeMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M8 3v10M3 8h10"/>
+              <path d="M3 6a2 2 0 0 1 2-2h3l2 2h3a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6z"/>
+              <path d="M8 8v3M6.5 9.5L8 11l1.5-1.5"/>
             </svg>
-            {{ i18n.toolbar.addRepository }}
+            {{ i18n.toolbar.cloneRepository }}
           </button>
+          <div class="dropdown-separator" />
           <button class="dropdown-item" @click="$emit('addGroup'); closeMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M8 3v10M3 8h10"/>
             </svg>
             {{ i18n.toolbar.addGroup }}
+          </button>
+          <button class="dropdown-item" @click="$emit('addRepository'); closeMenu()">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M8 3v10M3 8h10"/>
+            </svg>
+            {{ i18n.toolbar.addRepository }}
           </button>
         </div>
 

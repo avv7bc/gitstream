@@ -28,6 +28,8 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 - Working Tree / Index row above the graph — double-click opens the commit dialog
 - Selected commit details: author, date, message, changed files
 - Filter commits by message, author, SHA, date, or ref name
+- **File History** — commit log of a single file (`git log --follow`), its diff at the selected commit, and jump-to-commit in the graph
+- **Blame** — per-line authorship (`git blame --porcelain`) with a commit/author/date gutter; click a line to jump to its commit
 
 ### Branches, tags, stash
 - Local and remote branch list with ahead/behind indicators
@@ -45,6 +47,12 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 - **Set upstream** — pick the tracking branch for a local branch (or unset it)
 - Network progress indicator with remote name and timeout countdown
 - Configurable network timeout
+
+### Authentication
+- **In-app credential prompt** for HTTPS (login / token) and SSH key passphrase, via an askpass bridge — no silent hangs
+- SSH host-key confirmation prompt
+- **Remember** checkbox — enables a git credential helper so git persists credentials between operations
+- Network timeout pauses while a credential dialog is open; cancelling a prompt is reported cleanly, not as a crash
 
 ### Merge / Rebase / Conflict resolution
 - Merge branch, rebase branch onto branch

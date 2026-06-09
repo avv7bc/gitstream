@@ -251,6 +251,10 @@ function handleAddGroup() {
   repositoriesPanelRef.value?.triggerAddGroup();
 }
 
+function handleCloneRepository() {
+  repositoriesPanelRef.value?.triggerCloneRepository();
+}
+
 // --- Modal registry + open-order stack: Esc closes the topmost (last opened) ---
 const modalRegistry: { key: string; isOpen: () => boolean; close: () => void }[] = [
   { key: "commit", isOpen: () => showCommitDialog.value, close: () => { showCommitDialog.value = false; refreshAll(); } },
@@ -484,6 +488,7 @@ function onMouseUp() {
       @settings="showSettingsDialog = true"
       @stats="showStatsDialog = true"
       @add-repository="handleAddRepository"
+      @clone-repository="handleCloneRepository"
       @add-group="handleAddGroup"
       @discard="showDiscardDialog = true"
       @stash="showStashSaveDialog = true"

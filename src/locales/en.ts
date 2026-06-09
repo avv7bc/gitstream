@@ -17,6 +17,7 @@ export const en: Translations = {
     local: "Local",
     branch: "Branch",
     addRepository: "Add Repository",
+    cloneRepository: "Clone Repository",
     addGroup: "Add Group",
   },
   branches: {
