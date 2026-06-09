@@ -2,6 +2,8 @@
 
 A desktop Git GUI focused on everyday Git workflows — commits, branches, push/pull, diff review — without blocking the UI or unnecessary complexity.
 
+![GitStream](docs/screenshot.png)
+
 ## Features
 
 ### File operations
