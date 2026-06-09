@@ -106,16 +106,16 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 
 ## Download
 
-Latest release with binaries for all platforms: **v0.9.0**
+Latest release with binaries for all platforms: **v1.0.0**
 
 | Platform | Package | Link |
 |----------|---------|------|
-| Linux | `.deb` (Debian / Ubuntu) | [GitStream_0.9.0_amd64.deb](https://github.com/avv7bc/gitstream/releases/download/v0.9.0/GitStream_0.9.0_amd64.deb) |
-| Linux | `.rpm` (Fedora / RHEL) | [GitStream-0.9.0-1.x86_64.rpm](https://github.com/avv7bc/gitstream/releases/download/v0.9.0/GitStream-0.9.0-1.x86_64.rpm) |
-| Linux | `.AppImage` | [GitStream_0.9.0_amd64.AppImage](https://github.com/avv7bc/gitstream/releases/download/v0.9.0/GitStream_0.9.0_amd64.AppImage) |
-| macOS | `.dmg` (Apple Silicon) | [GitStream_0.9.0_aarch64.dmg](https://github.com/avv7bc/gitstream/releases/download/v0.9.0/GitStream_0.9.0_aarch64.dmg) |
-| Windows | `.exe` installer | [GitStream_0.9.0_x64-setup.exe](https://github.com/avv7bc/gitstream/releases/download/v0.9.0/GitStream_0.9.0_x64-setup.exe) |
-| Windows | `.msi` | [GitStream_0.9.0_x64_en-US.msi](https://github.com/avv7bc/gitstream/releases/download/v0.9.0/GitStream_0.9.0_x64_en-US.msi) |
+| Linux | `.deb` (Debian / Ubuntu) | [GitStream_1.0.0_amd64.deb](https://github.com/avv7bc/gitstream/releases/download/v1.0.0/GitStream_1.0.0_amd64.deb) |
+| Linux | `.rpm` (Fedora / RHEL) | [GitStream-1.0.0-1.x86_64.rpm](https://github.com/avv7bc/gitstream/releases/download/v1.0.0/GitStream-1.0.0-1.x86_64.rpm) |
+| Linux | `.AppImage` | [GitStream_1.0.0_amd64.AppImage](https://github.com/avv7bc/gitstream/releases/download/v1.0.0/GitStream_1.0.0_amd64.AppImage) |
+| macOS | `.dmg` (Apple Silicon) | [GitStream_1.0.0_aarch64.dmg](https://github.com/avv7bc/gitstream/releases/download/v1.0.0/GitStream_1.0.0_aarch64.dmg) |
+| Windows | `.exe` installer | [GitStream_1.0.0_x64-setup.exe](https://github.com/avv7bc/gitstream/releases/download/v1.0.0/GitStream_1.0.0_x64-setup.exe) |
+| Windows | `.msi` | [GitStream_1.0.0_x64_en-US.msi](https://github.com/avv7bc/gitstream/releases/download/v1.0.0/GitStream_1.0.0_x64_en-US.msi) |
 
 All releases: [github.com/avv7bc/gitstream/releases](https://github.com/avv7bc/gitstream/releases)
 
@@ -124,7 +124,7 @@ All releases: [github.com/avv7bc/gitstream/releases](https://github.com/avv7bc/g
 ### Prerequisites
 
 - **Git** — must be in `PATH` (GitStream calls `git` directly)
-- **Node.js** 18+ and **npm**
+- **Node.js** 20+ and **npm**
 - **Rust toolchain** — install via [rustup.rs](https://rustup.rs/)
 - **Tauri system dependencies** — see the [official prerequisites guide](https://tauri.app/start/prerequisites/):
   - **Linux:** `webkit2gtk`, `libgtk-3-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`, `build-essential`
@@ -184,6 +184,7 @@ Output:
 ```bash
 npm run dev          # Vite only (no Tauri, for UI debugging)
 npm run build        # type-check + build frontend
+npm test             # run frontend unit tests (Vitest)
 npx vue-tsc --noEmit # TypeScript check without building
 ```
 
