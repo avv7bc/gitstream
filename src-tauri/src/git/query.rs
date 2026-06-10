@@ -66,6 +66,7 @@ fn is_untracked(repo_path: &Path, file: &str) -> bool {
 }
 
 /// Источник содержимого файла для предпросмотра бинарных файлов.
+#[derive(Clone, Copy)]
 enum BlobSrc<'a> {
     /// Файл в рабочем дереве (читается с диска).
     Disk,
@@ -115,6 +116,48 @@ fn fill_binary(repo_path: &Path, diff: &mut FileDiff, old: Option<BlobSrc>, new:
         diff.new_image = image_of(repo_path, &new, &path);
         diff.old_image = old.as_ref().and_then(|s| image_of(repo_path, s, &path));
     }
+}
+
+/// Синтезирует дифф «весь файл без изменений»: все строки помечены как
+/// `context` и показываются одинаково в обеих колонках side-by-side. Нужно для
+/// режима "Show all files": неизменённый tracked-файл даёт пустой `git diff`,
+/// и панель Changes оставалась бы пустой ("No content to display"). Содержимое
+/// берётся из `src` (рабочее дерево или ревизия коммита).
+fn full_content_diff(repo_path: &Path, file: &str, src: BlobSrc) -> FileDiff {
+    let bytes = match src {
+        BlobSrc::Disk => std::fs::read(repo_path.join(file)).unwrap_or_default(),
+        BlobSrc::Rev(rev) => {
+            run_git_bytes(repo_path, &["show", &format!("{}:{}", rev, file)]).unwrap_or_default()
+        }
+    };
+    // Бинарный файл (есть NUL-байт) текстом не показываем — помечаем binary и
+    // заполняем превью/размер через fill_binary (старая и новая версия равны).
+    if bytes.contains(&0) {
+        let mut diff = FileDiff {
+            path: file.to_string(),
+            hunks: Vec::new(),
+            insertions: 0,
+            deletions: 0,
+            header: String::new(),
+            binary: true,
+            old_image: None,
+            new_image: None,
+            byte_size: None,
+        };
+        fill_binary(repo_path, &mut diff, Some(src), src);
+        return diff;
+    }
+    // Собираем псевдо-unified-diff из context-строк (префикс — пробел) и
+    // переиспользуем parse_diff_single: он проставит совпадающие old/new номера.
+    let text = String::from_utf8_lossy(&bytes);
+    let n = text.lines().count().max(1);
+    let mut diff_text = format!("@@ -1,{n} +1,{n} @@\n");
+    for line in text.lines() {
+        diff_text.push(' ');
+        diff_text.push_str(line);
+        diff_text.push('\n');
+    }
+    parse_diff_single(&diff_text, file)
 }
 
 pub fn status(repo_path: &Path) -> Result<Vec<FileStatus>, GitError> {
@@ -719,6 +762,11 @@ pub fn diff_file(
     }
     args.extend(["--", file]);
     let output = run_git(repo_path, &args).unwrap_or_default();
+    // Пустой unstaged-дифф у tracked-файла = файл не изменён (режим "Show all
+    // files"). Показываем содержимое целиком, иначе панель пуста.
+    if !staged && output.trim().is_empty() && !is_untracked(repo_path, file) {
+        return Ok(full_content_diff(repo_path, file, BlobSrc::Disk));
+    }
     let mut diff = parse_diff_single(&output, file);
     // staged: новая версия — индекс (`:path`); unstaged — рабочее дерево.
     let new = if staged { BlobSrc::Rev("") } else { BlobSrc::Disk };
@@ -794,6 +842,14 @@ pub fn diff_commit_file(
     };
 
     let mut diff = parse_diff_single(&output, file);
+    // Файл присутствует в дереве коммита, но этим коммитом не менялся (режим
+    // "Show all files") — `git diff` пуст. Показываем его содержимое целиком.
+    if diff.hunks.is_empty()
+        && !diff.binary
+        && run_git(repo_path, &["cat-file", "-e", &format!("{}:{}", oid, file)]).is_ok()
+    {
+        return Ok(full_content_diff(repo_path, file, BlobSrc::Rev(oid)));
+    }
     let parent = format!("{}^", oid);
     fill_binary(
         repo_path,
