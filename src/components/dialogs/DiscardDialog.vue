@@ -6,7 +6,7 @@ import { useI18n } from "@/composables/useI18n";
 
 const emit = defineEmits<{ close: [] }>();
 
-const { files, selectedPaths: fileListSelection, discardFiles, unstageFiles, refresh } = useFiles();
+const { files, selectedPaths: fileListSelection, discardFiles, unstageFiles, deleteFiles, refresh } = useFiles();
 const { dragStyle, onDragStart } = useDraggable();
 const { i18n } = useI18n();
 
@@ -14,8 +14,10 @@ const revertTo = ref<"head" | "index">("head");
 
 // Файлы с изменениями (не чистые). Показываем выбранные в FileList; если
 // выбора нет (или он не пересекается со списком) — все подходящие файлы.
+// Исключаем только синтетические unchanged-файлы (режим «показать все файлы»);
+// untracked попадают в список — Discard удаляет их с диска (как SmartGit).
 const changedFiles = computed(() => {
-  const base = files.value.filter((f) => f.state !== "untracked" || f.staged !== "unstaged");
+  const base = files.value.filter((f) => f.state !== "unchanged");
   const sel = base.filter((f) => fileListSelection.value.includes(f.path));
   return sel.length > 0 ? sel : base;
 });
@@ -48,13 +50,26 @@ function fileDir(path: string): string {
 async function handleDiscard() {
   if (!canDiscard.value) return;
   const paths = selectedPaths.value;
-  if (revertTo.value === "head") {
-    // Unstage first, then discard working tree changes
-    await unstageFiles(paths);
-    await discardFiles(paths);
-  } else {
-    // Revert to index = just discard working tree changes
-    await discardFiles(paths);
+
+  // Untracked-файлы git restore/unstage не знает — их Discard удаляет с диска
+  // (как SmartGit). Tracked-файлы откатываем через restore.
+  const untrackedSet = new Set(
+    files.value.filter((f) => f.state === "untracked").map((f) => f.path)
+  );
+  const untracked = paths.filter((p) => untrackedSet.has(p));
+  const tracked = paths.filter((p) => !untrackedSet.has(p));
+
+  if (untracked.length > 0) await deleteFiles(untracked);
+
+  if (tracked.length > 0) {
+    if (revertTo.value === "head") {
+      // Unstage first, then discard working tree changes
+      await unstageFiles(tracked);
+      await discardFiles(tracked);
+    } else {
+      // Revert to index = just discard working tree changes
+      await discardFiles(tracked);
+    }
   }
   await refresh();
   emit("close");
