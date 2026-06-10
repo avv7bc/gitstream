@@ -878,12 +878,6 @@ function compareCommitFile(path: string) {
   border-color: var(--border);
 }
 
-.panel-title {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
 .filter-tabs {
   display: flex;
   gap: 2px;

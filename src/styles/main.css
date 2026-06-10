@@ -391,6 +391,16 @@ mark.hl {
   color: var(--text-primary);
 }
 
+/* Заголовок панели — единый стиль для всех панелей
+   (Repositories, Branches, Commit Details, Graph, Files) */
+.panel-title {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 /* VSCode-style tooltip (директива v-tooltip) */
 .vscode-tooltip {
   position: fixed;

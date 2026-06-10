@@ -1218,14 +1218,6 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
   user-select: none;
   flex-shrink: 0;
 }
-.panel-title {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
 .branch-panel {
   display: flex;
   flex-direction: column;

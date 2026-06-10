@@ -683,14 +683,6 @@ defineExpose({
   user-select: none;
   flex-shrink: 0;
 }
-.panel-title {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
 .repos-tree {
   flex: 1;
   padding: 4px 0;

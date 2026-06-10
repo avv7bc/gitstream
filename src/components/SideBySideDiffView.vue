@@ -401,14 +401,6 @@ function scrollToHunk() {
   flex-shrink: 0;
 }
 
-.panel-title {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
 .diff-actions {
   display: flex;
   align-items: center;

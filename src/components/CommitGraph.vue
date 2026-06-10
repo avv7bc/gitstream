@@ -700,13 +700,6 @@ function formatDate(iso: string): string {
   user-select: none;
   flex-shrink: 0;
 }
-.panel-title {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
 .graph-toolbar {
   display: flex;
   align-items: center;

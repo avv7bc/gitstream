@@ -87,13 +87,6 @@ const formattedDate = computed(() => {
   user-select: none;
   flex-shrink: 0;
 }
-.panel-title {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
 .panel-title-date {
   margin-left: auto;
   font-family: var(--font-sans);
