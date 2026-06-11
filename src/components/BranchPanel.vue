@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useBranches } from "@/composables/useBranches";
-import { useRemote } from "@/composables/useRemote";
+import { useRemote, isRejectedNeedsFetch } from "@/composables/useRemote";
 import { logError } from "@/composables/useProgress";
 import { highlight } from "@/utils/highlight";
 import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
@@ -188,6 +188,12 @@ async function handlePushCtx() {
     emit("branchesChanged");
   } catch (e) {
     logError(`Push failed: ${e}`);
+    // Автоматический fetch: подтягиваем удалённые коммиты, чтобы причина
+    // отказа была видна в графе и behind-счётчике.
+    if (isRejectedNeedsFetch(e)) {
+      await fetchRemote(resolveRemoteFor(b));
+      emit("branchesChanged");
+    }
   }
 }
 

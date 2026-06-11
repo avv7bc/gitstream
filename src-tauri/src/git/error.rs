@@ -48,7 +48,7 @@ pub fn classify_git_error(stderr: &str) -> GitError {
             message: stderr.trim().to_string(),
             hint: Some("Check network connection and remote URL".into()),
         }
-    } else if s.contains("non-fast-forward") {
+    } else if s.contains("non-fast-forward") || s.contains("fetch first") {
         GitError::CommandFailed {
             message: stderr.trim().to_string(),
             hint: Some("Remote has new commits. Pull first, or use force push".into()),

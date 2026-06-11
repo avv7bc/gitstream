@@ -5,6 +5,11 @@ import { useSettings } from "@/composables/useSettings";
 
 const isBusy = ref(false);
 
+// Push отклонён, потому что на remote есть коммиты, которых нет локально.
+export function isRejectedNeedsFetch(e: unknown): boolean {
+  return /fetch first|non-fast-forward/i.test(String(e));
+}
+
 export function useRemote() {
   const { repoPath } = useRepo();
   const { networkTimeoutSecs } = useSettings();
@@ -48,14 +53,33 @@ export function useRemote() {
 
   async function push(remote: string, force: boolean) {
     if (!repoPath.value) return;
-    await wrapAsync(() =>
-      invoke("do_push", {
+    isBusy.value = true;
+    try {
+      await invoke("do_push", {
         repoPath: repoPath.value!,
         remote,
         force,
         timeoutSecs: networkTimeoutSecs.value,
-      })
-    );
+      });
+    } catch (e) {
+      logError(String(e));
+      // Автоматический fetch: подтягиваем удалённые коммиты, чтобы причина
+      // отказа была видна в графе и behind-счётчике.
+      if (isRejectedNeedsFetch(e)) {
+        try {
+          await invoke("do_fetch", {
+            repoPath: repoPath.value!,
+            remote,
+            prune: false,
+            timeoutSecs: networkTimeoutSecs.value,
+          });
+        } catch (fe) {
+          logError(String(fe));
+        }
+      }
+    } finally {
+      isBusy.value = false;
+    }
   }
 
   return { isBusy, fetchRemote, pull, push };

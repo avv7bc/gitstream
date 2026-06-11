@@ -49,7 +49,11 @@
       "Read(//home/avv/.claude/plugins/**)",
       "Bash(npm run *)",
       "Bash(npm view *)",
-      "Bash(cargo update *)"
+      "Bash(cargo update *)",
+      "Bash(echo \"=== exit: $? \\(grep filtered\\) ===\")",
+      "Skill(code-review)",
+      "Skill(code-review:*)",
+      "Bash(git -C /home/avv/projects/gitstream diff)"
     ],
     "additionalDirectories": [
       "/home/avv/projects/gitstream/docs/superpowers/specs",
