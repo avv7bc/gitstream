@@ -17,6 +17,7 @@
   display: flex;
   flex-direction: column;
   max-height: 80vh;
+  outline: none; /* диалоги фокусируются программно (tabindex=-1) — без focus-ring */
 }
 
 .dialog-header {

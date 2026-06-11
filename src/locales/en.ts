@@ -332,6 +332,10 @@ export const en: Translations = {
       ok: "OK",
       cancel: "Cancel",
     },
+    quit: {
+      message: "Quit GitStream?",
+      quit: "Quit",
+    },
     reword: {
       msgLabel: "Commit message",
       save: "Save",

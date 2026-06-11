@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useDraggable } from "@/composables/useDraggable";
 import { useI18n } from "@/composables/useI18n";
 
@@ -17,8 +17,23 @@ const emit = defineEmits<{
 }>();
 
 const checked = ref(false);
+const dialogRef = ref<HTMLElement | null>(null);
 const { dragStyle, onDragStart } = useDraggable();
 const { i18n } = useI18n();
+
+// Забираем фокус с элемента под диалогом: иначе Enter активирует его
+// (или кнопку подтверждения) — для quit-диалога это закрывало программу.
+onMounted(() => {
+  dialogRef.value?.focus();
+});
+
+// Enter = подтвердить (как в PullDialog). Если фокус на конкретной кнопке
+// (Tab-навигация) — активируется она, иначе срабатывает кнопка подтверждения.
+function onEnterKey(e: KeyboardEvent) {
+  if ((e.target as HTMLElement)?.tagName === "BUTTON") return;
+  e.preventDefault();
+  onConfirm();
+}
 
 function onConfirm() {
   emit("confirm", props.checkboxLabel ? checked.value : false);
@@ -27,7 +42,7 @@ function onConfirm() {
 
 <template>
   <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal-dialog confirm-dialog" :style="dragStyle">
+    <div class="modal-dialog confirm-dialog" :style="dragStyle" tabindex="-1" ref="dialogRef" @keydown.enter="onEnterKey">
       <div class="dialog-header" @mousedown="onDragStart">
         <h3>{{ i18n.dialog.confirm.title }}</h3>
         <button class="close-btn" @click="$emit('close')">

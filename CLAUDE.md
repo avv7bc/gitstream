@@ -187,6 +187,7 @@ src-tauri/src/                # Rust backend
 - **Settings** — тема, шрифты, таймаут сети, язык
 - **Add Repository / Add Group / Rename Node** — управление treeview
 - **Confirm** — универсальный диалог подтверждения, опц. список затрагиваемых объектов
+- **Quit** — подтверждение выхода при закрытии окна (`onCloseRequested` → preventDefault → ConfirmDialog → `destroy()`)
 - **Credential** — запрос логина/пароля/токена/SSH-passphrase (askpass), host-key confirm, чекбокс «Запомнить»
 - **File History** — история коммитов файла (`git log --follow`), diff файла на выбранном коммите, фильтр, переход к коммиту в графе (из контекстного меню FileList)
 - **Blame** — авторы по строкам (`git blame --porcelain`), gutter с sha/автором/датой на старте группы коммита, клик по строке → переход к коммиту (из контекстного меню FileList)
