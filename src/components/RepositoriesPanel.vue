@@ -150,6 +150,13 @@ function selectNode(node: TreeNode) {
   selectedId.value = node.id;
 }
 
+// Активный (открытый) репозиторий подсвечивается всегда, независимо от
+// selectedId: клик по другому узлу лишь выделяет его, но не должен скрывать,
+// какой репозиторий сейчас открыт.
+function isActiveRepo(node: TreeNode): boolean {
+  return node.type === "repo" && !!repoPath.value && node.path === repoPath.value;
+}
+
 // --- Double-click: open repo ---
 async function openRepoNode(node: TreeNode) {
   if (node.type === "repo") {
@@ -572,7 +579,7 @@ defineExpose({
             <div
               v-else
               class="tree-node repo-node indented"
-              :class="{ selected: selectedId === child.id, dragging: draggedId === child.id, ...dropClass(child) }"
+              :class="{ selected: selectedId === child.id, active: isActiveRepo(child), dragging: draggedId === child.id, ...dropClass(child) }"
               draggable="true"
               @dragstart="onDragStart($event, child)"
               @dragend="onDragEnd"
@@ -598,7 +605,7 @@ defineExpose({
         <div
           v-if="node.type === 'repo'"
           class="tree-node repo-node"
-          :class="{ selected: selectedId === node.id, dragging: draggedId === node.id, ...dropClass(node) }"
+          :class="{ selected: selectedId === node.id, active: isActiveRepo(node), dragging: draggedId === node.id, ...dropClass(node) }"
           draggable="true"
           @dragstart="onDragStart($event, node)"
           @dragend="onDragEnd"
@@ -706,6 +713,18 @@ defineExpose({
 }
 .tree-node.selected {
   background: var(--bg-surface);
+}
+/* Неактивные репозитории слегка приглушены */
+.repo-node .node-name {
+  color: var(--text-secondary);
+}
+/* Открытый репозиторий: линия слева и жирное имя, фон не фиксируется */
+.tree-node.active {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.tree-node.active .node-name {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 .tree-node.dragging {
   opacity: 0.4;
