@@ -41,7 +41,6 @@ import { useDiff } from "@/composables/useDiff";
 import { useRemote } from "@/composables/useRemote";
 import { useConflicts } from "@/composables/useConflicts";
 import { toggleLog, logError } from "@/composables/useProgress";
-import { useI18n } from "@/composables/useI18n";
 
 const { repoPath, onRepoOpened, restoreLastRepo } = useRepo();
 const { refresh: refreshFiles, selectedFile, files, stageFiles, unstageFiles } = useFiles();
@@ -52,7 +51,6 @@ const { pull, push, fetchRemote } = useRemote();
 const { target: compareTarget, close: closeFileCompare } = useFileCompare();
 const { refresh: refreshConflicts } = useConflicts();
 const { updateInfo, checkForUpdate } = useUpdate();
-const { i18n } = useI18n();
 
 const selectedFileStatus = computed(() =>
   files.value.find((f) => f.path === selectedFile.value) ?? null,
@@ -118,7 +116,6 @@ const showPullDialog = ref(false);
 const showCheckoutDialog = ref(false);
 const checkoutRemoteTarget = ref<string | null>(null);
 const showConfirmDialog = ref(false);
-const showQuitDialog = ref(false);
 const showDiscardDialog = ref(false);
 const showSettingsDialog = ref(false);
 const showStatsDialog = ref(false);
@@ -267,7 +264,6 @@ const modalRegistry: { key: string; isOpen: () => boolean; close: () => void }[]
   { key: "checkout", isOpen: () => showCheckoutDialog.value, close: () => { showCheckoutDialog.value = false; } },
   { key: "checkoutRemote", isOpen: () => !!checkoutRemoteTarget.value, close: () => { checkoutRemoteTarget.value = null; } },
   { key: "confirm", isOpen: () => showConfirmDialog.value, close: () => { showConfirmDialog.value = false; } },
-  { key: "quit", isOpen: () => showQuitDialog.value, close: () => { showQuitDialog.value = false; } },
   { key: "discard", isOpen: () => showDiscardDialog.value, close: () => { showDiscardDialog.value = false; refreshAll(); } },
   { key: "settings", isOpen: () => showSettingsDialog.value, close: () => { showSettingsDialog.value = false; } },
   { key: "stats", isOpen: () => showStatsDialog.value, close: () => { showStatsDialog.value = false; } },
@@ -383,15 +379,6 @@ function onContextMenu(e: MouseEvent) {
   e.preventDefault();
 }
 
-// Перехват закрытия окна: вместо немедленного выхода показываем подтверждение.
-// destroy() (а не close()) — иначе close снова породит close-requested и диалог.
-let unlistenCloseRequested: (() => void) | null = null;
-
-function quitApp() {
-  showQuitDialog.value = false;
-  getCurrentWindow().destroy();
-}
-
 onMounted(async () => {
   getCurrentWindow().setTitle(`GitStream v${__APP_VERSION__}`);
   window.addEventListener("keydown", onEscapeCapture, true);
@@ -400,10 +387,6 @@ onMounted(async () => {
   restoreLastRepo();
   pollTimer = setTimeout(pollTick, 1000);
   checkForUpdate();
-  unlistenCloseRequested = await getCurrentWindow().onCloseRequested((event) => {
-    event.preventDefault();
-    showQuitDialog.value = true;
-  });
 });
 onUnmounted(() => {
   window.removeEventListener("keydown", onEscapeCapture, true);
@@ -411,7 +394,6 @@ onUnmounted(() => {
   window.removeEventListener("contextmenu", onContextMenu);
   pollStopped = true;
   if (pollTimer) clearTimeout(pollTimer);
-  unlistenCloseRequested?.();
 });
 
 // --- Resizable panel sizes (persisted to localStorage) ---
@@ -603,13 +585,6 @@ function onMouseUp() {
       v-if="showConfirmDialog"
       :message="confirmMessage"
       @close="showConfirmDialog = false"
-    />
-    <ConfirmDialog
-      v-if="showQuitDialog"
-      :message="i18n.dialog.quit.message"
-      :confirm-label="i18n.dialog.quit.quit"
-      @close="showQuitDialog = false"
-      @confirm="quitApp"
     />
     <DiscardDialog v-if="showDiscardDialog" @close="showDiscardDialog = false; refreshAll()" />
     <StashSaveDialog v-if="showStashSaveDialog" @close="showStashSaveDialog = false" @confirm="handleStashSave" />
