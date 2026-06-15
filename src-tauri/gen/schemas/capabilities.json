@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Default capabilities for GitStream","local":true,"windows":["main"],"permissions":["core:default","core:window:allow-set-title","window-state:default","dialog:default"]}}
+{"default":{"identifier":"default","description":"Default capabilities for GitStream","local":true,"windows":["main"],"permissions":["core:default","core:window:allow-set-title","core:window:allow-destroy","window-state:default","dialog:default"]}}

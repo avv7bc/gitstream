@@ -287,16 +287,13 @@ watch(
   },
 );
 
-// Capture phase: runs before per-dialog handlers so the topmost modal swallows Esc.
-function onEscapeCapture(e: KeyboardEvent) {
-  if (e.key !== "Escape") return;
+// Закрывает верхнюю (последнюю открытую) модалку. Возвращает true, если что-то закрыли.
+// Используется и Esc, и перехватом закрытия окна (Alt+F4 / крестик).
+function closeTopModal(): boolean {
   // Compute open modals directly — never rely on the tracked stack for the bail-out,
-  // otherwise a stale stack would skip stopPropagation and let every dialog close at once.
+  // otherwise a stale stack would skip the close and let every dialog close at once.
   const open = modalRegistry.filter((m) => m.isOpen());
-  if (open.length === 0) return;
-  // Swallow the event so no other (per-dialog / window) handler closes a second window.
-  e.preventDefault();
-  e.stopImmediatePropagation();
+  if (open.length === 0) return false;
   // Topmost = most recently opened (tracked order); fall back to last open in registry.
   let top = open[open.length - 1];
   for (let i = modalOpenOrder.value.length - 1; i >= 0; i--) {
@@ -304,6 +301,18 @@ function onEscapeCapture(e: KeyboardEvent) {
     if (found) { top = found; break; }
   }
   top.close();
+  return true;
+}
+
+// Capture phase: runs before per-dialog handlers so the topmost modal swallows Esc.
+function onEscapeCapture(e: KeyboardEvent) {
+  if (e.key !== "Escape") return;
+  const open = modalRegistry.filter((m) => m.isOpen());
+  if (open.length === 0) return;
+  // Swallow the event so no other (per-dialog / window) handler closes a second window.
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  closeTopModal();
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -379,6 +388,10 @@ function onContextMenu(e: MouseEvent) {
   e.preventDefault();
 }
 
+// Перехват закрытия окна (Alt+F4 / крестик): если открыта модалка — гасим её,
+// а не приложение. Когда модалок нет — preventDefault не вызываем, окно закрывается сразу.
+let unlistenCloseRequested: (() => void) | null = null;
+
 onMounted(async () => {
   getCurrentWindow().setTitle(`GitStream v${__APP_VERSION__}`);
   window.addEventListener("keydown", onEscapeCapture, true);
@@ -387,6 +400,9 @@ onMounted(async () => {
   restoreLastRepo();
   pollTimer = setTimeout(pollTick, 1000);
   checkForUpdate();
+  unlistenCloseRequested = await getCurrentWindow().onCloseRequested((event) => {
+    if (closeTopModal()) event.preventDefault();
+  });
 });
 onUnmounted(() => {
   window.removeEventListener("keydown", onEscapeCapture, true);
@@ -394,6 +410,7 @@ onUnmounted(() => {
   window.removeEventListener("contextmenu", onContextMenu);
   pollStopped = true;
   if (pollTimer) clearTimeout(pollTimer);
+  unlistenCloseRequested?.();
 });
 
 // --- Resizable panel sizes (persisted to localStorage) ---
