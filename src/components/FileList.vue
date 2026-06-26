@@ -557,7 +557,7 @@ const stateIcons: Record<string, { color: string; letter: string; i18nKey: strin
   unchanged: { color: "var(--text-muted)", letter: "·", i18nKey: "stUnchanged" },
 };
 
-// Текстовая метка состояния файла (колонка State, как в SmartGit). Помимо
+// Текстовая метка состояния файла (колонка State). Помимо
 // state добавляем суффикс staged-статуса, чтобы было видно, попадёт ли файл
 // в коммит: «Modified · staged» / «Modified · unstaged» / «Modified · partial».
 function stateText(f: FileStatus): string {
@@ -1116,7 +1116,7 @@ function compareCommitFile(path: string) {
   white-space: nowrap;
 }
 
-/* Текстовая метка состояния — «колонка» State справа, как в SmartGit.
+/* Текстовая метка состояния — «колонка» State справа.
    Цвет наследует state, чтобы статус читался без расшифровки буквенного бейджа. */
 .state-text {
   margin-left: auto;

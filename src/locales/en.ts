@@ -76,7 +76,7 @@ export const en: Translations = {
     modified: "Modified",
     untracked: "Untracked",
     conflicted: "Conflicted",
-    // Singular per-file state labels (State column, как в SmartGit).
+    // Singular per-file state labels (State column).
     stModified: "Modified",
     stAdded: "Added",
     stDeleted: "Deleted",

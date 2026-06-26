@@ -81,7 +81,7 @@ const _ru = {
     modified: "Изменённые",
     untracked: "Неотслеживаемые",
     conflicted: "С конфликтами",
-    // Singular per-file state labels (колонка State, как в SmartGit).
+    // Singular per-file state labels (колонка State).
     stModified: "Изменён",
     stAdded: "Добавлен",
     stDeleted: "Удалён",
