@@ -304,6 +304,29 @@ fn unpushed_set(repo_path: &Path) -> std::collections::HashSet<String> {
         .unwrap_or_default()
 }
 
+// Upstream remote-tracking ref'ы локальных веток (`origin/main` для `main` и
+// т.п.), которые РЕАЛЬНО существуют. Нужны графу, чтобы показать «входящие»
+// (fetched, но ещё не влитые) коммиты: добавленные в `git log` они оказываются
+// выше HEAD и подсвечиваются приглушённо (.above-head). Берём ТОЛЬКО upstream'ы
+// локальных веток, а не все `--remotes`, иначе в граф лезут orphan remote-ветки
+// (origin/Demo-topic и т.п.), не связанные ни с одной локальной веткой.
+fn upstream_refs(repo_path: &Path) -> Vec<String> {
+    run_git(repo_path, &["for-each-ref", "--format=%(upstream)", "refs/heads/"])
+        .map(|o| {
+            o.lines()
+                .filter(|l| !l.is_empty())
+                // %(upstream) печатает настроенный upstream, даже если ref не
+                // существует (ветка удалена на remote / ещё не зафетчена). Такой
+                // ref уронил бы `git log` с кодом 128 → пустой граф. Отсеиваем.
+                .filter(|r| {
+                    run_git(repo_path, &["rev-parse", "--verify", "--quiet", r]).is_ok()
+                })
+                .map(|s| s.to_string())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> {
     // Пустой репозиторий (`git init` без коммитов): HEAD ещё не существует,
     // `git log` падает с кодом 128. Это не ошибка — лог просто пуст.
@@ -312,29 +335,26 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
         return Ok(Vec::new());
     }
     let limit_str = format!("-{}", limit);
-    // --branches: только локальные ветки. --remotes намеренно НЕ включаем —
-    // иначе в граф попадают коммиты, достижимые лишь из remote-веток
-    // (origin/Demo-topic и т.п.), которых нет ни в одной локальной ветке; это
-    // сбивает (см. запрос пользователя). Теги тоже НЕ включаем (в отличие от
-    // --all), иначе коммиты, живые лишь из-за тега (после squash/amend в
-    // ветке), рисуются паразитной отдельной веткой. Ref-лейблы remote/тегов на
-    // достижимых коммитах всё равно показываются. HEAD добавляем явно ради
-    // detached-режима.
+    // --branches: локальные ветки. Плюс upstream'ы локальных веток (см.
+    // upstream_refs) — чтобы «входящие» (fetched, но не влитые) коммиты попали
+    // в граф выше HEAD и подсветились приглушённо. Все `--remotes` намеренно НЕ
+    // включаем — иначе в граф лезут orphan remote-ветки (origin/Demo-topic и
+    // т.п.), не связанные ни с одной локальной веткой; это сбивает (см. запрос
+    // пользователя). Теги тоже НЕ включаем (в отличие от --all), иначе коммиты,
+    // живые лишь из-за тега (после squash/amend в ветке), рисуются паразитной
+    // отдельной веткой. Ref-лейблы remote/тегов на достижимых коммитах всё
+    // равно показываются. HEAD добавляем явно ради detached-режима.
     // --topo-order: коммиты одной ветки идут подряд, не перемешиваясь по дате
     // с коммитами других веток (как --date-order). Это даёт чистый граф в
     // стиле SmartGit/gitk: лейн смерженной ветки не «зигзагует» через mainline,
     // а тянется сплошным столбцом справа до своего мержа.
-    let output = run_git(
-        repo_path,
-        &[
-            "log",
-            "--branches",
-            "HEAD",
-            "--topo-order",
-            &format!("--format={}", LOG_FORMAT),
-            &limit_str,
-        ],
-    )?;
+    let mut args: Vec<String> = vec!["log".into(), "--branches".into(), "HEAD".into()];
+    args.extend(upstream_refs(repo_path));
+    args.push("--topo-order".into());
+    args.push(format!("--format={}", LOG_FORMAT));
+    args.push(limit_str);
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    let output = run_git(repo_path, &arg_refs)?;
     // Список remote'ов нужен parse_ref_labels: иначе локальные ветки
     // вида `feature/auth` неотличимы от `origin/main` (в %D обе со слешем).
     let remotes_list = remotes(repo_path).unwrap_or_default();
