@@ -44,7 +44,7 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 ### Remote operations
 - **Pull** — merge or rebase, with remote selection; upstream configured automatically
 - **Push** — always sets upstream on first push; force push with confirmation
-- **Fetch** — fetch without integrating; **Fetch --prune** to drop deleted remote branches
+- **Fetch** — fetch without integrating, as a split button next to Pull/Push: **Fetch** (default remote), **Fetch all** (`git fetch --all`), and **Fetch all (prune)**; per-remote Fetch / Fetch --prune from the Remotes section, plus a one-click Fetch all in its header
 - **Remote management** — add / edit URL / rename / remove remotes (Remotes section in the Branches panel)
 - **Set upstream** — pick the tracking branch for a local branch (or unset it)
 - Network progress indicator with remote name and timeout countdown
@@ -89,7 +89,7 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 - **Esc** — close only the topmost dialog/window
 
 ### Interface
-- Toolbar with **Repository▾**, **Local▾**, **Branch▾** dropdown menus and Pull/Push/Fetch buttons in the center
+- Toolbar with **Repository▾**, **Local▾**, **Branch▾** dropdown menus and color-coded Pull/Fetch (greenish) / Push (reddish) buttons in the center
 - **Git output** window — timestamped log of executed git commands and their errors
 - **Settings**, **Stats**, and **File Compare** (diff any two revisions of a file) dialogs
 - Branch author tooltip (VSCode-style) on hover
