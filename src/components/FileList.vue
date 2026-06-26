@@ -547,15 +547,27 @@ const stateFilterDefs: { key: StateFilterKey; letter: string; color: string; lab
 const stateFilterTitle = (key: StateFilterKey, fallback: string): string =>
   (i18n.value.files as Record<string, string>)[key] || fallback;
 
-const stateIcons: Record<string, { color: string; letter: string }> = {
-  modified: { color: "var(--blue)", letter: "M" },
-  added: { color: "var(--green)", letter: "A" },
-  deleted: { color: "var(--red)", letter: "D" },
-  renamed: { color: "var(--purple)", letter: "R" },
-  conflicted: { color: "var(--red)", letter: "C" },
-  untracked: { color: "var(--text-muted)", letter: "?" },
-  unchanged: { color: "var(--text-muted)", letter: "·" },
+const stateIcons: Record<string, { color: string; letter: string; i18nKey: string }> = {
+  modified: { color: "var(--blue)", letter: "M", i18nKey: "stModified" },
+  added: { color: "var(--green)", letter: "A", i18nKey: "stAdded" },
+  deleted: { color: "var(--red)", letter: "D", i18nKey: "stDeleted" },
+  renamed: { color: "var(--purple)", letter: "R", i18nKey: "stRenamed" },
+  conflicted: { color: "var(--red)", letter: "C", i18nKey: "stConflicted" },
+  untracked: { color: "var(--text-muted)", letter: "?", i18nKey: "stUntracked" },
+  unchanged: { color: "var(--text-muted)", letter: "·", i18nKey: "stUnchanged" },
 };
+
+// Текстовая метка состояния файла (колонка State, как в SmartGit). Помимо
+// state добавляем суффикс staged-статуса, чтобы было видно, попадёт ли файл
+// в коммит: «Modified · staged» / «Modified · unstaged» / «Modified · partial».
+function stateText(f: FileStatus): string {
+  const fl = i18n.value.files as Record<string, string>;
+  const base = fl[stateIcons[f.state]?.i18nKey] || f.state;
+  if (f.state === "unchanged" || f.state === "untracked") return base;
+  if (f.staged === "staged") return `${base} · ${i18n.value.files.staged}`;
+  if (f.staged === "partial") return `${base} · ${i18n.value.files.partiallyStaged}`;
+  return base;
+}
 
 function fileName(path: string): string {
   return path.split("/").pop() || path;
@@ -777,6 +789,10 @@ function compareCommitFile(path: string) {
 
           <span class="file-name" v-html="highlight(fileName(file.path), fileFilter)" />
           <span class="file-dir" v-html="highlight(fileDir(file.path), fileFilter)" />
+          <span
+            class="state-text"
+            :style="{ color: stateIcons[file.state]?.color }"
+          >{{ stateText(file) }}</span>
         </div>
       </template>
 
@@ -796,6 +812,10 @@ function compareCommitFile(path: string) {
           >{{ commitChangedPaths.has(cf.path) ? 'M' : '·' }}</span>
           <span class="file-name" v-html="highlight(fileName(cf.path), fileFilter)" />
           <span class="file-dir" v-html="highlight(fileDir(cf.path), fileFilter)" />
+          <span
+            class="state-text"
+            :style="{ color: commitChangedPaths.has(cf.path) ? 'var(--blue)' : 'var(--text-muted)' }"
+          >{{ commitChangedPaths.has(cf.path) ? i18n.files.stModified : i18n.files.stUnchanged }}</span>
           <span v-if="commitChangedPaths.has(cf.path)" class="file-stats">
             <span class="stat-add">+{{ cf.insertions }}</span>
             <span class="stat-del">-{{ cf.deletions }}</span>
@@ -1096,8 +1116,17 @@ function compareCommitFile(path: string) {
   white-space: nowrap;
 }
 
-.file-stats {
+/* Текстовая метка состояния — «колонка» State справа, как в SmartGit.
+   Цвет наследует state, чтобы статус читался без расшифровки буквенного бейджа. */
+.state-text {
   margin-left: auto;
+  padding-left: 12px;
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.file-stats {
   display: flex;
   gap: 6px;
   font-size: var(--font-size-xs);
