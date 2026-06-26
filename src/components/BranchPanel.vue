@@ -44,7 +44,7 @@ const {
   stashSave, stashApply, stashPop, stashDrop,
   addRemote, removeRemote, renameRemote, setRemoteUrl, setBranchUpstream,
 } = useBranches();
-const { fetchRemote } = useRemote();
+const { fetchRemote, fetchAll } = useRemote();
 
 // --- Create branch ---
 const showCreateBranchDialog = ref(false);
@@ -431,6 +431,11 @@ async function handleFetchRemoteCtx(prune: boolean) {
   closeRemoteMgmtCtxMenu();
   if (!r) return;
   await fetchRemote(r.name, prune);
+  emit("branchesChanged");
+}
+
+async function handleFetchAllCtx() {
+  await fetchAll(false);
   emit("branchesChanged");
 }
 
@@ -855,6 +860,17 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
           </svg>
           <span class="section-title">{{ i18n.branches.remotes }}</span>
           <span class="section-count">{{ filteredRemotes.length }}</span>
+          <button
+            v-if="filteredRemotes.length"
+            class="section-add-btn section-fetch-btn"
+            :title="i18n.toolbar.fetchAll"
+            @click.stop="handleFetchAllCtx"
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M13 8a5 5 0 1 1-1.46-3.54"/>
+              <path d="M13 2.5V5h-2.5"/>
+            </svg>
+          </button>
           <button
             class="section-add-btn"
             :title="i18n.branches.addRemote"
@@ -1482,5 +1498,14 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
 .section-add-btn:hover {
   background: var(--bg-tertiary);
   color: var(--text-primary);
+}
+.section-fetch-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.section-fetch-btn + .section-add-btn {
+  margin-left: 0;
 }
 </style>

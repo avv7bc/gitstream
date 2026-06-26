@@ -505,6 +505,24 @@ pub async fn do_fetch(
 }
 
 #[tauri::command]
+pub async fn do_fetch_all(
+    app: tauri::AppHandle,
+    repo_path: String,
+    prune: Option<bool>,
+    timeout_secs: Option<u64>,
+) -> Result<String, String> {
+    let args = mutation::fetch_all_args(prune.unwrap_or(false));
+    run_network_git(
+        &app,
+        Some(Path::new(&repo_path)),
+        &args,
+        timeout_secs,
+        "fetch",
+    )
+    .await
+}
+
+#[tauri::command]
 pub async fn do_pull(
     app: tauri::AppHandle,
     repo_path: String,

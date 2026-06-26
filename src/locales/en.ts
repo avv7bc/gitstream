@@ -6,6 +6,8 @@ export const en: Translations = {
     pull: "Pull",
     push: "Push",
     fetch: "Fetch",
+    fetchAll: "Fetch all",
+    fetchAllPrune: "Fetch all (prune)",
     commit: "Commit",
     checkout: "Checkout",
     stage: "Stage",

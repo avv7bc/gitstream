@@ -605,6 +605,18 @@ pub fn fetch_args(remote: &str, prune: bool) -> Vec<String> {
     args
 }
 
+pub fn fetch_all_args(prune: bool) -> Vec<String> {
+    let mut args = vec![
+        "fetch".to_string(),
+        "--all".to_string(),
+        "--tags".to_string(),
+    ];
+    if prune {
+        args.push("--prune".to_string());
+    }
+    args
+}
+
 pub fn add_remote(repo_path: &Path, name: &str, url: &str) -> Result<(), GitError> {
     validate_remote_name(name)?;
     validate_url(url)?;

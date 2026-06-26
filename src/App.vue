@@ -48,7 +48,7 @@ const { refresh: refreshFiles, selectedFile, files, stageFiles, unstageFiles } =
 const { refresh: refreshBranches, createTag, stashSave, branches, remotes } = useBranches();
 const { refresh: refreshLog, selectedCommit, commits, squashCommits, rewordCommit } = useLog();
 const { clearDiff } = useDiff();
-const { pull, push, fetchRemote } = useRemote();
+const { pull, push, fetchRemote, fetchAll } = useRemote();
 const { target: compareTarget, close: closeFileCompare } = useFileCompare();
 const { refresh: refreshConflicts } = useConflicts();
 const { updateInfo, checkForUpdate } = useUpdate();
@@ -252,6 +252,25 @@ function handleFetchRequest(remote: string) {
       document.body.style.cursor = "wait";
       try {
         await fetchRemote(remote);
+        await refreshAll();
+      } finally {
+        document.body.style.cursor = "";
+      }
+    });
+  });
+}
+// Fetch из тулбара: тянем remote по умолчанию (upstream → origin → первый).
+function handleToolbarFetch() {
+  const remote = pickDefaultRemote();
+  if (!remote) return;
+  handleFetchRequest(remote);
+}
+function handleFetchAllRequest(prune: boolean) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(async () => {
+      document.body.style.cursor = "wait";
+      try {
+        await fetchAll(prune);
         await refreshAll();
       } finally {
         document.body.style.cursor = "";
@@ -538,6 +557,8 @@ function onMouseUp() {
       @commit="showCommitDialog = true"
       @push="handlePushRequest('origin', false)"
       @pull="showPullDialog = true"
+      @fetch="handleToolbarFetch"
+      @fetch-all="handleFetchAllRequest"
       @checkout="showCheckoutDialog = true"
       @settings="showSettingsDialog = true"
       @stats="showStatsDialog = true"

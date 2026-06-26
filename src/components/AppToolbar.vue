@@ -9,6 +9,8 @@ defineEmits<{
   commit: [];
   push: [];
   pull: [];
+  fetch: [];
+  fetchAll: [prune: boolean];
   checkout: [];
   settings: [];
   stats: [];
@@ -58,6 +60,15 @@ async function doUnstage() {
 const showRepoMenu = ref(false);
 const showLocalMenu = ref(false);
 const showBranchMenu = ref(false);
+const showFetchMenu = ref(false);
+
+function toggleFetchMenu() {
+  showFetchMenu.value = !showFetchMenu.value;
+}
+
+function closeFetchMenu() {
+  showFetchMenu.value = false;
+}
 
 // Открытие любого из трёх дропдаунов закрывает остальные, чтобы они не
 // оставались открытыми одновременно.
@@ -249,18 +260,47 @@ function closeBranchMenu() {
     <div class="toolbar-spacer" />
 
     <div class="toolbar-group-center">
-      <button class="toolbar-btn-action" @click="$emit('pull')" data-shortcut="Alt+PageDown">
+      <button class="toolbar-btn-action action-green" @click="$emit('pull')" data-shortcut="Alt+PageDown">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
         </svg>
         <span>{{ i18n.toolbar.pull }}</span>
       </button>
-      <button class="toolbar-btn-action" @click="$emit('push')" data-shortcut="Alt+PageUp">
+      <button class="toolbar-btn-action action-red" @click="$emit('push')" data-shortcut="Alt+PageUp">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 3l4 4H9.5v5h-3V7H4L8 3z"/>
         </svg>
         <span>{{ i18n.toolbar.push }}</span>
       </button>
+
+      <div class="menu-button-wrapper">
+        <button class="toolbar-btn-action action-green fetch-split" @click="$emit('fetch')" :title="i18n.toolbar.fetch">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <path d="M13 8a5 5 0 1 1-1.46-3.54"/>
+            <path d="M13 2.5V5h-2.5"/>
+          </svg>
+          <span>{{ i18n.toolbar.fetch }}</span>
+          <span class="fetch-caret" @click.stop="toggleFetchMenu">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="opacity:0.6">
+              <path d="M2 3.5l3 3 3-3"/>
+            </svg>
+          </span>
+        </button>
+
+        <div v-if="showFetchMenu" class="dropdown-menu" @click.stop>
+          <button class="dropdown-item" @click="$emit('fetch'); closeFetchMenu()">
+            {{ i18n.toolbar.fetch }}
+          </button>
+          <button class="dropdown-item" @click="$emit('fetchAll', false); closeFetchMenu()">
+            {{ i18n.toolbar.fetchAll }}
+          </button>
+          <button class="dropdown-item" @click="$emit('fetchAll', true); closeFetchMenu()">
+            {{ i18n.toolbar.fetchAllPrune }}
+          </button>
+        </div>
+
+        <div v-if="showFetchMenu" class="menu-backdrop" @click="closeFetchMenu" @contextmenu.prevent="closeFetchMenu" />
+      </div>
     </div>
 
     <div class="toolbar-spacer" />
@@ -312,6 +352,20 @@ function closeBranchMenu() {
   gap: 4px;
 }
 
+.fetch-split {
+  position: relative;
+}
+.fetch-caret {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+  padding: 2px;
+  border-radius: var(--radius);
+}
+.fetch-caret:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+}
+
 .toolbar-btn-action[data-shortcut] {
   position: relative;
 }
@@ -361,6 +415,28 @@ function closeBranchMenu() {
 .toolbar-btn-action:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+/* Pull/Fetch — зеленоватые (входящие), Push — красноватый (исходящий).
+   Цвет приглушён подмешиванием базового текста, чтобы вписываться во все
+   темы; полная насыщенность проявляется только на hover. */
+.toolbar-btn-action.action-green {
+  color: color-mix(in srgb, var(--green) 50%, var(--text-secondary));
+  border-color: color-mix(in srgb, var(--green) 22%, var(--border));
+}
+.toolbar-btn-action.action-green:hover:not(:disabled) {
+  color: color-mix(in srgb, var(--green) 75%, var(--text-primary));
+  background: color-mix(in srgb, var(--green) 9%, transparent);
+  border-color: color-mix(in srgb, var(--green) 45%, var(--border));
+}
+.toolbar-btn-action.action-red {
+  color: color-mix(in srgb, var(--red) 50%, var(--text-secondary));
+  border-color: color-mix(in srgb, var(--red) 22%, var(--border));
+}
+.toolbar-btn-action.action-red:hover:not(:disabled) {
+  color: color-mix(in srgb, var(--red) 75%, var(--text-primary));
+  background: color-mix(in srgb, var(--red) 9%, transparent);
+  border-color: color-mix(in srgb, var(--red) 45%, var(--border));
 }
 
 .toolbar-group {

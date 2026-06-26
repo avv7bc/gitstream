@@ -43,6 +43,17 @@ export function useRemote() {
     );
   }
 
+  async function fetchAll(prune = false) {
+    if (!repoPath.value) return;
+    await wrapAsync(() =>
+      invoke("do_fetch_all", {
+        repoPath: repoPath.value!,
+        prune,
+        timeoutSecs: networkTimeoutSecs.value,
+      })
+    );
+  }
+
   async function pull(remote: string, rebase: boolean) {
     if (!repoPath.value) return;
     const ok = await wrapAsync(() =>
@@ -95,5 +106,5 @@ export function useRemote() {
     }
   }
 
-  return { isBusy, fetchRemote, pull, push };
+  return { isBusy, fetchRemote, fetchAll, pull, push };
 }

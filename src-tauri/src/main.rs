@@ -93,6 +93,7 @@ fn main() {
             commands::do_checkout,
             commands::do_checkout_remote,
             commands::do_fetch,
+            commands::do_fetch_all,
             commands::do_pull,
             commands::do_push,
             commands::do_diagnose_sync,
