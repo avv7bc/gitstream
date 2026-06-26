@@ -95,6 +95,8 @@ fn main() {
             commands::do_fetch,
             commands::do_pull,
             commands::do_push,
+            commands::do_diagnose_sync,
+            commands::do_push_force_lease,
             commands::do_push_branch,
             commands::do_merge,
             commands::do_rename_branch,

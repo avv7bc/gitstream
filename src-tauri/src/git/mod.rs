@@ -1,3 +1,4 @@
+pub mod diagnose;
 pub mod error;
 pub mod graph;
 pub mod mutation;

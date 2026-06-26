@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { invoke, logError } from "@/composables/useProgress";
 import { useRepo } from "@/composables/useRepo";
 import { useSettings } from "@/composables/useSettings";
+import { useSync } from "@/composables/useSync";
 
 const isBusy = ref(false);
 
@@ -13,15 +14,18 @@ export function isRejectedNeedsFetch(e: unknown): boolean {
 export function useRemote() {
   const { repoPath } = useRepo();
   const { networkTimeoutSecs } = useSettings();
+  const { diagnose, dismiss } = useSync();
 
   // Ошибки сетевых операций уходят в Git output (красным, с авто-открытием
-  // панели) — без модальных окон.
-  async function wrapAsync(fn: () => Promise<unknown>) {
+  // панели) — без модальных окон. Возвращает true при успехе.
+  async function wrapAsync(fn: () => Promise<unknown>): Promise<boolean> {
     isBusy.value = true;
     try {
       await fn();
+      return true;
     } catch (e) {
       logError(String(e));
+      return false;
     } finally {
       isBusy.value = false;
     }
@@ -41,7 +45,7 @@ export function useRemote() {
 
   async function pull(remote: string, rebase: boolean) {
     if (!repoPath.value) return;
-    await wrapAsync(() =>
+    const ok = await wrapAsync(() =>
       invoke("do_pull", {
         repoPath: repoPath.value!,
         remote,
@@ -49,6 +53,9 @@ export function useRemote() {
         timeoutSecs: networkTimeoutSecs.value,
       })
     );
+    // Успешный pull устраняет расхождение — гасим ассистента, если он висел
+    // (например после ручного Pull в обход кнопки решения).
+    if (ok) dismiss();
   }
 
   async function push(remote: string, force: boolean) {
@@ -61,10 +68,13 @@ export function useRemote() {
         force,
         timeoutSecs: networkTimeoutSecs.value,
       });
+      // Успешный push устраняет расхождение — гасим прежнюю ситуацию.
+      dismiss();
     } catch (e) {
       logError(String(e));
       // Автоматический fetch: подтягиваем удалённые коммиты, чтобы причина
-      // отказа была видна в графе и behind-счётчике.
+      // отказа была видна в графе и behind-счётчике, а remote-tracking ref
+      // стал актуальным для диагностики.
       if (isRejectedNeedsFetch(e)) {
         try {
           await invoke("do_fetch", {
@@ -76,6 +86,9 @@ export function useRemote() {
         } catch (fe) {
           logError(String(fe));
         }
+        // Распознаём ситуацию и показываем Sync Assistant с решениями
+        // вместо немой красной строки в Git output.
+        await diagnose(remote);
       }
     } finally {
       isBusy.value = false;

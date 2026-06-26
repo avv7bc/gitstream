@@ -8,7 +8,7 @@ use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
 
-use crate::git::{mutation, query, types::*};
+use crate::git::{diagnose, mutation, query, types::*};
 
 #[derive(serde::Serialize, Clone)]
 struct NetworkProgressEvent {
@@ -529,6 +529,36 @@ pub async fn do_push(
     let path = Path::new(&repo_path);
     let branch = query::current_branch_name(path).map_err(|e| e.to_string())?;
     let args = mutation::push_args(&remote, &branch, force);
+    run_network_git(&app, Some(path), &args, timeout_secs, "push").await
+}
+
+/// Диагностирует расхождение текущей ветки с её remote-tracking веткой.
+/// Локальная операция (только чтение ref'ов) — без сети и таймаута.
+/// Возвращает None, если расхождения нет или нет remote-tracking ветки.
+#[tauri::command]
+pub fn do_diagnose_sync(
+    repo_path: String,
+    remote: String,
+) -> Result<Option<diagnose::Situation>, String> {
+    let path = Path::new(&repo_path);
+    let branch = query::current_branch_name(path).map_err(|e| e.to_string())?;
+    Ok(diagnose::diagnose_sync(path, &remote, &branch))
+}
+
+/// Force-push текущей ветки через `--force-with-lease`. Перед отправкой
+/// сохраняет вершину remote-ветки в backup-ref (undo). Решение «push_force_lease»
+/// из Sync Assistant.
+#[tauri::command]
+pub async fn do_push_force_lease(
+    app: tauri::AppHandle,
+    repo_path: String,
+    remote: String,
+    timeout_secs: Option<u64>,
+) -> Result<String, String> {
+    let path = Path::new(&repo_path);
+    let branch = query::current_branch_name(path).map_err(|e| e.to_string())?;
+    mutation::backup_remote_tip(path, &remote, &branch);
+    let args = mutation::push_args(&remote, &branch, true);
     run_network_git(&app, Some(path), &args, timeout_secs, "push").await
 }
 

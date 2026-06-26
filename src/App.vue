@@ -9,6 +9,7 @@ import FileList from "./components/FileList.vue";
 import SideBySideDiffView from "./components/SideBySideDiffView.vue";
 import StatusBar from "./components/StatusBar.vue";
 import ConflictBar from "./components/ConflictBar.vue";
+import SyncAssistantBar from "./components/SyncAssistantBar.vue";
 import CommitDialog from "./components/dialogs/CommitDialog.vue";
 import PushDialog from "./components/dialogs/PushDialog.vue";
 import PullDialog from "./components/dialogs/PullDialog.vue";
@@ -512,6 +513,7 @@ function onMouseUp() {
     />
 
     <ConflictBar @changed="refreshAll()" />
+    <SyncAssistantBar @changed="refreshAll()" />
 
     <!-- Main body -->
     <div class="app-body">

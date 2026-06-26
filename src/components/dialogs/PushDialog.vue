@@ -52,7 +52,7 @@ function handlePush() {
           <span>{{ i18n.dialog.push.forcePush }}</span>
         </label>
         <p v-if="forcePush" class="force-warning">
-          Force push will overwrite remote history. Use with caution!
+          {{ i18n.dialog.push.forceWarning }}
         </p>
       </div>
 

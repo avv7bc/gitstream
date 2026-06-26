@@ -100,6 +100,37 @@ export const en: Translations = {
     useOurs: "Use ours",
     useTheirs: "Use theirs",
   },
+  sync: {
+    dismiss: "Dismiss",
+    situations: {
+      diverged_rewrite: {
+        title: "Local commit was rewritten",
+        detail: "This commit was already pushed, then amended (amend/rebase). The content is identical — safe to overwrite the remote version.",
+      },
+      diverged: {
+        title: "Branches have diverged",
+        detail: "The remote branch has {behind} commit(s) you don't have locally. Pull them first, otherwise the push is rejected.",
+      },
+    },
+    remedies: {
+      push_force_lease: {
+        label: "Overwrite (force-with-lease)",
+        detail: "git push --force-with-lease. Refuses if someone else pushed to the remote. A backup ref is created before pushing for undo.",
+      },
+      pull_rebase: {
+        label: "Pull & rebase",
+        detail: "git pull --rebase. Replays your commits on top of the remote ones — linear history.",
+      },
+      pull_merge: {
+        label: "Pull & merge",
+        detail: "git pull. Creates a merge commit joining both sides.",
+      },
+      fetch: {
+        label: "Fetch only",
+        detail: "git fetch. Pulls remote commits without changing anything locally.",
+      },
+    },
+  },
   update: {
     download: "Download",
   },
@@ -174,6 +205,7 @@ export const en: Translations = {
       forcePush: "Force push",
       push: "Push",
       forcePushBtn: "Force Push",
+      forceWarning: "Force push overwrites remote history. Uses --force-with-lease: it refuses if the remote has commits you haven't fetched — run Fetch/Pull first.",
       cancel: "Cancel",
     },
     pull: {

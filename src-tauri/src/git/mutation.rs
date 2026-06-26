@@ -714,11 +714,14 @@ pub fn pull_args(remote: &str, branch: &str, rebase: bool) -> Vec<String> {
     }
 }
 
+// force ⇒ `--force-with-lease`, а не `--force`: лизинг откажет, если на remote
+// с момента нашего fetch появились чужие коммиты — защита от перезаписи чужой
+// работы. Для нового upstream (ветки ещё нет на remote) лизинг не мешает.
 pub fn push_args(remote: &str, branch: &str, force: bool) -> Vec<String> {
     if force {
         vec![
             "push".into(),
-            "--force".into(),
+            "--force-with-lease".into(),
             "--set-upstream".into(),
             remote.into(),
             branch.into(),
@@ -732,7 +735,7 @@ pub fn push_branch_args(remote: &str, branch: &str, force: bool) -> Vec<String> 
     if force {
         vec![
             "push".into(),
-            "--force".into(),
+            "--force-with-lease".into(),
             "--set-upstream".into(),
             remote.into(),
             branch.into(),
@@ -740,6 +743,20 @@ pub fn push_branch_args(remote: &str, branch: &str, force: bool) -> Vec<String> 
     } else {
         vec!["push".into(), "--set-upstream".into(), remote.into(), branch.into()]
     }
+}
+
+/// Сохраняет текущую вершину remote-tracking ветки в локальный backup-ref
+/// `refs/gitstream/backup/<branch>` перед force-push. Если force-with-lease
+/// перезапишет коммит на remote, его всегда можно восстановить из этого ref'а.
+/// Ошибка не критична (нечего сохранять) — просто логируется.
+pub fn backup_remote_tip(repo_path: &Path, remote: &str, branch: &str) {
+    let remote_ref = format!("{}/{}", remote, branch);
+    let oid = match super::query::run_git(repo_path, &["rev-parse", "--verify", "--quiet", &remote_ref]) {
+        Ok(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return,
+    };
+    let backup = format!("refs/gitstream/backup/{}", branch);
+    let _ = run_git_mut(repo_path, &["update-ref", &backup, &oid]);
 }
 
 pub fn push_tag_args(remote: &str, name: &str, delete: bool) -> Vec<String> {
@@ -1087,7 +1104,7 @@ mod tag_tests {
         );
         assert_eq!(
             push_args("origin", "main", true),
-            vec!["push", "--force", "--set-upstream", "origin", "main"]
+            vec!["push", "--force-with-lease", "--set-upstream", "origin", "main"]
         );
     }
 
@@ -1099,7 +1116,7 @@ mod tag_tests {
         );
         assert_eq!(
             push_branch_args("origin", "main", true),
-            vec!["push", "--force", "--set-upstream", "origin", "main"]
+            vec!["push", "--force-with-lease", "--set-upstream", "origin", "main"]
         );
     }
 

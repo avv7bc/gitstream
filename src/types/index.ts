@@ -17,6 +17,26 @@ export interface FileStatus {
   staged: StagedState;
 }
 
+// --- Sync Assistant (распознавание git-проблем) ---
+// id определяет действие, которое выполнит useSync.applyRemedy.
+export type RemedyId = "push_force_lease" | "pull_rebase" | "pull_merge" | "fetch";
+
+export interface Remedy {
+  id: RemedyId;
+  danger: "safe" | "caution" | "danger";
+  recommended: boolean;
+}
+
+export interface Situation {
+  // "diverged_rewrite" — локальный коммит переписан (amend), безопасен force-with-lease;
+  // "diverged" — на обеих сторонах свои коммиты, нужен pull.
+  id: "diverged_rewrite" | "diverged";
+  severity: "info" | "warn" | "danger";
+  ahead: number;
+  behind: number;
+  remedies: Remedy[];
+}
+
 export interface CommitInfo {
   oid: string;
   short_oid: string;

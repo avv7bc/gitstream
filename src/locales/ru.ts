@@ -105,6 +105,37 @@ const _ru = {
     useOurs: "Use ours",
     useTheirs: "Use theirs",
   },
+  sync: {
+    dismiss: "Скрыть",
+    situations: {
+      diverged_rewrite: {
+        title: "Локальный коммит переписан",
+        detail: "Этот коммит уже был отправлен, а затем изменён (amend/rebase). Содержимое идентично — безопасно перезаписать удалённую версию.",
+      },
+      diverged: {
+        title: "Ветки разошлись",
+        detail: "На удалённой ветке есть {behind} коммит(ов), которых нет локально. Сначала заберите их, иначе push будет отклонён.",
+      },
+    },
+    remedies: {
+      push_force_lease: {
+        label: "Перезаписать (force-with-lease)",
+        detail: "git push --force-with-lease. Откажет, если на remote появились чужие коммиты. Перед отправкой делается backup-ref для отката.",
+      },
+      pull_rebase: {
+        label: "Забрать и перебазировать",
+        detail: "git pull --rebase. Переносит ваши коммиты поверх удалённых — линейная история.",
+      },
+      pull_merge: {
+        label: "Забрать и слить",
+        detail: "git pull. Создаёт merge-коммит, объединяя обе стороны.",
+      },
+      fetch: {
+        label: "Только обновить",
+        detail: "git fetch. Подтянуть удалённые коммиты, ничего не меняя локально.",
+      },
+    },
+  },
   update: {
     download: "Download",
   },
@@ -179,6 +210,7 @@ const _ru = {
       forcePush: "Force push",
       push: "Push",
       forcePushBtn: "Force Push",
+      forceWarning: "Force push перезапишет историю на remote. Используется --force-with-lease: откажет, если на remote есть незабранные коммиты — сначала сделайте Fetch/Pull.",
       cancel: "Cancel",
     },
     pull: {
