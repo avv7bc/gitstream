@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRepo } from "@/composables/useRepo";
 import { useBranches } from "@/composables/useBranches";
 import { useProgress, logOpen, toggleLog, closeLog } from "@/composables/useProgress";
@@ -32,6 +32,12 @@ watch(logOpen, (open) => {
 
 watch(networkProgressLog, () => {
   if (logOpen.value) nextTick(scrollToBottom);
+});
+
+// Подстраховка: если компонент размонтируется при открытом логе,
+// снять глобальный capture-listener, добавленный в watch(logOpen).
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onEscKey, true);
 });
 
 function scrollToBottom() {

@@ -318,9 +318,7 @@ function scrollToHunk() {
               <span class="line-prefix">{{ item.line.kind === "removed" ? "-" : " " }}</span>
               <span class="line-content">
                 <template v-if="item.line.wordDiffs">
-                  <template v-for="span in item.line.wordDiffs" :key="`${span.text}-${span.kind}`">
-                    <span :class="['word-diff', span.kind]">{{ span.text }}</span>
-                  </template>
+                  <span v-for="(span, spanIdx) in item.line.wordDiffs" :key="spanIdx" :class="['word-diff', span.kind]">{{ span.text }}</span>
                 </template>
                 <template v-else>{{ item.line.content }}</template>
               </span>
@@ -365,9 +363,7 @@ function scrollToHunk() {
               <span class="line-prefix">{{ item.line.kind === "added" ? "+" : " " }}</span>
               <span class="line-content">
                 <template v-if="item.line.wordDiffs">
-                  <template v-for="span in item.line.wordDiffs" :key="`${span.text}-${span.kind}`">
-                    <span :class="['word-diff', span.kind]">{{ span.text }}</span>
-                  </template>
+                  <span v-for="(span, spanIdx) in item.line.wordDiffs" :key="spanIdx" :class="['word-diff', span.kind]">{{ span.text }}</span>
                 </template>
                 <template v-else>{{ item.line.content }}</template>
               </span>

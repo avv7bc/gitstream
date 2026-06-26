@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, watch } from "vue";
 import { useCommit } from "@/composables/useCommit";
 import { useFiles } from "@/composables/useFiles";
 import { useRemote } from "@/composables/useRemote";
 import { useBranches } from "@/composables/useBranches";
 import { useDraggable } from "@/composables/useDraggable";
+import { logError } from "@/composables/useProgress";
 import { useI18n } from "@/composables/useI18n";
 import type { FileStatus } from "@/types";
 
@@ -31,11 +32,22 @@ const changedFiles = computed(() => {
 
 const selected = ref<Record<string, boolean>>({});
 
-onMounted(() => {
-  for (const f of changedFiles.value) {
-    selected.value[f.path] = true;
-  }
-});
+// Синхронизируем чекбоксы с актуальным списком файлов: новые файлы появляются
+// отмеченными, исчезнувшие — убираются. Иначе при изменении статуса файлов
+// после монтирования новые записи остались бы неотмеченными (undefined).
+watch(
+  changedFiles,
+  (list) => {
+    const paths = new Set(list.map((f) => f.path));
+    for (const f of list) {
+      if (selected.value[f.path] === undefined) selected.value[f.path] = true;
+    }
+    for (const key of Object.keys(selected.value)) {
+      if (!paths.has(key)) delete selected.value[key];
+    }
+  },
+  { immediate: true }
+);
 
 const selectedPaths = computed(() =>
   Object.entries(selected.value).filter(([, v]) => v).map(([k]) => k)
@@ -96,6 +108,10 @@ async function handleCommit(alsoPush: boolean) {
     }
     await refresh();
     emit("close");
+  } catch (e) {
+    // Ошибка коммита/пуша уходит в Git output; диалог остаётся открытым,
+    // чтобы пользователь увидел причину и не потерял введённое сообщение.
+    logError(String(e));
   } finally {
     busy.value = false;
   }

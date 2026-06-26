@@ -347,6 +347,9 @@ function isEditableTarget(el: EventTarget | null): boolean {
 
 function onGlobalKeyDown(e: KeyboardEvent): void {
   if (isEditableTarget(e.target)) return;
+  // Не выполнять деструктивные хоткеи (cherry-pick/revert), пока поверх графа
+  // открыт любой модальный диалог — правило «хоткеи только для верхнего окна».
+  if (document.querySelector(".modal-overlay")) return;
   if (e.shiftKey && e.ctrlKey && (e.key === 'M' || e.key === 'm')) {
     e.preventDefault();
     runCherryPick(selectedCommit.value);

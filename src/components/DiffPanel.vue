@@ -32,9 +32,7 @@ const panelRef = ref<HTMLDivElement | null>(null);
           </span>
           <span class="line-content">
             <template v-if="line.wordDiffs">
-              <template v-for="span in line.wordDiffs" :key="`${span.text}-${span.kind}`">
-                <span :class="['word-diff', span.kind]">{{ span.text }}</span>
-              </template>
+              <span v-for="(span, spanIdx) in line.wordDiffs" :key="spanIdx" :class="['word-diff', span.kind]">{{ span.text }}</span>
             </template>
             <template v-else>
               {{ line.content }}

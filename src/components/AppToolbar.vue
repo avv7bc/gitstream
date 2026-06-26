@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useFiles } from "@/composables/useFiles";
+import { logError } from "@/composables/useProgress";
 import { useI18n } from "@/composables/useI18n";
 const { i18n } = useI18n();
 
@@ -37,18 +38,34 @@ const canUnstage = computed(
 );
 const canDiscard = computed(() => !!selectedStatus.value);
 
-function doStage() {
-  if (canStage.value && selectedFile.value) stageFiles([selectedFile.value]);
+async function doStage() {
+  if (!(canStage.value && selectedFile.value)) return;
+  try {
+    await stageFiles([selectedFile.value]);
+  } catch (e) {
+    logError(String(e));
+  }
 }
-function doUnstage() {
-  if (canUnstage.value && selectedFile.value) unstageFiles([selectedFile.value]);
+async function doUnstage() {
+  if (!(canUnstage.value && selectedFile.value)) return;
+  try {
+    await unstageFiles([selectedFile.value]);
+  } catch (e) {
+    logError(String(e));
+  }
 }
 
 const showRepoMenu = ref(false);
 const showLocalMenu = ref(false);
+const showBranchMenu = ref(false);
 
+// Открытие любого из трёх дропдаунов закрывает остальные, чтобы они не
+// оставались открытыми одновременно.
 function toggleRepoMenu() {
-  showRepoMenu.value = !showRepoMenu.value;
+  const next = !showRepoMenu.value;
+  showLocalMenu.value = false;
+  showBranchMenu.value = false;
+  showRepoMenu.value = next;
 }
 
 function closeMenu() {
@@ -56,17 +73,21 @@ function closeMenu() {
 }
 
 function toggleLocalMenu() {
-  showLocalMenu.value = !showLocalMenu.value;
+  const next = !showLocalMenu.value;
+  showRepoMenu.value = false;
+  showBranchMenu.value = false;
+  showLocalMenu.value = next;
 }
 
 function closeLocalMenu() {
   showLocalMenu.value = false;
 }
 
-const showBranchMenu = ref(false);
-
 function toggleBranchMenu() {
-  showBranchMenu.value = !showBranchMenu.value;
+  const next = !showBranchMenu.value;
+  showRepoMenu.value = false;
+  showLocalMenu.value = false;
+  showBranchMenu.value = next;
 }
 
 function closeBranchMenu() {

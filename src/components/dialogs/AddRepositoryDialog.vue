@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { invoke } from "@/composables/useProgress";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useDraggable } from "@/composables/useDraggable";
@@ -56,11 +56,21 @@ function onPathInput() {
   }, 300);
 }
 
+// Снять висящий debounce-таймер, если диалог закрыли в течение 300 мс после
+// ввода — иначе колбэк выстрелит на размонтированном компоненте.
+onUnmounted(() => {
+  if (checkTimer) clearTimeout(checkTimer);
+});
+
 async function browseFolder() {
-  const selected = await open({ directory: true, multiple: false, title: "Select repository directory" });
-  if (selected) {
-    repoPath.value = selected as string;
-    onPathInput();
+  try {
+    const selected = await open({ directory: true, multiple: false, title: "Select repository directory" });
+    if (selected) {
+      repoPath.value = selected as string;
+      onPathInput();
+    }
+  } catch {
+    // Отмена/ошибка системного диалога выбора папки — игнорируем.
   }
 }
 

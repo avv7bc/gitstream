@@ -25,9 +25,7 @@ function getLineClass(line?: DiffLineWithWordDiff): string {
       <span class="line-prefix">{{ oldLine ? (oldLine.kind === "removed" ? "-" : " ") : "" }}</span>
       <span class="line-content">
         <template v-if="oldLine?.wordDiffs">
-          <template v-for="span in oldLine.wordDiffs" :key="`${span.text}-${span.kind}`">
-            <span :class="['word-diff', span.kind]">{{ span.text }}</span>
-          </template>
+          <span v-for="(span, spanIdx) in oldLine.wordDiffs" :key="spanIdx" :class="['word-diff', span.kind]">{{ span.text }}</span>
         </template>
         <template v-else>
           {{ oldLine?.content ?? "" }}
@@ -40,9 +38,7 @@ function getLineClass(line?: DiffLineWithWordDiff): string {
       <span class="line-prefix">{{ newLine ? (newLine.kind === "added" ? "+" : " ") : "" }}</span>
       <span class="line-content">
         <template v-if="newLine?.wordDiffs">
-          <template v-for="span in newLine.wordDiffs" :key="`${span.text}-${span.kind}`">
-            <span :class="['word-diff', span.kind]">{{ span.text }}</span>
-          </template>
+          <span v-for="(span, spanIdx) in newLine.wordDiffs" :key="spanIdx" :class="['word-diff', span.kind]">{{ span.text }}</span>
         </template>
         <template v-else>
           {{ newLine?.content ?? "" }}

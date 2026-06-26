@@ -1,4 +1,4 @@
-import { ref, computed } from "vue";
+import { ref, computed, onUnmounted } from "vue";
 
 export function useDraggable() {
   const offset = ref({ x: 0, y: 0 });
@@ -34,6 +34,11 @@ export function useDraggable() {
   const dragStyle = computed(() => ({
     transform: `translate(${offset.value.x}px, ${offset.value.y}px)`,
   }));
+
+  // Если компонент размонтируется с зажатой мышью во время перетаскивания
+  // (например, диалог закрыли по Esc прямо во время drag), снять висящие
+  // window-listener'ы, иначе они утекут.
+  onUnmounted(onEnd);
 
   return { dragStyle, onDragStart };
 }

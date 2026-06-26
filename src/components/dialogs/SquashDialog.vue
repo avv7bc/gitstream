@@ -26,14 +26,12 @@ onMounted(() => {
 
 const canConfirm = computed(() => !busy.value && message.value.trim().length > 0);
 
-async function doSquash() {
+function doSquash() {
   if (!canConfirm.value) return;
+  // busy остаётся true до размонтирования диалога родителем (после rebase):
+  // не сбрасываем в finally, иначе защита от повторного запуска иллюзорна.
   busy.value = true;
-  try {
-    emit("confirm", message.value.trim());
-  } finally {
-    busy.value = false;
-  }
+  emit("confirm", message.value.trim());
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -43,7 +41,9 @@ function onKeydown(e: KeyboardEvent) {
 
 function onTextareaKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") { emit("close"); return; }
-  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { doSquash(); return; }
+  // stopPropagation на Ctrl+Enter тоже — иначе событие всплывёт на оверлей
+  // (@keydown=onKeydown) и doSquash вызовется дважды.
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.stopPropagation(); doSquash(); return; }
   e.stopPropagation();
 }
 </script>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, watch } from "vue";
 import { useFiles } from "@/composables/useFiles";
 import { useDraggable } from "@/composables/useDraggable";
+import { logError } from "@/composables/useProgress";
 import { useI18n } from "@/composables/useI18n";
 
 const emit = defineEmits<{ close: [] }>();
@@ -24,18 +25,30 @@ const changedFiles = computed(() => {
 
 // Selection state: file path -> checked
 const selected = ref<Record<string, boolean>>({});
+const busy = ref(false);
 
-onMounted(() => {
-  for (const f of changedFiles.value) {
-    selected.value[f.path] = true;
-  }
-});
+// Синхронизация чекбоксов с актуальным списком файлов (новые отмечены,
+// исчезнувшие убраны) — иначе изменение статуса после монтирования оставило бы
+// новые файлы неотмеченными.
+watch(
+  changedFiles,
+  (list) => {
+    const paths = new Set(list.map((f) => f.path));
+    for (const f of list) {
+      if (selected.value[f.path] === undefined) selected.value[f.path] = true;
+    }
+    for (const key of Object.keys(selected.value)) {
+      if (!paths.has(key)) delete selected.value[key];
+    }
+  },
+  { immediate: true }
+);
 
 const selectedPaths = computed(() =>
   Object.entries(selected.value).filter(([, v]) => v).map(([k]) => k)
 );
 
-const canDiscard = computed(() => selectedPaths.value.length > 0);
+const canDiscard = computed(() => !busy.value && selectedPaths.value.length > 0);
 
 function fileName(path: string): string {
   const parts = path.split("/");
@@ -51,28 +64,37 @@ async function handleDiscard() {
   if (!canDiscard.value) return;
   const paths = selectedPaths.value;
 
-  // Untracked-файлы git restore/unstage не знает — их Discard удаляет с диска
-  // (как SmartGit). Tracked-файлы откатываем через restore.
-  const untrackedSet = new Set(
-    files.value.filter((f) => f.state === "untracked").map((f) => f.path)
-  );
-  const untracked = paths.filter((p) => untrackedSet.has(p));
-  const tracked = paths.filter((p) => !untrackedSet.has(p));
+  // busy блокирует повторный запуск деструктивной операции (двойной клик).
+  busy.value = true;
+  try {
+    // Untracked-файлы git restore/unstage не знает — их Discard удаляет с диска
+    // (как SmartGit). Tracked-файлы откатываем через restore.
+    const untrackedSet = new Set(
+      files.value.filter((f) => f.state === "untracked").map((f) => f.path)
+    );
+    const untracked = paths.filter((p) => untrackedSet.has(p));
+    const tracked = paths.filter((p) => !untrackedSet.has(p));
 
-  if (untracked.length > 0) await deleteFiles(untracked);
+    if (untracked.length > 0) await deleteFiles(untracked);
 
-  if (tracked.length > 0) {
-    if (revertTo.value === "head") {
-      // Unstage first, then discard working tree changes
-      await unstageFiles(tracked);
-      await discardFiles(tracked);
-    } else {
-      // Revert to index = just discard working tree changes
-      await discardFiles(tracked);
+    if (tracked.length > 0) {
+      if (revertTo.value === "head") {
+        // Unstage first, then discard working tree changes
+        await unstageFiles(tracked);
+        await discardFiles(tracked);
+      } else {
+        // Revert to index = just discard working tree changes
+        await discardFiles(tracked);
+      }
     }
+    await refresh();
+    emit("close");
+  } catch (e) {
+    // Ошибка уходит в Git output; диалог остаётся открытым.
+    logError(String(e));
+  } finally {
+    busy.value = false;
   }
-  await refresh();
-  emit("close");
 }
 </script>
 

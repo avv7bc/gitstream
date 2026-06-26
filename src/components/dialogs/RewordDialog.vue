@@ -24,14 +24,12 @@ onMounted(() => {
   text.value = props.message;
 });
 
-async function doConfirm() {
+function doConfirm() {
   if (busy.value || !text.value.trim()) return;
+  // busy остаётся true до размонтирования диалога родителем: не сбрасываем
+  // в finally, иначе защита от повторного reword (rebase) иллюзорна.
   busy.value = true;
-  try {
-    emit("confirm", text.value.trim());
-  } finally {
-    busy.value = false;
-  }
+  emit("confirm", text.value.trim());
 }
 
 function onTextareaKeydown(e: KeyboardEvent) {

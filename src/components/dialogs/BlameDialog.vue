@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useDraggable } from "@/composables/useDraggable";
 import { useI18n } from "@/composables/useI18n";
 import { useBlame } from "@/composables/useBlame";
+import { useVirtualList } from "@/composables/useVirtualList";
 
 const { path, lines, loading, goToCommit, close } = useBlame();
 const { dragStyle, onDragStart } = useDraggable();
@@ -18,6 +19,11 @@ const rows = computed(() =>
     groupStart: i === 0 || lines.value[i - 1].oid !== line.oid,
   })),
 );
+
+// Виртуализация: blame больших файлов (тысячи строк) рендерим окном видимых
+// строк, иначе UI подвисает. Высота строки зафиксирована в CSS под LINE_HEIGHT.
+const blScroll = ref<HTMLElement | null>(null);
+const { visibleItems, paddingTop, paddingBottom } = useVirtualList(rows, blScroll);
 
 function shortDate(epoch: number): string {
   return new Date(epoch * 1000).toISOString().slice(0, 10);
@@ -36,22 +42,24 @@ function shortDate(epoch: number): string {
 
       <div class="bl-body">
         <div v-if="!loading && lines.length === 0" class="bl-empty">{{ t.empty }}</div>
-        <div v-else class="bl-scroll">
-          <div v-for="row in rows" :key="row.line.line_no" class="bl-row">
-            <button
-              class="bl-gutter"
-              :class="{ 'group-start': row.groupStart }"
-              :title="row.groupStart ? `${row.line.short_oid} · ${row.line.summary}` : ''"
-              @click="goToCommit(row.line.oid)"
-            >
-              <template v-if="row.groupStart">
-                <span class="bl-sha">{{ row.line.short_oid }}</span>
-                <span class="bl-author">{{ row.line.author }}</span>
-                <span class="bl-date">{{ shortDate(row.line.author_time) }}</span>
-              </template>
-            </button>
-            <span class="bl-lineno">{{ row.line.line_no }}</span>
-            <span class="bl-content">{{ row.line.content }}</span>
+        <div v-else ref="blScroll" class="bl-scroll">
+          <div :style="{ paddingTop: paddingTop + 'px', paddingBottom: paddingBottom + 'px' }">
+            <div v-for="{ item: row } in visibleItems" :key="row.line.line_no" class="bl-row">
+              <button
+                class="bl-gutter"
+                :class="{ 'group-start': row.groupStart }"
+                :title="row.groupStart ? `${row.line.short_oid} · ${row.line.summary}` : ''"
+                @click="goToCommit(row.line.oid)"
+              >
+                <template v-if="row.groupStart">
+                  <span class="bl-sha">{{ row.line.short_oid }}</span>
+                  <span class="bl-author">{{ row.line.author }}</span>
+                  <span class="bl-date">{{ shortDate(row.line.author_time) }}</span>
+                </template>
+              </button>
+              <span class="bl-lineno">{{ row.line.line_no }}</span>
+              <span class="bl-content">{{ row.line.content }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -99,6 +107,10 @@ function shortDate(epoch: number): string {
   display: flex;
   align-items: stretch;
   white-space: pre;
+  /* Высота строки зафиксирована под LINE_HEIGHT в useVirtualList (20px) —
+     при изменении синхронизировать обе константы. */
+  height: 20px;
+  line-height: 20px;
 }
 .bl-row:hover {
   background: var(--hover-bg, rgba(255, 255, 255, 0.04));

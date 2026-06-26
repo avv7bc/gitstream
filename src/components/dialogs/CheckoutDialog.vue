@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useBranches } from "@/composables/useBranches";
 import { useDraggable } from "@/composables/useDraggable";
+import { logError } from "@/composables/useProgress";
 import { useI18n } from "@/composables/useI18n";
 import { highlight } from "@/utils/highlight";
 
@@ -13,6 +14,10 @@ const { i18n } = useI18n();
 
 const search = ref("");
 const selectedBranch = ref<string | null>(null);
+const busy = ref(false);
+const searchInput = ref<HTMLInputElement | null>(null);
+
+onMounted(() => nextTick(() => searchInput.value?.focus()));
 
 const filteredBranches = computed(() => {
   const q = search.value.toLowerCase();
@@ -24,10 +29,19 @@ const filteredBranches = computed(() => {
 });
 
 async function handleCheckout() {
-  if (!selectedBranch.value) return;
-  await checkout(selectedBranch.value);
-  emit("close");
-  emit("checkedOut");
+  if (!selectedBranch.value || busy.value) return;
+  busy.value = true;
+  try {
+    await checkout(selectedBranch.value);
+    emit("close");
+    emit("checkedOut");
+  } catch (e) {
+    // Ошибка (грязное дерево/конфликт) уходит в Git output; диалог остаётся
+    // открытым, чтобы пользователь увидел причину и мог повторить.
+    logError(String(e));
+  } finally {
+    busy.value = false;
+  }
 }
 </script>
 
@@ -43,6 +57,7 @@ async function handleCheckout() {
 
       <div class="dialog-body">
         <input
+          ref="searchInput"
           v-model="search"
           type="text"
           :placeholder="i18n.dialog.checkout.searchPlaceholder"
@@ -71,7 +86,7 @@ async function handleCheckout() {
         <button class="btn btn-secondary" @click="$emit('close')">{{ i18n.dialog.checkout.cancel }}</button>
         <button
           class="btn btn-primary"
-          :disabled="!selectedBranch || branches.find(b => b.name === selectedBranch)?.is_current"
+          :disabled="busy || !selectedBranch || branches.find(b => b.name === selectedBranch)?.is_current"
           @click="handleCheckout"
         >
           {{ i18n.dialog.checkout.checkout }}

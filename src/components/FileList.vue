@@ -591,7 +591,11 @@ async function selectFile(path: string, e?: MouseEvent) {
   if (isWorkingTree.value) {
     const f = files.value.find((x) => x.path === path);
     const staged = f?.staged === "staged";
-    await diffFile(path, staged);
+    try {
+      await diffFile(path, staged);
+    } catch (err) {
+      logError(`Diff failed: ${err}`);
+    }
   }
 }
 
@@ -615,7 +619,11 @@ async function selectCommitFile(path: string, e?: MouseEvent) {
   }
   selectedFile.value = path;
   if (selectedCommit.value && selectedCommit.value !== "__worktree__") {
-    await diffCommit(selectedCommit.value, path);
+    try {
+      await diffCommit(selectedCommit.value, path);
+    } catch (err) {
+      logError(`Diff failed: ${err}`);
+    }
   }
 }
 
