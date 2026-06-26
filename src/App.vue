@@ -45,7 +45,7 @@ import { toggleLog, logError } from "@/composables/useProgress";
 
 const { repoPath, onRepoOpened, restoreLastRepo } = useRepo();
 const { refresh: refreshFiles, selectedFile, files, stageFiles, unstageFiles } = useFiles();
-const { refresh: refreshBranches, createTag, stashSave } = useBranches();
+const { refresh: refreshBranches, createTag, stashSave, branches, remotes } = useBranches();
 const { refresh: refreshLog, selectedCommit, commits, squashCommits, rewordCommit } = useLog();
 const { clearDiff } = useDiff();
 const { pull, push, fetchRemote } = useRemote();
@@ -94,7 +94,43 @@ onRepoOpened(async () => {
   selectedFile.value = null;
   clearDiff();
   await refreshAll();
+  // Авто-fetch на новом активном репозитории: подтягиваем удалённые коммиты,
+  // чтобы граф сразу показывал «входящие» (приглушённые) коммиты и актуальный
+  // behind-счётчик. Неблокирующе (без await) и тихо: ошибки сети уходят в Git
+  // output внутри fetchRemote, интерфейс не ждёт сеть.
+  void autoFetchOnOpen();
 });
+
+// Remote по умолчанию для авто-fetch: remote текущей ветки (upstream вида
+// "origin/main") → "origin" → первый из списка. Нет remote'ов → null.
+function pickDefaultRemote(): string | null {
+  const list = remotes.value;
+  if (!list.length) return null;
+  const up = branches.value.find((b) => b.is_current)?.upstream;
+  const upRemote = up ? list.find((r) => up.startsWith(r + "/")) : null;
+  return upRemote ?? (list.includes("origin") ? "origin" : list[0]);
+}
+
+// Репозитории, для которых авто-fetch уже выполнялся в этом запуске программы.
+// Set живёт всё время жизни корневого компонента = всю сессию приложения,
+// поэтому повторное переключение на тот же репо fetch уже не запускает.
+const autoFetchedRepos = new Set<string>();
+
+async function autoFetchOnOpen() {
+  const path = repoPath.value;
+  if (!path) return;
+  // Авто-fetch — один раз на репозиторий за сессию. Помечаем до сетевого
+  // вызова: защищает и от повторов при возврате к репо, и от гонки двух
+  // быстрых переключений на один путь. Ручной Fetch при этом доступен всегда.
+  if (autoFetchedRepos.has(path)) return;
+  const remote = pickDefaultRemote();
+  if (!remote) return;
+  autoFetchedRepos.add(path);
+  await fetchRemote(remote);
+  // Репозиторий могли переключить, пока шёл сетевой fetch — обновляем граф
+  // только если активный репозиторий не сменился.
+  if (repoPath.value === path) await refreshAll();
+}
 
 watch(repoPath, (val) => {
   if (!val) {
