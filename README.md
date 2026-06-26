@@ -43,8 +43,10 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 
 ### Remote operations
 - **Pull** — merge or rebase, with remote selection; upstream configured automatically
-- **Push** — always sets upstream on first push; force push with confirmation
+- **Push** — always sets upstream on first push; force push only via `--force-with-lease`, guarded by a backup ref (`refs/gitstream/backup/<branch>`) so it can be undone — no silent destructive actions
 - **Fetch** — fetch without integrating, as a split button next to Pull/Push: **Fetch** (default remote), **Fetch all** (`git fetch --all`), and **Fetch all (prune)**; per-remote Fetch / Fetch --prune from the Remotes section, plus a one-click Fetch all in its header
+- **Sync Assistant** — when a push is rejected (non-fast-forward) it diagnoses the situation and offers safe one-click remedies: a rewritten-commit case (same tree, different SHA — amend/rebase) → force-with-lease; a genuine divergence → pull --rebase / merge
+- **Auto-fetch on repository switch** — fetches once per repo per session so the graph immediately shows incoming (dimmed) commits and an accurate behind count, without blocking the UI
 - **Remote management** — add / edit URL / rename / remove remotes (Remotes section in the Branches panel)
 - **Set upstream** — pick the tracking branch for a local branch (or unset it)
 - Network progress indicator with remote name and timeout countdown
@@ -94,7 +96,7 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 - **Settings**, **Stats**, and **File Compare** (diff any two revisions of a file) dialogs
 - Branch author tooltip (VSCode-style) on hover
 - Binary-file and image preview in the diff panel
-- Dark theme (Catppuccin-inspired)
+- **Multiple light and dark themes** — System (follows the OS), Dark+ (VSCode), Light, Material / Material Light, SmartGit, Catppuccin Mocha / Latte, Solarized Light, GitHub Dark / Light, Dracula, Sublime (Monokai Pro)
 - Draggable modal dialogs
 - Resizable panels
 - Status bar: current branch, ahead/behind, operation progress
