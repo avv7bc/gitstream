@@ -111,18 +111,28 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 
 ## Download
 
-Latest release with binaries for all platforms: **v1.0.1**
+Latest release with binaries for all platforms: **v1.1.4**
 
 | Platform | Package | Link |
 |----------|---------|------|
-| Linux | `.deb` (Debian / Ubuntu) | [GitStream_1.0.1_amd64.deb](https://github.com/avv7bc/gitstream/releases/download/v1.0.1/GitStream_1.0.1_amd64.deb) |
-| Linux | `.rpm` (Fedora / RHEL) | [GitStream-1.0.1-1.x86_64.rpm](https://github.com/avv7bc/gitstream/releases/download/v1.0.1/GitStream-1.0.1-1.x86_64.rpm) |
-| Linux | `.AppImage` | [GitStream_1.0.1_amd64.AppImage](https://github.com/avv7bc/gitstream/releases/download/v1.0.1/GitStream_1.0.1_amd64.AppImage) |
-| macOS | `.dmg` (Apple Silicon) | [GitStream_1.0.1_aarch64.dmg](https://github.com/avv7bc/gitstream/releases/download/v1.0.1/GitStream_1.0.1_aarch64.dmg) |
-| Windows | `.exe` installer | [GitStream_1.0.1_x64-setup.exe](https://github.com/avv7bc/gitstream/releases/download/v1.0.1/GitStream_1.0.1_x64-setup.exe) |
-| Windows | `.msi` | [GitStream_1.0.1_x64_en-US.msi](https://github.com/avv7bc/gitstream/releases/download/v1.0.1/GitStream_1.0.1_x64_en-US.msi) |
+| Linux | `.deb` (Debian / Ubuntu) | [GitStream_1.1.4_amd64.deb](https://github.com/avv7bc/gitstream/releases/download/v1.1.4/GitStream_1.1.4_amd64.deb) |
+| Linux | `.rpm` (Fedora / RHEL) | [GitStream-1.1.4-1.x86_64.rpm](https://github.com/avv7bc/gitstream/releases/download/v1.1.4/GitStream-1.1.4-1.x86_64.rpm) |
+| Linux | `.AppImage` | [GitStream_1.1.4_amd64.AppImage](https://github.com/avv7bc/gitstream/releases/download/v1.1.4/GitStream_1.1.4_amd64.AppImage) |
+| macOS | `.dmg` (Apple Silicon) | [GitStream_1.1.4_aarch64.dmg](https://github.com/avv7bc/gitstream/releases/download/v1.1.4/GitStream_1.1.4_aarch64.dmg) |
+| Windows | `.exe` installer | [GitStream_1.1.4_x64-setup.exe](https://github.com/avv7bc/gitstream/releases/download/v1.1.4/GitStream_1.1.4_x64-setup.exe) |
+| Windows | `.msi` | [GitStream_1.1.4_x64_en-US.msi](https://github.com/avv7bc/gitstream/releases/download/v1.1.4/GitStream_1.1.4_x64_en-US.msi) |
 
 All releases: [github.com/avv7bc/gitstream/releases](https://github.com/avv7bc/gitstream/releases)
+
+### macOS: "GitStream is damaged and can't be opened"
+
+The macOS build is **not signed with an Apple Developer ID and not notarized**, so after downloading the `.dmg` via a browser, Gatekeeper marks the app as "damaged" (the `com.apple.quarantine` attribute). This is expected — the app is fine. To run it, copy `GitStream.app` to `/Applications` and strip the quarantine attribute:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/GitStream.app
+```
+
+Then open the app normally.
 
 ## Getting started
 
