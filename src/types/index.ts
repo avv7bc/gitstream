@@ -79,6 +79,13 @@ export interface TagInfo {
   message: string | null;
 }
 
+export type TagSyncState = "synced" | "diverged" | "local_only" | "remote_only";
+
+export interface TagSyncStatus {
+  name: string;
+  status: TagSyncState;
+}
+
 export interface StashEntry {
   index: number;
   message: string;

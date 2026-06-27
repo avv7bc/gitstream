@@ -105,6 +105,7 @@ fn main() {
             commands::do_create_tag,
             commands::do_delete_tag,
             commands::do_push_tag,
+            commands::get_tag_sync_status,
             commands::do_delete_remote_branch,
             settings::get_settings,
             settings::set_settings,

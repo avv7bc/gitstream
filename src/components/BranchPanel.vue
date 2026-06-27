@@ -11,7 +11,7 @@ import CreateBranchDialog from "@/components/dialogs/CreateBranchDialog.vue";
 import RemoteDialog from "@/components/dialogs/RemoteDialog.vue";
 import SetUpstreamDialog from "@/components/dialogs/SetUpstreamDialog.vue";
 import RefIcon from "@/components/RefIcon.vue";
-import type { BranchInfo, TagInfo, StashEntry, RemoteInfo } from "@/types";
+import type { BranchInfo, TagInfo, StashEntry, RemoteInfo, TagSyncState } from "@/types";
 import { useI18n } from "@/composables/useI18n";
 const { i18n } = useI18n();
 
@@ -40,11 +40,57 @@ async function handleLocalDblClick(branch: { name: string; is_current: boolean }
 const {
   branches, tags, stashes, remotes, remoteUrls,
   checkout, createBranch, mergeBranch, rebaseOnto, renameBranch, deleteBranch, deleteRemoteBranch, pushBranch,
-  deleteTag, pushTag,
+  deleteTag, pushTag, getTagSyncStatus,
   stashSave, stashApply, stashPop, stashDrop,
   addRemote, removeRemote, renameRemote, setRemoteUrl, setBranchUpstream,
 } = useBranches();
-const { fetchRemote, fetchAll } = useRemote();
+const { fetchRemote, fetchAll, syncTags } = useRemote();
+
+// Статус каждого тега относительно remote (заполняется по «Проверить теги»):
+// имя → synced/diverged/local_only/remote_only. Пусто, пока не проверяли.
+const tagSync = ref<Record<string, TagSyncState>>({});
+
+async function refreshTagSync() {
+  if (!remotes.value.length) return;
+  try {
+    const statuses = await getTagSyncStatus(remotes.value[0]);
+    const map: Record<string, TagSyncState> = {};
+    for (const s of statuses) map[s.name] = s.status;
+    tagSync.value = map;
+  } catch (e) {
+    logError(String(e));
+  }
+}
+
+const showSyncTagsConfirm = ref(false);
+
+// Полная синхронизация тегов с remote (--force + --prune-tags), затем
+// обновление списка и статусов.
+async function handleSyncTags() {
+  showSyncTagsConfirm.value = false;
+  if (!remotes.value.length) return;
+  const ok = await syncTags(remotes.value[0]);
+  if (ok) {
+    emit("tagsChanged");
+    await refreshTagSync();
+  }
+}
+
+function tagSyncLabel(name: string): string {
+  const st = tagSync.value[name];
+  if (st === "diverged") return "⇅";
+  if (st === "local_only") return i18n.value.branches.tagLocalOnly;
+  if (st === "remote_only") return i18n.value.branches.tagRemoteOnly;
+  return "";
+}
+
+function tagSyncTitle(name: string): string {
+  const st = tagSync.value[name];
+  if (st === "diverged") return i18n.value.branches.tagDiverged;
+  if (st === "local_only") return i18n.value.branches.tagLocalOnlyHint;
+  if (st === "remote_only") return i18n.value.branches.tagRemoteOnlyHint;
+  return "";
+}
 
 // --- Create branch ---
 const showCreateBranchDialog = ref(false);
@@ -285,6 +331,8 @@ const tagCtxMenu = ref<{ x: number; y: number } | null>(null);
 const ctxTag = ref<TagInfo | null>(null);
 const showDeleteTagConfirm = ref(false);
 const targetTags = ref<TagInfo[]>([]);
+const showForcePushTagConfirm = ref(false);
+const forcePushTagTargets = ref<TagInfo[]>([]);
 
 function onTagContextMenu(e: MouseEvent, tag: TagInfo) {
   e.preventDefault();
@@ -306,21 +354,49 @@ function closeTagCtxMenu() {
 
 const hasRemote = computed(() => remotes.value.length > 0);
 
+// Отказ push'а тега из-за того, что на remote уже есть тег с этим именем
+// (но другим коммитом). Лечится force-push'ем.
+function isTagClobber(e: unknown): boolean {
+  return /already exists|would clobber|non-fast-forward|\[rejected\]/i.test(String(e));
+}
+
+async function pushTags(targets: TagInfo[], remote: string, force: boolean) {
+  const errors: string[] = [];
+  const needForce: TagInfo[] = [];
+  for (const t of targets) {
+    try {
+      await pushTag(remote, t.name, false, force);
+    } catch (e) {
+      if (!force && isTagClobber(e)) needForce.push(t);
+      else errors.push(`${t.name}: ${e}`);
+    }
+  }
+  if (errors.length) logError(`Push tag failed:\n${errors.join("\n")}`);
+  emit("tagsChanged");
+  return needForce;
+}
+
 async function handlePushTagCtx() {
   const targets = selectedTags.value;
   closeTagCtxMenu();
   if (!targets.length) return;
   const remote = remotes.value[0] ?? "origin";
-  const errors: string[] = [];
-  for (const t of targets) {
-    try {
-      await pushTag(remote, t.name, false);
-    } catch (e) {
-      errors.push(`${t.name}: ${e}`);
-    }
+  // Обычный push; теги, отклонённые из-за расхождения, предлагаем force-push'нуть.
+  const needForce = await pushTags(targets, remote, false);
+  if (needForce.length) {
+    forcePushTagTargets.value = needForce;
+    showForcePushTagConfirm.value = true;
   }
-  if (errors.length) logError(`Push tag failed:\n${errors.join("\n")}`);
-  emit("tagsChanged");
+}
+
+async function confirmForcePushTag() {
+  const targets = forcePushTagTargets.value;
+  showForcePushTagConfirm.value = false;
+  forcePushTagTargets.value = [];
+  if (!targets.length) return;
+  const remote = remotes.value[0] ?? "origin";
+  await pushTags(targets, remote, true);
+  await refreshTagSync();
 }
 
 function handleDeleteTagCtx() {
@@ -905,6 +981,18 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
           <span class="section-title">{{ i18n.branches.tags }}</span>
           <span class="section-count">{{ filteredTags.length }}</span>
           <button
+            v-if="hasRemote"
+            class="section-add-btn"
+            :title="i18n.branches.checkRemoteTags"
+            @click.stop="refreshTagSync"
+          >⟲</button>
+          <button
+            v-if="hasRemote"
+            class="section-add-btn"
+            :title="i18n.branches.syncTags"
+            @click.stop="showSyncTagsConfirm = true"
+          >⇅</button>
+          <button
             class="section-add-btn"
             :title="i18n.branches.addTag"
             @click.stop="emit('createTag')"
@@ -921,6 +1009,12 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
           >
             <RefIcon kind="tag" class="bp-icon bp-icon--tag" />
             <span class="branch-name" v-html="highlight(tag.name, filter)" />
+            <span
+              v-if="tagSync[tag.name] && tagSync[tag.name] !== 'synced'"
+              class="tag-sync-badge"
+              :class="`tag-sync--${tagSync[tag.name]}`"
+              :title="tagSyncTitle(tag.name)"
+            >{{ tagSyncLabel(tag.name) }}</span>
           </div>
         </div>
       </div>
@@ -1094,6 +1188,27 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
         :checkbox-label="hasRemote ? `Also delete on remote '${remotes[0]}'` : undefined"
         @close="showDeleteTagConfirm = false; targetTags = []"
         @confirm="confirmDeleteTag"
+      />
+
+      <ConfirmDialog
+        v-if="showForcePushTagConfirm && forcePushTagTargets.length"
+        :message="forcePushTagTargets.length > 1
+          ? i18n.branches.forcePushTagsConfirm.replace('{n}', String(forcePushTagTargets.length))
+          : i18n.branches.forcePushTagConfirm.replace('{name}', forcePushTagTargets[0].name)"
+        :items="forcePushTagTargets.length > 1 ? forcePushTagTargets.map((t) => t.name) : undefined"
+        :confirm-label="i18n.branches.forcePushTag"
+        danger
+        @close="showForcePushTagConfirm = false; forcePushTagTargets = []"
+        @confirm="confirmForcePushTag"
+      />
+
+      <ConfirmDialog
+        v-if="showSyncTagsConfirm"
+        :message="i18n.branches.syncTagsConfirm.replace('{remote}', remotes[0] ?? 'origin')"
+        :confirm-label="i18n.branches.syncTags"
+        danger
+        @close="showSyncTagsConfirm = false"
+        @confirm="handleSyncTags"
       />
 
       <div
@@ -1411,6 +1526,28 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
   color: var(--red);
 }
 .behind-badge::before { content: "\2193"; }
+
+/* Бейдж расхождения тега с remote */
+.tag-sync-badge {
+  margin-left: auto;
+  font-size: var(--font-size-xs);
+  padding: 0 5px;
+  border-radius: 8px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.tag-sync--diverged {
+  background: rgba(250, 179, 135, 0.18);
+  color: var(--peach, #fab387);
+}
+.tag-sync--local_only {
+  background: rgba(137, 180, 250, 0.15);
+  color: var(--blue, #89b4fa);
+}
+.tag-sync--remote_only {
+  background: rgba(148, 226, 213, 0.15);
+  color: var(--teal, #94e2d5);
+}
 
 .stash-item {
   align-items: flex-start;

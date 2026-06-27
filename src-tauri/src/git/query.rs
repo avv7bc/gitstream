@@ -629,7 +629,7 @@ pub fn tags(repo_path: &Path) -> Result<Vec<TagInfo>, GitError> {
     let format = "%(refname:short)%00%(*objectname:short)%00%(contents:subject)";
     // --sort=-version:refname — semver-сортировка по убыванию (v0.7.13 идёт
     // после v0.7.9, а не между v0.7.0 и v0.7.2 как при алфавитной по умолчанию).
-    // Как в SmartGit: новые версии сверху.
+    // Новые версии — сверху.
     let output = run_git(
         repo_path,
         &[
@@ -654,6 +654,89 @@ pub fn tags(repo_path: &Path) -> Result<Vec<TagInfo>, GitError> {
         result.push(TagInfo { name, oid, message });
     }
     Ok(result)
+}
+
+/// Локальные теги в виде (имя → полный oid коммита, на который тег указывает).
+/// Для аннотированного тега берём `*objectname` (коммит после разыменования),
+/// для lightweight — `objectname`. Полные oid'ы, чтобы сравнивать с ls-remote.
+pub fn local_tag_commits(repo_path: &Path) -> Result<Vec<(String, String)>, GitError> {
+    let format = "%(refname:short)%00%(objectname)%00%(*objectname)";
+    let output = run_git(
+        repo_path,
+        &["for-each-ref", &format!("--format={}", format), "refs/tags"],
+    )?;
+    let mut result = Vec::new();
+    for line in output.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = line.splitn(3, '\0').collect();
+        let name = parts.first().unwrap_or(&"").to_string();
+        let obj = parts.get(1).unwrap_or(&"").to_string();
+        let deref = parts.get(2).copied().unwrap_or("");
+        let commit = if deref.is_empty() { obj } else { deref.to_string() };
+        if !name.is_empty() {
+            result.push((name, commit));
+        }
+    }
+    Ok(result)
+}
+
+/// Сравнивает локальные теги с выводом `git ls-remote --tags <remote>` и
+/// возвращает статус каждого тега. Чистая функция — без сети, удобно тестировать.
+/// `remote_output` — построчно `<oid>\trefs/tags/<name>` (+ возможные `^{}`
+/// строки с разыменованным коммитом для аннотированных тегов).
+pub fn compute_tag_sync(
+    local: &[(String, String)],
+    remote_output: &str,
+) -> Vec<TagSyncStatus> {
+    // имя → commit oid на remote; для аннотированного предпочитаем `^{}` (коммит).
+    let mut remote: HashMap<String, String> = HashMap::new();
+    for line in remote_output.lines() {
+        let mut it = line.split('\t');
+        let oid = match it.next() {
+            Some(o) if !o.is_empty() => o,
+            _ => continue,
+        };
+        let refname = match it.next() {
+            Some(r) => r,
+            None => continue,
+        };
+        let name = match refname.strip_prefix("refs/tags/") {
+            Some(n) => n,
+            None => continue,
+        };
+        if let Some(base) = name.strip_suffix("^{}") {
+            // Разыменованная строка — это и есть коммит; перекрывает oid тег-объекта.
+            remote.insert(base.to_string(), oid.to_string());
+        } else {
+            remote.entry(name.to_string()).or_insert_with(|| oid.to_string());
+        }
+    }
+
+    let local_names: HashSet<&str> = local.iter().map(|(n, _)| n.as_str()).collect();
+    let mut result = Vec::new();
+    for (name, commit) in local {
+        let status = match remote.get(name) {
+            Some(roid) if roid == commit => "synced",
+            Some(_) => "diverged",
+            None => "local_only",
+        };
+        result.push(TagSyncStatus {
+            name: name.clone(),
+            status: status.to_string(),
+        });
+    }
+    // Теги, которые есть на remote, но отсутствуют локально.
+    for name in remote.keys() {
+        if !local_names.contains(name.as_str()) {
+            result.push(TagSyncStatus {
+                name: name.clone(),
+                status: "remote_only".to_string(),
+            });
+        }
+    }
+    result
 }
 
 pub fn stashes(repo_path: &Path) -> Result<Vec<StashEntry>, GitError> {
@@ -1826,5 +1909,39 @@ filename f.txt\n\
     #[test]
     fn empty_output_yields_no_lines() {
         assert!(parse_blame_porcelain("").is_empty());
+    }
+}
+
+#[cfg(test)]
+mod tag_sync_tests {
+    use super::compute_tag_sync;
+
+    fn s(a: &str, b: &str) -> (String, String) {
+        (a.to_string(), b.to_string())
+    }
+
+    #[test]
+    fn classifies_synced_diverged_local_and_remote_only() {
+        let local = vec![
+            s("v1.0", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), // synced
+            s("v2.0", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), // diverged
+            s("v3.0", "cccccccccccccccccccccccccccccccccccccccc"), // local_only
+        ];
+        // v1.0 совпадает; v2.0 на remote другой; v4.0 только на remote (annotated:
+        // строка тег-объекта + разыменованный ^{} коммит).
+        let remote = "\
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\trefs/tags/v1.0
+9999999999999999999999999999999999999999\trefs/tags/v2.0
+dddddddddddddddddddddddddddddddddddddddd\trefs/tags/v4.0
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\trefs/tags/v4.0^{}";
+
+        let res = compute_tag_sync(&local, remote);
+        let get = |n: &str| res.iter().find(|t| t.name == n).map(|t| t.status.as_str());
+
+        assert_eq!(get("v1.0"), Some("synced"));
+        assert_eq!(get("v2.0"), Some("diverged"));
+        assert_eq!(get("v3.0"), Some("local_only"));
+        // remote_only берёт разыменованный коммит из ^{}-строки.
+        assert_eq!(get("v4.0"), Some("remote_only"));
     }
 }

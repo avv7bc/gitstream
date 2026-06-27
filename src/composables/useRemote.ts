@@ -43,6 +43,24 @@ export function useRemote() {
     );
   }
 
+  // Полная синхронизация тегов с remote: --force обновляет разошедшиеся теги,
+  // --prune-tags удаляет локальные теги, которых уже нет на remote. Операция
+  // деструктивна для локальных тегов, поэтому вызывается только по явному
+  // действию пользователя. Возвращает true при успехе.
+  async function syncTags(remote: string): Promise<boolean> {
+    if (!repoPath.value) return false;
+    return await wrapAsync(() =>
+      invoke("do_fetch", {
+        repoPath: repoPath.value!,
+        remote,
+        prune: false,
+        forceTags: true,
+        pruneTags: true,
+        timeoutSecs: networkTimeoutSecs.value,
+      })
+    );
+  }
+
   async function fetchAll(prune = false) {
     if (!repoPath.value) return;
     await wrapAsync(() =>
@@ -106,5 +124,5 @@ export function useRemote() {
     }
   }
 
-  return { isBusy, fetchRemote, fetchAll, pull, push };
+  return { isBusy, fetchRemote, fetchAll, syncTags, pull, push };
 }

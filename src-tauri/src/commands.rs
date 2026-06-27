@@ -50,9 +50,15 @@ async fn run_network_git(
 ) -> Result<String, String> {
     let secs = effective_timeout_secs(timeout_secs);
 
-    // Вставляем --progress после subcommand чтобы git писал прогресс в pipe
+    // Вставляем --progress после subcommand чтобы git писал прогресс в pipe.
+    // Только для команд передачи объектов — ls-remote и подобные на --progress
+    // падают с "unknown option".
     let mut git_args = args.to_vec();
-    if !git_args.is_empty() {
+    const PROGRESS_OK: [&str; 4] = ["fetch", "pull", "push", "clone"];
+    if git_args
+        .first()
+        .is_some_and(|c| PROGRESS_OK.contains(&c.as_str()))
+    {
         git_args.insert(1, "--progress".into());
     }
 
@@ -491,9 +497,16 @@ pub async fn do_fetch(
     repo_path: String,
     remote: String,
     prune: Option<bool>,
+    force_tags: Option<bool>,
+    prune_tags: Option<bool>,
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
-    let args = mutation::fetch_args(&remote, prune.unwrap_or(false));
+    let args = mutation::fetch_args(
+        &remote,
+        prune.unwrap_or(false),
+        force_tags.unwrap_or(false),
+        prune_tags.unwrap_or(false),
+    );
     run_network_git(
         &app,
         Some(Path::new(&repo_path)),
@@ -509,9 +522,15 @@ pub async fn do_fetch_all(
     app: tauri::AppHandle,
     repo_path: String,
     prune: Option<bool>,
+    force_tags: Option<bool>,
+    prune_tags: Option<bool>,
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
-    let args = mutation::fetch_all_args(prune.unwrap_or(false));
+    let args = mutation::fetch_all_args(
+        prune.unwrap_or(false),
+        force_tags.unwrap_or(false),
+        prune_tags.unwrap_or(false),
+    );
     run_network_git(
         &app,
         Some(Path::new(&repo_path)),
@@ -607,9 +626,10 @@ pub async fn do_push_tag(
     remote: String,
     name: String,
     delete: bool,
+    force: Option<bool>,
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
-    let args = mutation::push_tag_args(&remote, &name, delete);
+    let args = mutation::push_tag_args(&remote, &name, delete, force.unwrap_or(false));
     run_network_git(
         &app,
         Some(Path::new(&repo_path)),
@@ -618,6 +638,31 @@ pub async fn do_push_tag(
         "push",
     )
     .await
+}
+
+/// Сравнивает локальные теги с remote (через `git ls-remote --tags`) и возвращает
+/// статус каждого: synced / diverged / local_only / remote_only. Сетевая операция.
+#[tauri::command]
+pub async fn get_tag_sync_status(
+    app: tauri::AppHandle,
+    repo_path: String,
+    remote: String,
+    timeout_secs: Option<u64>,
+) -> Result<Vec<crate::git::types::TagSyncStatus>, String> {
+    let local = query::local_tag_commits(Path::new(&repo_path)).map_err(|e| e.to_string())?;
+    let out = run_network_git(
+        &app,
+        Some(Path::new(&repo_path)),
+        &[
+            "ls-remote".to_string(),
+            "--tags".to_string(),
+            remote,
+        ],
+        timeout_secs,
+        "fetch",
+    )
+    .await?;
+    Ok(query::compute_tag_sync(&local, &out))
 }
 
 #[tauri::command]

@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { invoke } from "@/composables/useProgress";
-import type { BranchInfo, TagInfo, StashEntry, RemoteInfo } from "@/types";
+import type { BranchInfo, TagInfo, StashEntry, RemoteInfo, TagSyncStatus } from "@/types";
 import { useRepo } from "@/composables/useRepo";
 import { useSettings } from "@/composables/useSettings";
 
@@ -185,13 +185,25 @@ export function useBranches() {
     await invoke("do_delete_tag", { repoPath: repoPath.value, name });
   }
 
-  async function pushTag(remote: string, name: string, del: boolean) {
+  async function pushTag(remote: string, name: string, del: boolean, force = false) {
     if (!repoPath.value) return;
     await invoke("do_push_tag", {
       repoPath: repoPath.value,
       remote,
       name,
       delete: del,
+      force,
+      timeoutSecs: networkTimeoutSecs.value,
+    });
+  }
+
+  // Сравнивает локальные теги с remote (ls-remote): synced/diverged/local_only/
+  // remote_only. Сетевая операция — вызывать по явному действию.
+  async function getTagSyncStatus(remote: string): Promise<TagSyncStatus[]> {
+    if (!repoPath.value) return [];
+    return await invoke<TagSyncStatus[]>("get_tag_sync_status", {
+      repoPath: repoPath.value,
+      remote,
       timeoutSecs: networkTimeoutSecs.value,
     });
   }
@@ -200,7 +212,7 @@ export function useBranches() {
     branches, tags, stashes, remotes, remoteUrls,
     refresh, checkout, checkoutRemote,
     createBranch, mergeBranch, rebaseOnto, renameBranch, deleteBranch, deleteRemoteBranch, pushBranch,
-    createTag, deleteTag, pushTag,
+    createTag, deleteTag, pushTag, getTagSyncStatus,
     stashSave, stashApply, stashPop, stashDrop,
     addRemote, removeRemote, renameRemote, setRemoteUrl, setBranchUpstream,
   };

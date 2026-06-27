@@ -596,23 +596,39 @@ pub fn delete_tag(repo_path: &Path, name: &str) -> Result<(), GitError> {
     Ok(())
 }
 
-pub fn fetch_args(remote: &str, prune: bool) -> Vec<String> {
+// force ⇒ `--force`: иначе git отказывается обновлять локальный тег, разошедшийся
+// с remote («would clobber existing tag»), и расхождение остаётся незамеченным.
+// prune_tags ⇒ `--prune-tags`: удаляет локальные теги, которых уже нет на remote
+// (обычный `--prune` теги не трогает). Требует `--prune`, поэтому добавляем его.
+pub fn fetch_args(remote: &str, prune: bool, force: bool, prune_tags: bool) -> Vec<String> {
     let mut args = vec!["fetch".to_string(), "--tags".to_string()];
-    if prune {
+    if force {
+        args.push("--force".to_string());
+    }
+    if prune || prune_tags {
         args.push("--prune".to_string());
+    }
+    if prune_tags {
+        args.push("--prune-tags".to_string());
     }
     args.push(remote.to_string());
     args
 }
 
-pub fn fetch_all_args(prune: bool) -> Vec<String> {
+pub fn fetch_all_args(prune: bool, force: bool, prune_tags: bool) -> Vec<String> {
     let mut args = vec![
         "fetch".to_string(),
         "--all".to_string(),
         "--tags".to_string(),
     ];
-    if prune {
+    if force {
+        args.push("--force".to_string());
+    }
+    if prune || prune_tags {
         args.push("--prune".to_string());
+    }
+    if prune_tags {
+        args.push("--prune-tags".to_string());
     }
     args
 }
@@ -771,13 +787,23 @@ pub fn backup_remote_tip(repo_path: &Path, remote: &str, branch: &str) {
     let _ = run_git_mut(repo_path, &["update-ref", &backup, &oid]);
 }
 
-pub fn push_tag_args(remote: &str, name: &str, delete: bool) -> Vec<String> {
+// force ⇒ `--force` (только при не-delete): перемещение уже опубликованного тега
+// на другой коммit — не fast-forward, поэтому без --force git отклоняет push.
+// Для тегов нет remote-tracking ref, на который мог бы опереться --force-with-lease,
+// поэтому здесь честный --force; вызывающий обязан подтвердить действие в UI.
+pub fn push_tag_args(remote: &str, name: &str, delete: bool, force: bool) -> Vec<String> {
     let refspec = if delete {
         format!(":refs/tags/{}", name)
     } else {
         format!("refs/tags/{}", name)
     };
-    vec!["push".into(), remote.into(), refspec]
+    let mut args = vec!["push".to_string()];
+    if force && !delete {
+        args.push("--force".to_string());
+    }
+    args.push(remote.to_string());
+    args.push(refspec);
+    args
 }
 
 pub fn delete_remote_branch_args(remote: &str, branch: &str) -> Vec<String> {
@@ -1089,10 +1115,26 @@ mod tag_tests {
 
     #[test]
     fn fetch_args_basic() {
-        assert_eq!(fetch_args("origin", false), vec!["fetch", "--tags", "origin"]);
         assert_eq!(
-            fetch_args("origin", true),
+            fetch_args("origin", false, false, false),
+            vec!["fetch", "--tags", "origin"]
+        );
+        assert_eq!(
+            fetch_args("origin", true, false, false),
             vec!["fetch", "--tags", "--prune", "origin"]
+        );
+    }
+
+    #[test]
+    fn fetch_args_force_and_prune_tags() {
+        // force ⇒ --force; prune_tags ⇒ --prune + --prune-tags даже без явного prune.
+        assert_eq!(
+            fetch_args("origin", false, true, true),
+            vec!["fetch", "--tags", "--force", "--prune", "--prune-tags", "origin"]
+        );
+        assert_eq!(
+            fetch_all_args(false, true, true),
+            vec!["fetch", "--all", "--tags", "--force", "--prune", "--prune-tags"]
         );
     }
 
@@ -1135,11 +1177,25 @@ mod tag_tests {
     #[test]
     fn push_tag_args_delete_toggle() {
         assert_eq!(
-            push_tag_args("origin", "v1.0", false),
+            push_tag_args("origin", "v1.0", false, false),
             vec!["push", "origin", "refs/tags/v1.0"]
         );
         assert_eq!(
-            push_tag_args("origin", "v1.0", true),
+            push_tag_args("origin", "v1.0", true, false),
+            vec!["push", "origin", ":refs/tags/v1.0"]
+        );
+    }
+
+    #[test]
+    fn push_tag_args_force() {
+        // force при создании/перемещении ⇒ --force.
+        assert_eq!(
+            push_tag_args("origin", "v1.0", false, true),
+            vec!["push", "--force", "origin", "refs/tags/v1.0"]
+        );
+        // force при удалении игнорируется (удаление и так не fast-forward-зависимо).
+        assert_eq!(
+            push_tag_args("origin", "v1.0", true, true),
             vec!["push", "origin", ":refs/tags/v1.0"]
         );
     }

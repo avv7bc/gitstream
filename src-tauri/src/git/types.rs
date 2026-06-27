@@ -57,6 +57,14 @@ pub struct TagInfo {
     pub message: Option<String>,
 }
 
+/// Состояние локального/remote тега относительно друг друга.
+/// status: "synced" | "diverged" | "local_only" | "remote_only".
+#[derive(Serialize, Clone, Debug)]
+pub struct TagSyncStatus {
+    pub name: String,
+    pub status: String,
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct RemoteInfo {
     pub name: String,
