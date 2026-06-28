@@ -43,7 +43,7 @@ import { useRemote } from "@/composables/useRemote";
 import { useConflicts } from "@/composables/useConflicts";
 import { toggleLog, logError } from "@/composables/useProgress";
 
-const { repoPath, onRepoOpened, restoreLastRepo } = useRepo();
+const { repoPath, openRepo, onRepoOpened, restoreLastRepo } = useRepo();
 const { refresh: refreshFiles, selectedFile, files, stageFiles, unstageFiles } = useFiles();
 const { refresh: refreshBranches, createTag, stashSave, branches, remotes } = useBranches();
 const { refresh: refreshLog, selectedCommit, commits, squashCommits, rewordCommit } = useLog();
@@ -130,6 +130,23 @@ async function autoFetchOnOpen() {
   // Репозиторий могли переключить, пока шёл сетевой fetch — обновляем граф
   // только если активный репозиторий не сменился.
   if (repoPath.value === path) await refreshAll();
+}
+
+// Добавили новый (существующий) репозиторий в список → открываем его и сразу
+// подтягиваем изменения с remote. pull уже включает fetch, поэтому помечаем
+// репо как «авто-fetch выполнен», чтобы onRepoOpened не дублировал сеть.
+async function handleRepoAdded(path: string) {
+  autoFetchedRepos.add(path);
+  await openRepo(path);
+  const remote = pickDefaultRemote();
+  if (!remote) return; // нет remote'ов — тянуть неоткуда
+  document.body.style.cursor = "wait";
+  try {
+    await pull(remote, false);
+    if (repoPath.value === path) await refreshAll();
+  } finally {
+    document.body.style.cursor = "";
+  }
 }
 
 watch(repoPath, (val) => {
@@ -580,7 +597,7 @@ function onMouseUp() {
           class="repos-section"
           :style="reposHeight ? { flex: 'none', height: reposHeight + 'px' } : {}"
         >
-          <RepositoriesPanel ref="repositoriesPanelRef" />
+          <RepositoriesPanel ref="repositoriesPanelRef" @repo-added="handleRepoAdded" />
         </div>
         <div class="resize-handle-h" @mousedown="onMouseDown($event, 'repos')" />
         <div class="branches-section">

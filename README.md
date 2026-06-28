@@ -111,16 +111,16 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 
 ## Download
 
-Latest release with binaries for all platforms: **v1.1.4**
+Latest release with binaries for all platforms: **v1.1.6** (previous: [v1.1.4](https://github.com/avv7bc/gitstream/releases/tag/v1.1.4))
 
 | Platform | Package | Link |
 |----------|---------|------|
-| Linux | `.deb` (Debian / Ubuntu) | [GitStream_1.1.4_amd64.deb](https://github.com/avv7bc/gitstream/releases/download/v1.1.4/GitStream_1.1.4_amd64.deb) |
-| Linux | `.rpm` (Fedora / RHEL) | [GitStream-1.1.4-1.x86_64.rpm](https://github.com/avv7bc/gitstream/releases/download/v1.1.4/GitStream-1.1.4-1.x86_64.rpm) |
-| Linux | `.AppImage` | [GitStream_1.1.4_amd64.AppImage](https://github.com/avv7bc/gitstream/releases/download/v1.1.4/GitStream_1.1.4_amd64.AppImage) |
-| macOS | `.dmg` (Apple Silicon) | [GitStream_1.1.4_aarch64.dmg](https://github.com/avv7bc/gitstream/releases/download/v1.1.4/GitStream_1.1.4_aarch64.dmg) |
-| Windows | `.exe` installer | [GitStream_1.1.4_x64-setup.exe](https://github.com/avv7bc/gitstream/releases/download/v1.1.4/GitStream_1.1.4_x64-setup.exe) |
-| Windows | `.msi` | [GitStream_1.1.4_x64_en-US.msi](https://github.com/avv7bc/gitstream/releases/download/v1.1.4/GitStream_1.1.4_x64_en-US.msi) |
+| Linux | `.deb` (Debian / Ubuntu) | [GitStream_1.1.6_amd64.deb](https://github.com/avv7bc/gitstream/releases/download/v1.1.6/GitStream_1.1.6_amd64.deb) |
+| Linux | `.rpm` (Fedora / RHEL) | [GitStream-1.1.6-1.x86_64.rpm](https://github.com/avv7bc/gitstream/releases/download/v1.1.6/GitStream-1.1.6-1.x86_64.rpm) |
+| Linux | `.AppImage` | [GitStream_1.1.6_amd64.AppImage](https://github.com/avv7bc/gitstream/releases/download/v1.1.6/GitStream_1.1.6_amd64.AppImage) |
+| macOS | `.dmg` (Apple Silicon) | [GitStream_1.1.6_aarch64.dmg](https://github.com/avv7bc/gitstream/releases/download/v1.1.6/GitStream_1.1.6_aarch64.dmg) |
+| Windows | `.exe` installer | [GitStream_1.1.6_x64-setup.exe](https://github.com/avv7bc/gitstream/releases/download/v1.1.6/GitStream_1.1.6_x64-setup.exe) |
+| Windows | `.msi` | [GitStream_1.1.6_x64_en-US.msi](https://github.com/avv7bc/gitstream/releases/download/v1.1.6/GitStream_1.1.6_x64_en-US.msi) |
 
 All releases: [github.com/avv7bc/gitstream/releases](https://github.com/avv7bc/gitstream/releases)
 

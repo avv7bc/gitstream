@@ -14,6 +14,11 @@ import RenameNodeDialog from "@/components/dialogs/RenameNodeDialog.vue";
 const { i18n } = useI18n();
 const { networkTimeoutSecs } = useSettings();
 
+const emit = defineEmits<{
+  // Добавлен новый существующий репозиторий — App откроет его и сделает pull.
+  "repo-added": [path: string];
+}>();
+
 // --- Tree node types ---
 interface RepoNode {
   id: string;
@@ -364,6 +369,10 @@ async function confirmAddRepository(path: string, name: string, isGitRepo: boole
   }
 
   selectedId.value = await addRepoToTree(path, name, target);
+
+  // Существующий репозиторий → открываем и сразу подтягиваем изменения с
+  // remote. Для свежесозданного через init remote'а ещё нет — pull пропускаем.
+  if (isGitRepo) emit("repo-added", path);
 }
 
 const showAddGroupDialog = ref(false);
