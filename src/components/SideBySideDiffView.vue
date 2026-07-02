@@ -6,7 +6,8 @@ import { useSyncScroll } from "@/composables/useSyncScroll";
 import { useSideBySideDiff, type DiffHunkWithWordDiff, type DiffLineWithWordDiff } from "@/composables/useSideBySideDiff";
 import { useVirtualList } from "@/composables/useVirtualList";
 import { useI18n } from "@/composables/useI18n";
-import { logError } from "@/composables/useProgress";
+import { logError, logOpen, closeLog, showOutput } from "@/composables/useProgress";
+import GitOutputPanel from "./GitOutputPanel.vue";
 
 const LINE_HEIGHT = 20;
 
@@ -227,38 +228,64 @@ function scrollToHunk() {
 <template>
   <div class="diff-view">
     <div class="panel-title-bar">
-      <span class="panel-title">Changes of {{ diffFileName }}</span>
-      <div class="diff-actions">
-        <span class="sel-counter" v-if="hasSelection">
-          {{ selectedLines.size }} selected
-        </span>
+      <div class="panel-tabs">
         <button
-          class="diff-nav-btn"
-          :disabled="!hasHunks || currentHunkIndex === 0"
-          @click="goToPreviousHunk"
-          title="Previous Hunk"
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16">
-            <path d="M8 3l-5 5h10z" fill="currentColor" />
-          </svg>
-        </button>
-        <span class="hunk-counter" v-if="hasHunks">
-          {{ currentHunkIndex + 1 }} / {{ enrichedHunks.length }}
-        </span>
+          class="panel-tab"
+          :class="{ active: !logOpen }"
+          @click="closeLog"
+        >Changes</button>
         <button
-          class="diff-nav-btn"
-          :disabled="!hasHunks || currentHunkIndex === enrichedHunks.length - 1"
-          @click="goToNextHunk"
-          title="Next Hunk"
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16">
-            <path d="M8 13l5-5H3z" fill="currentColor" />
-          </svg>
-        </button>
+          class="panel-tab"
+          :class="{ active: logOpen }"
+          @click="showOutput"
+        >Git output</button>
       </div>
     </div>
 
-    <div class="diff-container">
+    <GitOutputPanel v-show="logOpen" />
+
+    <!-- Строка под вкладками: заголовки колонок + элементы управления diff
+         (навигация по хункам, счётчик выделения) — по образцу VSCode. -->
+    <div v-show="!logOpen && !isBinary" class="diff-subheader">
+      <div class="sub-col">
+        <span class="side-label-text">{{ i18n.diff.oldVersion }}</span>
+      </div>
+      <div class="sub-divider" />
+      <div class="sub-col">
+        <span class="side-label-text">{{ i18n.diff.newVersion }}</span>
+        <span v-if="diffFileName" class="diff-breadcrumb">{{ diffFileName }}</span>
+        <div class="diff-actions">
+          <span class="sel-counter" v-if="hasSelection">
+            {{ selectedLines.size }} selected
+          </span>
+          <button
+            class="diff-nav-btn"
+            :disabled="!hasHunks || currentHunkIndex === 0"
+            @click="goToPreviousHunk"
+            title="Previous Hunk"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16">
+              <path d="M8 3l-5 5h10z" fill="currentColor" />
+            </svg>
+          </button>
+          <span class="hunk-counter" v-if="hasHunks">
+            {{ currentHunkIndex + 1 }} / {{ enrichedHunks.length }}
+          </span>
+          <button
+            class="diff-nav-btn"
+            :disabled="!hasHunks || currentHunkIndex === enrichedHunks.length - 1"
+            @click="goToNextHunk"
+            title="Next Hunk"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16">
+              <path d="M8 13l5-5H3z" fill="currentColor" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-show="!logOpen" class="diff-container">
       <!-- Бинарный файл: превью изображений (старая/новая версия) либо
            уведомление с размером для прочих бинарных файлов. -->
       <div v-if="isBinary" class="binary-view">
@@ -294,7 +321,6 @@ function scrollToHunk() {
 
       <!-- LEFT: old version — placeholder for added lines -->
       <div ref="leftPanelRef" class="diff-side old">
-        <div class="side-label">{{ i18n.diff.oldVersion }}</div>
         <div :style="{ height: paddingTop + 'px' }" />
         <template v-for="{ item, index } in visibleItems" :key="index">
           <div v-if="item.type === 'hunk-header'" class="hunk-header">
@@ -332,7 +358,6 @@ function scrollToHunk() {
 
       <!-- RIGHT: new version — placeholder for removed lines -->
       <div ref="rightPanelRef" class="diff-side new">
-        <div class="side-label">{{ i18n.diff.newVersion }}</div>
         <div :style="{ height: paddingTop + 'px' }" />
         <template v-for="{ item, index } in visibleItems" :key="index">
           <div v-if="item.type === 'hunk-header'" class="hunk-header hunk-header-actions">
@@ -397,11 +422,87 @@ function scrollToHunk() {
   flex-shrink: 0;
 }
 
+/* VSCode-подобная полоса вкладок нижней панели (Changes | Git output) */
+.panel-tabs {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  margin-left: -8px;
+}
+
+.panel-tab {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 12px;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  user-select: none;
+}
+.panel-tab:hover {
+  color: var(--text-primary);
+}
+.panel-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+.diff-breadcrumb {
+  margin-left: auto;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 .diff-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-left: auto;
+}
+
+/* Строка под вкладками: заголовки колонок Old/New Version + элементы управления */
+.diff-subheader {
+  display: flex;
+  align-items: stretch;
+  height: 26px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.sub-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  overflow: hidden;
+}
+
+.sub-divider {
+  width: 1px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.side-label-text {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .diff-nav-btn {

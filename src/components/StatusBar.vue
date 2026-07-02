@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed } from "vue";
 import { useRepo } from "@/composables/useRepo";
 import { useBranches } from "@/composables/useBranches";
-import { useProgress, logOpen, toggleLog, closeLog } from "@/composables/useProgress";
+import { useProgress, logOpen, toggleLog } from "@/composables/useProgress";
 
 const { repoInfo } = useRepo();
 const { isWorking, progressLabel, networkProgressLog } = useProgress();
@@ -11,38 +11,6 @@ const { branches } = useBranches();
 const currentBranchInfo = computed(() => branches.value.find((b) => b.is_current));
 const ahead = computed(() => currentBranchInfo.value?.ahead ?? 0);
 const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
-
-function onEscKey(e: KeyboardEvent) {
-  if (e.key === "Escape") {
-    e.stopPropagation();
-    closeLog();
-  }
-}
-
-const logContentRef = ref<HTMLElement | null>(null);
-
-watch(logOpen, (open) => {
-  if (open) {
-    window.addEventListener("keydown", onEscKey, true);
-    nextTick(scrollToBottom);
-  } else {
-    window.removeEventListener("keydown", onEscKey, true);
-  }
-});
-
-watch(networkProgressLog, () => {
-  if (logOpen.value) nextTick(scrollToBottom);
-});
-
-// Подстраховка: если компонент размонтируется при открытом логе,
-// снять глобальный capture-listener, добавленный в watch(logOpen).
-onBeforeUnmount(() => {
-  window.removeEventListener("keydown", onEscKey, true);
-});
-
-function scrollToBottom() {
-  if (logContentRef.value) logContentRef.value.scrollTop = logContentRef.value.scrollHeight;
-}
 </script>
 
 <template>
@@ -90,23 +58,6 @@ function scrollToBottom() {
         </svg>
       </span>
     </div>
-
-    <Teleport to="body">
-      <div v-if="logOpen" class="progress-log-popup">
-        <div class="progress-log-header">
-          <span>Git output</span>
-          <button class="progress-log-close" @click="closeLog">✕</button>
-        </div>
-        <div ref="logContentRef" class="progress-log-content">
-          <div
-            v-for="(line, i) in networkProgressLog"
-            :key="i"
-            class="log-line"
-            :class="{ 'log-error': line.isError }"
-          >{{ line.text }}</div>
-        </div>
-      </div>
-    </Teleport>
   </div>
 </template>
 
@@ -235,71 +186,5 @@ function scrollToBottom() {
 }
 .log-chevron.open {
   transform: rotate(180deg);
-}
-
-.progress-log-popup {
-  position: fixed;
-  bottom: calc(var(--statusbar-height) + 4px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 50;
-  width: min(680px, 90vw);
-  height: 320px;
-  background: var(--panel-bg, #1e1e2e);
-  border: 1px solid var(--border, #45475a);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.progress-log-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--text-muted, #a6adc8);
-  background: var(--titlebar-bg, #181825);
-  border-bottom: 1px solid var(--border, #45475a);
-  user-select: none;
-  flex-shrink: 0;
-}
-
-.progress-log-close {
-  background: none;
-  border: none;
-  color: var(--text-muted, #a6adc8);
-  cursor: pointer;
-  padding: 0 2px;
-  font-size: 12px;
-  line-height: 1;
-}
-.progress-log-close:hover {
-  color: var(--text, #cdd6f4);
-}
-
-.progress-log-content {
-  flex: 1;
-  min-height: 0;
-  margin: 0;
-  padding: 8px 10px;
-  font-family: var(--font-mono, monospace);
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--text, #cdd6f4);
-  overflow: auto;
-  user-select: text;
-  cursor: text;
-}
-
-.log-line {
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-.log-line.log-error {
-  color: var(--red);
 }
 </style>

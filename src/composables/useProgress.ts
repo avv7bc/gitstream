@@ -99,8 +99,19 @@ export function toggleLog() {
   logOpen.value = !logOpen.value;
 }
 
+// Показать вкладку Git output в нижней панели.
+export function showOutput() {
+  logOpen.value = true;
+}
+
+// Вернуться на вкладку Changes (Git output скрыт, данные лога сохраняются).
 export function closeLog() {
   logOpen.value = false;
+}
+
+// Очистить лог Git output.
+export function clearLog() {
+  networkProgressLog.value = [];
 }
 
 listen<{ op: string; line: string }>("network_progress", (event) => {
