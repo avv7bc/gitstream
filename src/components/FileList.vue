@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
-import { invoke, logError } from "@/composables/useProgress";
+import { invoke, logError, closeLog } from "@/composables/useProgress";
 import { useFiles } from "@/composables/useFiles";
 import { useI18n } from "@/composables/useI18n";
 import { useLog } from "@/composables/useLog";
@@ -580,6 +580,8 @@ function fileDir(path: string): string {
 }
 
 async function selectFile(path: string, e?: MouseEvent) {
+  // Выбор файла показывает его diff → переключаемся на вкладку Changes.
+  closeLog();
   const list = dirFilteredFiles.value.map((f) => f.path);
   if (e?.shiftKey && anchorPath.value !== null) {
     const a = list.indexOf(anchorPath.value);
@@ -612,6 +614,8 @@ async function selectFile(path: string, e?: MouseEvent) {
 }
 
 async function selectCommitFile(path: string, e?: MouseEvent) {
+  // Выбор файла показывает его diff → переключаемся на вкладку Changes.
+  closeLog();
   const list = dirFilteredCommitFiles.value.map((f) => f.path);
   if (e?.shiftKey && anchorPath.value !== null) {
     const a = list.indexOf(anchorPath.value);

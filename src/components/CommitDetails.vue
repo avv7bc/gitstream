@@ -150,7 +150,7 @@ const formattedDate = computed(() => {
 }
 .commit-msg {
   font-size: var(--font-size-sm);
-  color: var(--text-secondary);
+  color: var(--text-primary);
   white-space: pre-wrap;
   line-height: 1.4;
   margin-top: 8px;

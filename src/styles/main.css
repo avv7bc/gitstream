@@ -20,44 +20,46 @@
   --statusbar-hover: rgba(255, 255, 255, 0.18);
 }
 
-/* LIGHT theme */
+/* LIGHT theme — refreshed for readability (GitHub Light / VSCode Light Modern).
+   Иерархия панелей: белый холст → холодновато-серые сайдбары → чуть темнее
+   заголовки/тулбары. Контрастный текст и заметные границы. */
 :root,
 :root[data-theme="light"] {
   --bg-primary: #ffffff;
-  --bg-secondary: #f2f2f2;
-  --bg-tertiary: #ffffff;
-  --bg-surface: #ebebeb;
-  --bg-hover: #e5f1fb;
-  --bg-active: #cce8ff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eceff2;
+  --bg-surface: #eaeef2;
+  --bg-hover: #eaeef2;
+  --bg-active: #dbeafe;
 
-  --text-primary: #1e1e1e;
-  --text-secondary: #4a4a4a;
-  --text-muted: #8a8a8a;
+  --text-primary: #1f2328;
+  --text-secondary: #57606a;
+  --text-muted: #6b7280;
 
-  --border: #c8c8c8;
-  --border-subtle: #e0e0e0;
+  --border: #d0d7de;
+  --border-subtle: #dae0e6;
 
-  --accent: #1e6fba;
-  --accent-hover: #2a7fce;
+  --accent: #0969da;
+  --accent-hover: #0860c4;
 
-  --green: #2e8b2e;
-  --red: #c83232;
-  --yellow: #c8a000;
-  --blue: #1e6fba;
-  --purple: #8a3a9a;
-  --teal: #2a8a8a;
-  --orange: #d97706;
+  --green: #1a7f37;
+  --red: #cf222e;
+  --yellow: #9a6700;
+  --blue: #0969da;
+  --purple: #8250df;
+  --teal: #1b7c83;
+  --orange: #bc4c00;
 
   /* Метка незапушенного коммита в графе. Тёплый янтарь, читается на любом
      фоне темы, не совпадает с цветами lane-палитры. */
-  --unpushed: #c8870c;
+  --unpushed: #bf8700;
 
-  --diff-added-bg: #d4f8d4;
-  --diff-added-line: #eaffea;
-  --diff-removed-bg: #fcd9d9;
-  --diff-removed-line: #ffeeee;
-  --diff-word-added-bg: rgba(34, 197, 94, 0.35);
-  --diff-word-removed-bg: rgba(239, 68, 68, 0.35);
+  --diff-added-bg: #d6f6dd;
+  --diff-added-line: #e6ffec;
+  --diff-removed-bg: #ffd7d5;
+  --diff-removed-line: #ffebe9;
+  --diff-word-added-bg: rgba(26, 127, 55, 0.30);
+  --diff-word-removed-bg: rgba(207, 34, 46, 0.28);
 }
 
 /* Catppuccin Latte (light) theme — светлая пара к Catppuccin Mocha */
