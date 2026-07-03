@@ -138,7 +138,10 @@ onMounted(() => {
 
 .log-line {
   white-space: pre-wrap;
-  word-break: break-all;
+  /* Переносим по словам; очень длинные токены (SHA, URL) рвём лишь при нужде,
+     а не по каждой букве (как делал break-all). */
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 .log-line.log-error {
   color: var(--red);

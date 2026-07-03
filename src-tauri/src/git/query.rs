@@ -11,6 +11,9 @@ pub fn run_git(repo_path: &Path, args: &[&str]) -> Result<String, GitError> {
     // core.quotePath=false: иначе git экранирует не-ASCII пути (кириллицу)
     // октальными escape'ами вида "\320\277...", и они не совпадают с чистым
     // UTF-8 из `ls-files -z` — ломается список файлов и дерево папок.
+    // Query-команды выполняются автоматически при обновлении/выборе — в Git
+    // output их не пишем (иначе поток фоновых событий). Логируются только
+    // мутации (run_git_mut) и сетевые операции (run_network_git).
     let output = Command::new("git")
         .args(["-c", "core.quotePath=false", "-C"])
         .arg(repo_path)
@@ -1847,6 +1850,47 @@ mod edge_case_tests {
         );
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    // ДИАГНОСТИКА бага «после push граф не обновляется»: проверяем, что тот же
+    // `log()`, что зовёт get_log, после реального push отдаёт unpushed=false.
+    #[test]
+    fn push_flips_unpushed_flag_in_log() {
+        let dir = with_commits("push_flip");
+        // bare remote рядом
+        let bare = std::env::temp_dir()
+            .join(format!("gitstream_edge_bare_{}.git", std::process::id()));
+        let _ = fs::remove_dir_all(&bare);
+        let out = Command::new("git")
+            .args(["init", "-q", "--bare"])
+            .arg(&bare)
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        git(&dir, &["remote", "add", "origin", bare.to_str().unwrap()]);
+
+        // ДО push — всё незапушено
+        assert!(
+            log(&dir, 100).unwrap().iter().all(|c| c.unpushed),
+            "до push все коммиты незапушены"
+        );
+
+        let branch = run_git(&dir, &["rev-parse", "--abbrev-ref", "HEAD"])
+            .unwrap()
+            .trim()
+            .to_string();
+        git(&dir, &["push", "--set-upstream", "origin", &branch]);
+
+        // ПОСЛЕ push — ничего не должно оставаться незапушенным
+        let after = log(&dir, 100).unwrap();
+        assert!(
+            after.iter().all(|c| !c.unpushed),
+            "после push unpushed обязан стать false, получено: {:?}",
+            after.iter().map(|c| (c.oid.clone(), c.unpushed)).collect::<Vec<_>>()
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::remove_dir_all(&bare);
     }
 }
 

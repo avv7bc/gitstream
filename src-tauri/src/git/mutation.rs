@@ -19,6 +19,8 @@ pub enum LineOp {
 }
 
 fn run_git_mut(repo_path: &Path, args: &[&str]) -> Result<String, GitError> {
+    // Мутации инициирует человек — пишем их в Git output. Query-команды
+    // (query::run_git напрямую) выполняются автоматически и не логируются.
     let result = super::query::run_git(repo_path, args);
     match &result {
         Ok(out) => crate::app_log::log_git(args, out, true),

@@ -884,9 +884,11 @@ defineExpose({
 .net-op.push {
   color: color-mix(in srgb, var(--red) 75%, var(--text-primary));
 }
-.net-op.pull,
-.net-op.fetch {
+.net-op.pull {
   color: color-mix(in srgb, var(--green) 75%, var(--text-primary));
+}
+.net-op.fetch {
+  color: color-mix(in srgb, var(--yellow) 80%, var(--text-primary));
 }
 .net-op .spin {
   animation: net-op-spin 0.8s linear infinite;

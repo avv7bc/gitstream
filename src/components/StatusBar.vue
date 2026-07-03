@@ -41,9 +41,6 @@ const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
         :title="networkProgressLog.length > 0 ? 'Нажмите для просмотра лога' : undefined"
         @click="toggleLog"
       >
-        <svg v-if="isWorking" class="codicon spin" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-          <path fill-rule="evenodd" clip-rule="evenodd" d="M8 1.5a6.5 6.5 0 1 0 6.5 6.5h-1.5a5 5 0 1 1-5-5V1.5z"/>
-        </svg>
         <span>{{ progressLabel }}</span>
         <svg v-if="networkProgressLog.length > 0" class="log-chevron" :class="{ open: logOpen }" width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
           <path fill-rule="evenodd" clip-rule="evenodd" d="M7.976 10.072l-4.357-4.357.62-.618L7.976 8.837l3.737-3.74.62.618z"/>
@@ -169,15 +166,6 @@ const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
 }
 .status-message.clickable:hover {
   color: var(--statusbar-fg);
-}
-
-.codicon.spin {
-  animation: gs-spin 0.8s linear infinite;
-}
-
-@keyframes gs-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 .log-chevron {

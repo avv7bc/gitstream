@@ -154,11 +154,11 @@ listen<{ cmd: string; output: string; success: boolean }>("git_command", (event)
   pushLines(items);
 });
 
-// Операции без привязки к репозиторию — показываются в статус-баре.
-// Сетевые операции с repoPath выводятся крутилкой на узле репозитория.
-const statusBarOps = computed(() =>
-  [...active.value.values()].filter((op) => !(op.kind && op.repoPath)),
-);
+// Все активные операции показываются в статус-баре (сетевые — с обратным
+// отсчётом). Сетевые операции с repoPath ДОПОЛНИТЕЛЬНО дублируются крутилкой
+// на узле репозитория в панели Repositories (см. repoNetworkOps) — статус-бар
+// даёт текстовую индикацию «что читается», узел — привязку к репозиторию.
+const statusBarOps = computed(() => [...active.value.values()]);
 
 export const isWorking = computed(() => statusBarOps.value.length > 0);
 

@@ -91,11 +91,17 @@ async fn run_network_git(
         .spawn()
         .map_err(|e| format!("Failed to run git: {} (Is git installed and in PATH?)", e))?;
 
+    // Пишем строку команды в Git output. Ответ/прогресс идёт live через
+    // network_progress, а ошибки/таймауты логирует фронтенд (logError), поэтому
+    // здесь — только сама команда и (ниже) успешный stdout.
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    crate::app_log::log_git(&arg_refs, "", true);
+
     // Стримим stderr построчно и эмитим события прогресса
     let app_handle = app.clone();
     let op = label.to_string();
     let stderr_pipe = child.stderr.take();
-    let stderr_task: tokio::task::JoinHandle<String> = tokio::spawn(async move {
+    let mut stderr_task: tokio::task::JoinHandle<String> = tokio::spawn(async move {
         let mut collected = String::new();
         if let Some(pipe) = stderr_pipe {
             let mut reader = BufReader::new(pipe);
@@ -144,7 +150,17 @@ async fn run_network_git(
             if remaining <= poll {
                 let _ = child.start_kill();
                 let _ = child.wait().await;
-                let _ = stderr_task.await;
+                // stderr_task может зависнуть навсегда: git убит, но его потомок
+                // (ssh для SSH-remote) наследует write-конец stderr-pipe и держит
+                // его открытым, поэтому read_line никогда не увидит EOF. Без
+                // ограничения run_network_git не вернётся, промис в UI не
+                // зарезолвится, и крутилка на узле репозитория висит вечно.
+                if tokio::time::timeout(Duration::from_secs(1), &mut stderr_task)
+                    .await
+                    .is_err()
+                {
+                    stderr_task.abort();
+                }
                 return Err(format!("Network timeout: {} превысил {} сек", label, secs));
             }
             remaining -= poll;
@@ -152,12 +168,25 @@ async fn run_network_git(
         tokio::time::sleep(poll).await;
     };
 
-    let stderr_text = stderr_task.await.unwrap_or_default();
+    // Тот же риск зависания на осиротевшем потомке, что и в ветке таймаута:
+    // ждём дочитывание stderr ограниченное время, иначе отменяем задачу.
+    let stderr_text = match tokio::time::timeout(Duration::from_secs(2), &mut stderr_task).await {
+        Ok(joined) => joined.unwrap_or_default(),
+        Err(_) => {
+            stderr_task.abort();
+            String::new()
+        }
+    };
     let mut stdout = String::new();
     if let Some(mut o) = child.stdout.take() {
         let _ = o.read_to_string(&mut stdout).await;
     }
     if status.success() {
+        // Успешный ответ (напр. список ссылок ls-remote) — в Git output.
+        // Для fetch/pull/push stdout обычно пуст, прогресс уже был в stderr.
+        if !stdout.trim().is_empty() {
+            crate::app_log::log_git(&arg_refs, &stdout, true);
+        }
         Ok(stdout)
     } else {
         Err(crate::git::error::classify_git_error(&stderr_text).to_string())
