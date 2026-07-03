@@ -130,7 +130,7 @@ src-tauri/src/                # Rust backend
 - **Ctrl+A** — выделить все файлы в FileList (working tree и commit-файлы)
 - Commit (с amend), Reword (HEAD — amend; не-HEAD — rebase -i со сценарным редактором)
 - Squash нескольких коммитов в один
-- Push / Pull / Fetch (с диалогами выбора remote, таймаут сетевых операций, индикатор remote + обратный отсчёт); Fetch --prune
+- Push / Pull / Fetch (с диалогами выбора remote, таймаут сетевых операций); Fetch --prune. Индикатор сетевой операции — крутилка со стрелкой направления (↑ push / ↓ pull, fetch) справа на узле репозитория в панели Repositories (`repoNetworkOps` в `useProgress.ts`); remote и обратный отсчёт — в тултипе; операция привязана к репозиторию по `repoPath`
 - **Sync Assistant** — при отклонённом push (non-fast-forward) распознаёт ситуацию и предлагает безопасные решения в один клик (`diagnose.rs` → `Situation`/`Remedy`, `SyncAssistantBar.vue`, `useSync.ts`): спец-кейс «переписанный коммит» (одинаковое дерево, разный SHA — amend/rebase) → force-with-lease; настоящее расхождение → pull --rebase / merge. Force-push только через `--force-with-lease` + backup-ref `refs/gitstream/backup/<branch>` для отката; никаких тихих деструктивных действий
 - **Аутентификация** — перехват запроса credentials через askpass-мост (self-exec helper): HTTPS login/token, SSH passphrase, host-key confirm; `CredentialDialog` в GUI; чекбокс «Запомнить» включает git credential helper; таймаут сети на паузе, пока открыт диалог; отмена → `AuthCancelled`
 - **Управление remote** — add / edit-url / rename / remove (секция Remotes в BranchPanel + контекстное меню)

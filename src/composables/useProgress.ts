@@ -19,10 +19,13 @@ function withRemote(prefix: string, args: Args): string {
 
 const COMMAND_LABEL_BUILDERS: Record<string, (args: Args) => string> = {
   do_fetch: (a) => withRemote("Fetch from", a),
+  do_fetch_all: () => "Fetch all remotes…",
   do_pull: (a) => withRemote("Pull from", a),
   do_push: (a) => withRemote("Push to", a),
   do_push_branch: (a) => withRemote("Push to", a),
   do_push_tag: (a) => withRemote("Push tag to", a),
+  do_push_force_lease: (a) => withRemote("Force push to", a),
+  do_delete_remote_branch: (a) => withRemote("Push to", a),
   get_status: () => "File status…",
   get_log: () => "Loading log…",
   stage_files: () => "Stage…",
@@ -32,11 +35,29 @@ const COMMAND_LABEL_BUILDERS: Record<string, (args: Args) => string> = {
 
 const FALLBACK_LABEL = "Working…";
 
+// Сетевые команды с направлением: push — исходящая (стрелка вверх),
+// pull/fetch — входящие (стрелка вниз). Такие операции привязываются к
+// репозиторию и показываются крутилкой на его узле в панели Repositories.
+export type NetworkOpKind = "push" | "pull" | "fetch";
+
+const NETWORK_OP_KIND: Record<string, NetworkOpKind> = {
+  do_push: "push",
+  do_push_branch: "push",
+  do_push_tag: "push",
+  do_push_force_lease: "push",
+  do_delete_remote_branch: "push",
+  do_pull: "pull",
+  do_fetch: "fetch",
+  do_fetch_all: "fetch",
+};
+
 interface ActiveOp {
   cmd: string;
   label: string;
   startedAt: number;
   timeoutSecs?: number;
+  kind?: NetworkOpKind;
+  repoPath?: string;
 }
 
 const active = ref(new Map<number, ActiveOp>());
@@ -130,7 +151,13 @@ listen<{ cmd: string; output: string; success: boolean }>("git_command", (event)
   pushLines(items);
 });
 
-export const isWorking = computed(() => active.value.size > 0);
+// Операции без привязки к репозиторию — показываются в статус-баре.
+// Сетевые операции с repoPath выводятся крутилкой на узле репозитория.
+const statusBarOps = computed(() =>
+  [...active.value.values()].filter((op) => !(op.kind && op.repoPath)),
+);
+
+export const isWorking = computed(() => statusBarOps.value.length > 0);
 
 function formatCountdown(op: ActiveOp): string {
   if (!op.timeoutSecs) return op.label;
@@ -141,12 +168,27 @@ function formatCountdown(op: ActiveOp): string {
 
 export const progressLabel = computed(() => {
   if (networkProgressLine.value) return networkProgressLine.value;
-  const size = active.value.size;
-  if (size === 0) return "";
-  if (size > 1) return `Operations: ${size}`;
-  const first = active.value.values().next().value as ActiveOp | undefined;
-  if (!first) return FALLBACK_LABEL;
-  return formatCountdown(first);
+  const ops = statusBarOps.value;
+  if (ops.length === 0) return "";
+  if (ops.length > 1) return `Operations: ${ops.length}`;
+  return formatCountdown(ops[0]);
+});
+
+export interface RepoNetworkOp {
+  kind: NetworkOpKind;
+  label: string;
+}
+
+// Активная сетевая операция по пути репозитория: kind — направление стрелки,
+// label — текст с обратным отсчётом для тултипа.
+export const repoNetworkOps = computed(() => {
+  const map = new Map<string, RepoNetworkOp>();
+  for (const op of active.value.values()) {
+    if (op.kind && op.repoPath && !map.has(op.repoPath)) {
+      map.set(op.repoPath, { kind: op.kind, label: formatCountdown(op) });
+    }
+  }
+  return map;
 });
 
 export async function invoke<T>(
@@ -158,10 +200,13 @@ export async function invoke<T>(
   const label = builder ? builder(args) : FALLBACK_LABEL;
   const timeoutRaw = args?.timeoutSecs;
   const timeoutSecs = typeof timeoutRaw === "number" && timeoutRaw > 0 ? timeoutRaw : undefined;
+  const kind = NETWORK_OP_KIND[cmd];
+  const pathRaw = args?.repoPath;
+  const repoPath = typeof pathRaw === "string" && pathRaw ? pathRaw : undefined;
 
   const timer = setTimeout(() => {
     const next = new Map(active.value);
-    next.set(id, { cmd, label, startedAt: Date.now(), timeoutSecs });
+    next.set(id, { cmd, label, startedAt: Date.now(), timeoutSecs, kind, repoPath });
     active.value = next;
     if (timeoutSecs) ensureTicker();
   }, THRESHOLD_MS);

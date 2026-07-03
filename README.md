@@ -49,7 +49,7 @@ A desktop Git GUI focused on everyday Git workflows — commits, branches, push/
 - **Auto-fetch on repository switch** — fetches once per repo per session so the graph immediately shows incoming (dimmed) commits and an accurate behind count, without blocking the UI
 - **Remote management** — add / edit URL / rename / remove remotes (Remotes section in the Branches panel)
 - **Set upstream** — pick the tracking branch for a local branch (or unset it)
-- Network progress indicator with remote name and timeout countdown
+- Per-repository network activity indicator — a spinner with a direction arrow (up = push, down = pull / fetch) next to the repository name in the Repositories tree; remote name and timeout countdown in the tooltip
 - Configurable network timeout
 
 ### Authentication

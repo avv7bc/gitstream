@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from "vue";
-import { invoke } from "@/composables/useProgress";
+import { invoke, repoNetworkOps } from "@/composables/useProgress";
 import { useRepo } from "@/composables/useRepo";
 import { useI18n } from "@/composables/useI18n";
 import type { RepoInfo } from "@/types";
@@ -160,6 +160,12 @@ function selectNode(node: TreeNode) {
 // какой репозиторий сейчас открыт.
 function isActiveRepo(node: TreeNode): boolean {
   return node.type === "repo" && !!repoPath.value && node.path === repoPath.value;
+}
+
+// Активная сетевая операция репозитория (fetch/pull/push) — крутилка со
+// стрелкой направления справа от имени узла.
+function netOp(path: string) {
+  return repoNetworkOps.value.get(path);
 }
 
 // --- Double-click: open repo ---
@@ -605,6 +611,28 @@ defineExpose({
               </svg>
               <span class="node-name">{{ child.name }}</span>
               <span v-if="(child as RepoNode).branch" class="repo-branch">({{ (child as RepoNode).branch }})</span>
+              <span
+                v-if="netOp((child as RepoNode).path)"
+                class="net-op"
+                :class="netOp((child as RepoNode).path)!.kind"
+                :title="netOp((child as RepoNode).path)!.label"
+              >
+                <svg class="spin" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M8 1.5a6.5 6.5 0 1 0 6.5 6.5h-1.5a5 5 0 1 1-5-5V1.5z"/>
+                </svg>
+                <svg class="dir" width="10" height="10" viewBox="0 0 16 16">
+                  <path
+                    v-if="netOp((child as RepoNode).path)!.kind === 'push'"
+                    d="M8 13V3M4 6.5L8 3l4 3.5"
+                    fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                  />
+                  <path
+                    v-else
+                    d="M8 3v10M4 9.5L8 13l4-3.5"
+                    fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
               <span v-if="(child as RepoNode).hasChanges" class="changes-dot" />
             </div>
           </template>
@@ -631,6 +659,28 @@ defineExpose({
           </svg>
           <span class="node-name">{{ node.name }}</span>
           <span v-if="node.branch" class="repo-branch">({{ node.branch }})</span>
+          <span
+            v-if="netOp(node.path)"
+            class="net-op"
+            :class="netOp(node.path)!.kind"
+            :title="netOp(node.path)!.label"
+          >
+            <svg class="spin" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M8 1.5a6.5 6.5 0 1 0 6.5 6.5h-1.5a5 5 0 1 1-5-5V1.5z"/>
+            </svg>
+            <svg class="dir" width="10" height="10" viewBox="0 0 16 16">
+              <path
+                v-if="netOp(node.path)!.kind === 'push'"
+                d="M8 13V3M4 6.5L8 3l4 3.5"
+                fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+              />
+              <path
+                v-else
+                d="M8 3v10M4 9.5L8 13l4-3.5"
+                fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+              />
+            </svg>
+          </span>
           <span v-if="node.hasChanges" class="changes-dot" />
         </div>
       </template>
@@ -819,6 +869,39 @@ defineExpose({
   background: var(--yellow);
   flex-shrink: 0;
   margin-left: auto;
+}
+
+/* --- Индикатор сетевой операции (справа от имени репозитория) --- */
+/* Цвета согласованы с кнопками тулбара: push — исходящий (красный),
+   pull/fetch — входящие (зелёный). */
+.net-op {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.net-op.push {
+  color: color-mix(in srgb, var(--red) 75%, var(--text-primary));
+}
+.net-op.pull,
+.net-op.fetch {
+  color: color-mix(in srgb, var(--green) 75%, var(--text-primary));
+}
+.net-op .spin {
+  animation: net-op-spin 0.8s linear infinite;
+}
+.net-op .dir {
+  flex-shrink: 0;
+}
+/* Если рядом точка изменений — авто-отступ вправо берёт на себя индикатор */
+.net-op ~ .changes-dot {
+  margin-left: 6px;
+}
+
+@keyframes net-op-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .folder-children {
