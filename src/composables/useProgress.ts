@@ -26,6 +26,7 @@ const COMMAND_LABEL_BUILDERS: Record<string, (args: Args) => string> = {
   do_push_tag: (a) => withRemote("Push tag to", a),
   do_push_force_lease: (a) => withRemote("Force push to", a),
   do_delete_remote_branch: (a) => withRemote("Push to", a),
+  get_tag_sync_status: (a) => withRemote("Checking tags on", a),
   get_status: () => "File status…",
   get_log: () => "Loading log…",
   stage_files: () => "Stage…",
@@ -49,6 +50,8 @@ const NETWORK_OP_KIND: Record<string, NetworkOpKind> = {
   do_pull: "pull",
   do_fetch: "fetch",
   do_fetch_all: "fetch",
+  // ls-remote — входящий сетевой запрос: тот же индикатор, что у fetch.
+  get_tag_sync_status: "fetch",
 };
 
 interface ActiveOp {
