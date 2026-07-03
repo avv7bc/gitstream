@@ -9,7 +9,7 @@ const { loading, stats, error, period, progress, loadStats, abort } = useStats()
 const { i18n } = useI18n();
 
 // --- Persisted window geometry ---
-const GEOM_KEY = "gitstream-stats-geom";
+const GEOM_KEY = "gitstream-stats-geom-v2";
 
 interface Geom { x: number; y: number; w: number; h: number; }
 
@@ -23,7 +23,7 @@ function loadGeom(): Geom {
       }
     }
   } catch { /* ignore */ }
-  const w = Math.min(860, Math.round(window.innerWidth * 0.75));
+  const w = Math.min(960, Math.round(window.innerWidth * 0.85));
   const h = Math.min(720, Math.round(window.innerHeight * 0.82));
   return { x: Math.round((window.innerWidth - w) / 2), y: Math.round((window.innerHeight - h) / 2), w, h };
 }
