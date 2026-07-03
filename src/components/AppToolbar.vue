@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch, onUnmounted } from "vue";
 import { useFiles } from "@/composables/useFiles";
 import { logError } from "@/composables/useProgress";
 import { useI18n } from "@/composables/useI18n";
@@ -62,6 +62,8 @@ const showLocalMenu = ref(false);
 const showBranchMenu = ref(false);
 const showFetchMenu = ref(false);
 
+const fetchWrapper = ref<HTMLElement | null>(null);
+
 function toggleFetchMenu() {
   showFetchMenu.value = !showFetchMenu.value;
 }
@@ -69,6 +71,34 @@ function toggleFetchMenu() {
 function closeFetchMenu() {
   showFetchMenu.value = false;
 }
+
+// Дропдаун Fetch лежит внутри toolbar-group-center с transform, из-за чего
+// fixed-backdrop схлопывается в бокс группы и не ловит клики снаружи. Поэтому
+// закрытие по клику вне и по Esc вешаем на document, пока меню открыто.
+function onFetchDocClick(e: MouseEvent) {
+  if (fetchWrapper.value && !fetchWrapper.value.contains(e.target as Node)) {
+    closeFetchMenu();
+  }
+}
+function onFetchDocKey(e: KeyboardEvent) {
+  if (e.key === "Escape") closeFetchMenu();
+}
+watch(showFetchMenu, (open) => {
+  if (open) {
+    document.addEventListener("click", onFetchDocClick);
+    document.addEventListener("contextmenu", onFetchDocClick);
+    document.addEventListener("keydown", onFetchDocKey);
+  } else {
+    document.removeEventListener("click", onFetchDocClick);
+    document.removeEventListener("contextmenu", onFetchDocClick);
+    document.removeEventListener("keydown", onFetchDocKey);
+  }
+});
+onUnmounted(() => {
+  document.removeEventListener("click", onFetchDocClick);
+  document.removeEventListener("contextmenu", onFetchDocClick);
+  document.removeEventListener("keydown", onFetchDocKey);
+});
 
 // Открытие любого из трёх дропдаунов закрывает остальные, чтобы они не
 // оставались открытыми одновременно.
@@ -260,20 +290,7 @@ function closeBranchMenu() {
     <div class="toolbar-spacer" />
 
     <div class="toolbar-group-center">
-      <button class="toolbar-btn-action action-green" @click="$emit('pull')" data-shortcut="Alt+PageDown">
-        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
-        </svg>
-        <span>{{ i18n.toolbar.pull }}</span>
-      </button>
-      <button class="toolbar-btn-action action-red" @click="$emit('push')" data-shortcut="Alt+PageUp">
-        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8 3l4 4H9.5v5h-3V7H4L8 3z"/>
-        </svg>
-        <span>{{ i18n.toolbar.push }}</span>
-      </button>
-
-      <div class="menu-button-wrapper">
+      <div class="menu-button-wrapper" ref="fetchWrapper">
         <button class="toolbar-btn-action action-green fetch-split" @click="$emit('fetch')" :title="i18n.toolbar.fetch">
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
             <path d="M13 8a5 5 0 1 1-1.46-3.54"/>
@@ -298,9 +315,20 @@ function closeBranchMenu() {
             {{ i18n.toolbar.fetchAllPrune }}
           </button>
         </div>
-
-        <div v-if="showFetchMenu" class="menu-backdrop" @click="closeFetchMenu" @contextmenu.prevent="closeFetchMenu" />
       </div>
+
+      <button class="toolbar-btn-action action-green" @click="$emit('pull')" data-shortcut="Alt+PageDown">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
+        </svg>
+        <span>{{ i18n.toolbar.pull }}</span>
+      </button>
+      <button class="toolbar-btn-action action-red" @click="$emit('push')" data-shortcut="Alt+PageUp">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 3l4 4H9.5v5h-3V7H4L8 3z"/>
+        </svg>
+        <span>{{ i18n.toolbar.push }}</span>
+      </button>
     </div>
 
     <div class="toolbar-spacer" />
@@ -346,19 +374,24 @@ function closeBranchMenu() {
 .toolbar-group-center {
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(calc(-50% - 24px));
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.fetch-split {
+.toolbar-btn-action.fetch-split {
   position: relative;
+  justify-content: flex-start;
+  padding-left: 6px;
 }
 .fetch-caret {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
-  margin-left: 2px;
   padding: 2px;
   border-radius: var(--radius);
 }
@@ -394,8 +427,10 @@ function closeBranchMenu() {
 .toolbar-btn-action {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  padding: 4px 12px;
+  min-width: 83px;
+  padding: 3px 10px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--bg-primary, var(--bg-secondary));
