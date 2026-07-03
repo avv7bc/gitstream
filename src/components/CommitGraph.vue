@@ -29,9 +29,16 @@ const GRAPH_PALETTE = ["--blue", "--green", "--purple", "--teal", "--orange", "-
 const GRAPH_COL_W = 14;
 const GRAPH_PAD = 8;
 const GRAPH_ROW_H = 24;
+// Кап видимых lane (аналог --graph-lane-limit в git log --graph): колонки за
+// пределом клампятся к последней позиции и рисуются приглушённо — ветвистый
+// участок в глубине истории не должен раздувать колонку графа для всех строк.
+const MAX_VISIBLE_LANES = 10;
 
 function laneX(c: number): number {
-  return GRAPH_PAD + c * GRAPH_COL_W;
+  return GRAPH_PAD + Math.min(c, MAX_VISIBLE_LANES) * GRAPH_COL_W;
+}
+function laneClipped(c: number): boolean {
+  return c > MAX_VISIBLE_LANES;
 }
 function laneColor(colorIdx: number): string {
   return `var(${GRAPH_PALETTE[colorIdx % GRAPH_PALETTE.length]})`;
@@ -68,7 +75,17 @@ const graphMaxCol = computed(() => {
   }
   return m;
 });
-const graphColW = computed(() => Math.max(80, laneX(graphMaxCol.value) + 16));
+// Ширина колонки графа не сужается при подгрузке истории — только растёт
+// (и то до капа), иначе текстовые колонки прыгают по горизонтали при скролле.
+const graphMaxColSeen = ref(0);
+watch(
+  graphMaxCol,
+  (m) => {
+    if (m > graphMaxColSeen.value) graphMaxColSeen.value = m;
+  },
+  { immediate: true }
+);
+const graphColW = computed(() => Math.max(80, laneX(graphMaxColSeen.value) + 16));
 
 // Индекс HEAD-коммита в отфильтрованном списке: ищем по ref-у текущей
 // локальной ветки. С `git log --all` HEAD больше не обязательно сверху —
@@ -110,6 +127,9 @@ const wtInlineLines = computed<{ col: number; full: boolean }[]>(() => {
 });
 const { files } = useFiles();
 const { repoPath } = useRepo();
+watch(repoPath, () => {
+  graphMaxColSeen.value = 0;
+});
 
 const graphFilter = ref("");
 
@@ -576,6 +596,7 @@ function formatDate(iso: string): string {
               :d="linePath(ln, idx === 0)"
               :stroke="laneColor(ln.color)"
               stroke-width="2"
+              :stroke-opacity="laneClipped(ln.from_column) || laneClipped(ln.to_column) ? 0.3 : 1"
               fill="none"
             />
             <!-- Незапушенный («исходящий») коммит — залитый кружок цветом
@@ -588,6 +609,7 @@ function formatDate(iso: string): string {
               :fill="commit.unpushed ? 'var(--unpushed)' : 'var(--bg-primary)'"
               :stroke="commit.unpushed ? 'var(--unpushed)' : laneColor(commit.column)"
               stroke-width="2"
+              :opacity="laneClipped(commit.column) ? 0.45 : 1"
             />
           </svg>
         </div>
