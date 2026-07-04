@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.avv7bc.gitstream</id>
+
+  <name>GitStream</name>
+  <summary>Desktop Git GUI for everyday workflows</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <developer id="io.github.avv7bc">
+    <name>avv</name>
+  </developer>
+
+  <description>
+    <p>
+      GitStream is a desktop Git GUI focused on everyday Git workflows — commits,
+      branches, push/pull and diff review — without blocking the UI or unnecessary
+      complexity.
+    </p>
+    <p>Highlights:</p>
+    <ul>
+      <li>Commit graph with branch/merge lane rendering and infinite scroll</li>
+      <li>Stage, unstage, discard and partial (line/hunk) staging</li>
+      <li>Unified and side-by-side diffs with synchronized scrolling</li>
+      <li>Branches, tags and stashes management with search</li>
+      <li>Fetch, pull and push with a non-blocking network layer</li>
+      <li>Sync Assistant for rejected pushes and safe force-with-lease</li>
+      <li>Merge, rebase, cherry-pick, revert and conflict resolution</li>
+      <li>File history, blame, and repository statistics</li>
+      <li>English and Russian interface</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">io.github.avv7bc.gitstream.desktop</launchable>
+
+  <url type="homepage">https://github.com/avv7bc/gitstream</url>
+  <url type="bugtracker">https://github.com/avv7bc/gitstream/issues</url>
+  <url type="vcs-browser">https://github.com/avv7bc/gitstream</url>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/avv7bc/gitstream/main/flatpak/screenshots/main.png</image>
+      <caption>Commit graph, branches and side-by-side diff</caption>
+    </screenshot>
+  </screenshots>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="1.1.23" date="2026-07-04">
+      <description>
+        <p>Settings timeout values persist; wider Statistics window fitting the yearly heatmap.</p>
+      </description>
+    </release>
+  </releases>
+</component>

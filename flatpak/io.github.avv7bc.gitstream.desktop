@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=GitStream
+GenericName=Git GUI
+Comment=Desktop Git GUI for everyday workflows
+Exec=gitstream
+Icon=io.github.avv7bc.gitstream
+Terminal=false
+Categories=Development;RevisionControl;
+Keywords=git;vcs;version control;commit;branch;diff;
+StartupWMClass=GitStream

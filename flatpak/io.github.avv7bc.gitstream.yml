@@ -1,0 +1,90 @@
+# Flathub manifest for GitStream.
+# Approach: repackage the prebuilt .deb from the GitHub Release (no compilation of
+# the app itself). The Flathub buildbot bundles a `git` binary (built from source)
+# because the GNOME runtime does not ship one and GitStream shells out to `git`.
+#
+# Before opening the Flathub PR, fill every REPLACE_ME below (see flatpak/README.md).
+app-id: io.github.avv7bc.gitstream
+runtime: org.gnome.Platform
+runtime-version: '47'
+sdk: org.gnome.Sdk
+command: gitstream
+
+finish-args:
+  # GUI
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+  # Networking for fetch/pull/push
+  - --share=network
+  # Access to the user's repositories and git config
+  - --filesystem=home
+  # SSH remotes via the host ssh-agent
+  - --socket=ssh-auth
+  # Credential storage (libsecret / gnome-keyring)
+  - --talk-name=org.freedesktop.secrets
+
+modules:
+  # -------------------------------------------------------------------------
+  # git — required at runtime; GitStream invokes the `git` CLI.
+  # Built from the official tarball on the Flathub builder (not locally).
+  # -------------------------------------------------------------------------
+  - name: git
+    buildsystem: simple
+    build-commands:
+      - make configure
+      - ./configure --prefix=/app --with-openssl --with-curl --without-tcltk
+      - make -j$(nproc) NO_GETTEXT=1 all
+      - make NO_GETTEXT=1 install
+    sources:
+      - type: archive
+        url: https://mirrors.edge.kernel.org/pub/software/scm/git/git-2.47.1.tar.xz
+        sha256: f3d8f9bb23ae392374e91cd9d395970dabc5b9c5ee72f39884613cd84a6ed310
+
+  # -------------------------------------------------------------------------
+  # gitstream — prebuilt binary extracted from the release .deb.
+  # -------------------------------------------------------------------------
+  - name: gitstream
+    buildsystem: simple
+    build-commands:
+      # Unpack the Debian package (control + data archives).
+      - ar x gitstream.deb
+      - tar -xf data.tar.*
+      # Install the main binary regardless of its exact name inside the .deb.
+      - |
+        bin="$(find usr/bin -maxdepth 1 -type f | head -n1)"
+        install -Dm755 "$bin" /app/bin/gitstream
+      # App-id-named icon, desktop entry and AppStream metadata.
+      - install -Dm644 io.github.avv7bc.gitstream.png
+        /app/share/icons/hicolor/256x256/apps/io.github.avv7bc.gitstream.png
+      - install -Dm644 io.github.avv7bc.gitstream.desktop
+        /app/share/applications/io.github.avv7bc.gitstream.desktop
+      - install -Dm644 io.github.avv7bc.gitstream.metainfo.xml
+        /app/share/metainfo/io.github.avv7bc.gitstream.metainfo.xml
+    sources:
+      - type: file
+        url: https://github.com/avv7bc/gitstream/releases/download/v1.1.23/GitStream_1.1.23_amd64.deb
+        sha256: b2a7c9cb520d4a424c07aaebc2d192eb665dfc87e42e45a3363d1a8ea8cd6a50
+        dest-filename: gitstream.deb
+        only-arches:
+          - x86_64
+        # Auto-update: flatpak-external-data-checker will open a PR on each new
+        # GitHub release, updating url + sha256 for you.
+        x-checker-data:
+          type: json
+          url: https://api.github.com/repos/avv7bc/gitstream/releases/latest
+          version-query: .tag_name | sub("^v"; "")
+          url-query: >-
+            .assets[] | select(.name | test("amd64\\.deb$")) | .browser_download_url
+
+      - type: file
+        url: https://raw.githubusercontent.com/avv7bc/gitstream/v1.1.23/src-tauri/icons/256x256.png
+        sha256: 9f05e87a658c981aa469111cbceff4b1c55c032389a8aa5db3e1d49a95074b09
+        dest-filename: io.github.avv7bc.gitstream.png
+
+      - type: file
+        path: io.github.avv7bc.gitstream.desktop
+
+      - type: file
+        path: io.github.avv7bc.gitstream.metainfo.xml
