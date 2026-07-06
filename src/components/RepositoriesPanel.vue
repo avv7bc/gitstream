@@ -56,7 +56,7 @@ function saveTree() {
 }
 
 // --- State ---
-const { repoPath, openRepo, closeRepo } = useRepo();
+const { repoPath, repoInfo, openRepo, closeRepo } = useRepo();
 
 const tree = ref<TreeNode[]>(loadTree());
 
@@ -446,6 +446,18 @@ watch(repoPath, (path) => {
     if (active) selectedId.value = active.id;
   }
 });
+
+// Держим ярлык ветки активного репозитория в дереве в актуальном состоянии:
+// repoInfo обновляется после checkout/мутаций (refreshInfo), а узел дерева
+// иначе показывал бы ветку, загруженную при добавлении/монтировании.
+watch(
+  () => repoInfo.value?.current_branch,
+  (branch) => {
+    if (!repoPath.value || branch == null) return;
+    const active = findAllRepos(tree.value).find((r) => r.path === repoPath.value);
+    if (active && active.branch !== branch) active.branch = branch;
+  },
+);
 
 function deleteNode() {
   if (ctxTargetId.value) {
