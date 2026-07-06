@@ -330,6 +330,52 @@ fn upstream_refs(repo_path: &Path) -> Vec<String> {
         .unwrap_or_default()
 }
 
+// Remote-ветки, связанные с локальной историей: содержат хотя бы один
+// корневой коммит локальных веток/HEAD, то есть делят с ними общую историю.
+// Такие ветки (запушенные коллегами, ещё не чекаученные локально) после fetch
+// должны быть видны в графе — иначе fetch выглядит неработающим. Orphan
+// remote-ветки (отдельный корень, ни одного общего коммита) отсеиваются:
+// они не связаны с локальной работой и лишь захламляют обзор.
+// Символические ref'ы (origin/HEAD) пропускаем — это алиасы, не ветки.
+fn connected_remote_refs(repo_path: &Path) -> Vec<String> {
+    let roots = match run_git(
+        repo_path,
+        &["rev-list", "--max-parents=0", "--branches", "HEAD"],
+    ) {
+        Ok(o) => o,
+        Err(_) => return Vec::new(),
+    };
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Vec::new();
+    for root in roots.split_whitespace() {
+        let out = match run_git(
+            repo_path,
+            &[
+                "for-each-ref",
+                "--format=%(refname)%00%(symref)",
+                "--contains",
+                root,
+                "refs/remotes/",
+            ],
+        ) {
+            Ok(o) => o,
+            Err(_) => continue,
+        };
+        for line in out.lines() {
+            let mut parts = line.splitn(2, '\0');
+            let name = parts.next().unwrap_or("");
+            let symref = parts.next().unwrap_or("");
+            if name.is_empty() || !symref.is_empty() {
+                continue;
+            }
+            if seen.insert(name.to_string()) {
+                result.push(name.to_string());
+            }
+        }
+    }
+    result
+}
+
 pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> {
     // Пустой репозиторий (`git init` без коммитов): HEAD ещё не существует,
     // `git log` падает с кодом 128. Это не ошибка — лог просто пуст.
@@ -340,19 +386,30 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
     let limit_str = format!("-{}", limit);
     // --branches: локальные ветки. Плюс upstream'ы локальных веток (см.
     // upstream_refs) — чтобы «входящие» (fetched, но не влитые) коммиты попали
-    // в граф выше HEAD и подсветились приглушённо. Все `--remotes` намеренно НЕ
-    // включаем — иначе в граф лезут orphan remote-ветки (origin/Demo-topic и
-    // т.п.), не связанные ни с одной локальной веткой; это сбивает (см. запрос
-    // пользователя). Теги тоже НЕ включаем (в отличие от --all), иначе коммиты,
-    // живые лишь из-за тега (после squash/amend в ветке), рисуются паразитной
-    // отдельной веткой. Ref-лейблы remote/тегов на достижимых коммитах всё
-    // равно показываются. HEAD добавляем явно ради detached-режима.
+    // в граф выше HEAD и подсветились приглушённо. Плюс remote-ветки, связанные
+    // с локальной историей (см. connected_remote_refs) — иначе запушенные
+    // коллегами ветки после fetch невидимы и fetch выглядит неработающим.
+    // Голый `--remotes` намеренно НЕ включаем — иначе в граф лезут orphan
+    // remote-ветки (origin/Demo-topic и т.п.), не связанные ни с одной
+    // локальной веткой; это сбивает (см. запрос пользователя). Теги тоже НЕ
+    // включаем (в отличие от --all), иначе коммиты, живые лишь из-за тега
+    // (после squash/amend в ветке), рисуются паразитной отдельной веткой.
+    // Ref-лейблы remote/тегов на достижимых коммитах всё равно показываются.
+    // HEAD добавляем явно ради detached-режима.
     // --topo-order: коммиты одной ветки идут подряд, не перемешиваясь по дате
     // с коммитами других веток (как --date-order). Это даёт чистый граф в
     // стиле SmartGit/gitk: лейн смерженной ветки не «зигзагует» через mainline,
     // а тянется сплошным столбцом справа до своего мержа.
     let mut args: Vec<String> = vec!["log".into(), "--branches".into(), "HEAD".into()];
-    args.extend(upstream_refs(repo_path));
+    // Дубликаты ref'ов (upstream обычно и connected) git log переваривает,
+    // но убираем их сами, чтобы командная строка в логах оставалась читаемой.
+    let mut extra: Vec<String> = upstream_refs(repo_path);
+    for r in connected_remote_refs(repo_path) {
+        if !extra.contains(&r) {
+            extra.push(r);
+        }
+    }
+    args.extend(extra);
     args.push("--topo-order".into());
     args.push(format!("--format={}", LOG_FORMAT));
     args.push(limit_str);
@@ -1399,6 +1456,121 @@ mod diff_untracked_tests {
             .collect();
         assert_eq!(added, vec!["alpha", "beta", "gamma"]);
         assert_eq!(diff.path, "new.txt");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod log_remote_refs_tests {
+    use super::*;
+    use std::fs;
+
+    fn git(dir: &Path, args: &[&str]) -> String {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    }
+
+    fn init_repo(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("gitstream_{}_{}", name, std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "-q", "-b", "main"]);
+        git(&dir, &["config", "user.email", "t@t.t"]);
+        git(&dir, &["config", "user.name", "t"]);
+        dir
+    }
+
+    fn commit(dir: &Path, file: &str, msg: &str) -> String {
+        fs::write(dir.join(file), msg).unwrap();
+        git(dir, &["add", "."]);
+        git(dir, &["commit", "-qm", msg]);
+        git(dir, &["rev-parse", "HEAD"])
+    }
+
+    // Remote-ветка, разделяющая историю с локальными (коллега запушил ветку,
+    // мы её ещё не чекаутили), после fetch должна быть видна в графе — иначе
+    // fetch выглядит неработающим.
+    #[test]
+    fn connected_remote_branch_included_in_log() {
+        let dir = init_repo("log_connected");
+        commit(&dir, "a.txt", "c1 base");
+        git(&dir, &["checkout", "-qb", "tmp"]);
+        let c2 = commit(&dir, "t.txt", "c2 remote topic");
+        git(&dir, &["checkout", "-q", "main"]);
+        // Имитация fetch: remote-tracking ref без локальной ветки.
+        git(&dir, &["update-ref", "refs/remotes/origin/topic", &c2]);
+        git(&dir, &["branch", "-qD", "tmp"]);
+
+        let commits = log(&dir, 50).unwrap();
+        let messages: Vec<&str> = commits.iter().map(|c| c.message.as_str()).collect();
+        assert!(
+            messages.iter().any(|m| m.contains("c2 remote topic")),
+            "коммит связанной remote-ветки должен попасть в граф, есть только: {:?}",
+            messages
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // Orphan remote-ветка (отдельный корень, ни одного общего коммита
+    // с локальной историей) в граф не попадает — прежнее поведение сохраняем.
+    #[test]
+    fn orphan_remote_branch_excluded_from_log() {
+        let dir = init_repo("log_orphan");
+        commit(&dir, "a.txt", "c1 base");
+        git(&dir, &["checkout", "-q", "--orphan", "demo"]);
+        git(&dir, &["rm", "-rfq", "."]);
+        let d1 = commit(&dir, "d.txt", "d1 orphan");
+        git(&dir, &["checkout", "-q", "main"]);
+        git(&dir, &["update-ref", "refs/remotes/origin/demo", &d1]);
+        git(&dir, &["branch", "-qD", "demo"]);
+
+        let commits = log(&dir, 50).unwrap();
+        let messages: Vec<&str> = commits.iter().map(|c| c.message.as_str()).collect();
+        assert!(
+            !messages.iter().any(|m| m.contains("d1 orphan")),
+            "orphan remote-ветка не должна попадать в граф: {:?}",
+            messages
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // origin/HEAD — символический алиас, не самостоятельная ветка;
+    // не должен ломать сбор connected-ref'ов.
+    #[test]
+    fn connected_refs_skip_symbolic_origin_head() {
+        let dir = init_repo("log_symref");
+        commit(&dir, "a.txt", "c1 base");
+        git(&dir, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
+        git(
+            &dir,
+            &["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"],
+        );
+
+        let refs = connected_remote_refs(&dir);
+        assert!(
+            refs.contains(&"refs/remotes/origin/main".to_string()),
+            "origin/main должен быть connected: {:?}",
+            refs
+        );
+        assert!(
+            !refs.iter().any(|r| r.ends_with("origin/HEAD")),
+            "символический origin/HEAD не должен попадать в refs: {:?}",
+            refs
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
