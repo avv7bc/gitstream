@@ -1090,7 +1090,7 @@ dependencies = [
 
 [[package]]
 name = "gitstream"
-version = "1.1.26"
+version = "1.1.27"
 dependencies = [
  "base64 0.22.1",
  "getrandom 0.2.17",
