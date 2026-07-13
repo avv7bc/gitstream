@@ -36,7 +36,7 @@ fn strip_ansi(s: &str) -> String {
             Some('[') => {
                 chars.next();
                 // параметры/промежуточные байты — до финального 0x40..=0x7e
-                while let Some(c2) = chars.next() {
+                for c2 in chars.by_ref() {
                     if ('\x40'..='\x7e').contains(&c2) {
                         break;
                     }
@@ -122,6 +122,21 @@ fn truncate_output(s: &str) -> String {
     out
 }
 
+pub fn log_git(args: &[&str], output: &str, success: bool) {
+    let Some(handle) = APP_HANDLE.get() else {
+        return;
+    };
+    let cmd = format!("$ git {}", args.join(" "));
+    let _ = handle.emit(
+        "git_command",
+        GitCommandEvent {
+            cmd,
+            output: truncate_output(output),
+            success,
+        },
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,19 +169,4 @@ mod tests {
         assert_eq!(sanitize("branch 'master' set up to track 'origin/master'."),
                    "branch 'master' set up to track 'origin/master'.");
     }
-}
-
-pub fn log_git(args: &[&str], output: &str, success: bool) {
-    let Some(handle) = APP_HANDLE.get() else {
-        return;
-    };
-    let cmd = format!("$ git {}", args.join(" "));
-    let _ = handle.emit(
-        "git_command",
-        GitCommandEvent {
-            cmd,
-            output: truncate_output(output),
-            success,
-        },
-    );
 }
