@@ -63,6 +63,9 @@ async fn run_network_git(
     }
 
     let mut cmd = TokioCommand::new("git");
+    // core.quotePath=false: иначе git экранирует не-ASCII пути (кириллицу)
+    // в вывод pull/clone октальными кодами вида \320\273 — см. query::run_git.
+    cmd.args(["-c", "core.quotePath=false"]);
     if let Some(p) = repo_path {
         cmd.arg("-C").arg(p);
     }
