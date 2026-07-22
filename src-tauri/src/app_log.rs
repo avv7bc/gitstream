@@ -71,44 +71,57 @@ fn strip_ansi(s: &str) -> String {
     out
 }
 
-// Ответ одной команды — это ОДНО событие и должен занимать одну строку в
-// панели (перенос строки = новое событие). Многие --format/-z команды содержат
-// управляющие символы (%x1e RS между записями, %x00 NUL между полями) и
-// собственные переводы строк (тело коммита, список remote). Все они сводятся к
-// пробелу с схлопыванием повторов — вывод остаётся одной строкой, а по ширине
-// панель переносит его мягко (pre-wrap), не создавая псевдо-событий.
+// Псевдографика, которой hooks (lefthook) рисуют декоративные рамки и
+// анимации: box drawing (U+2500..U+257F) и block elements (U+2580..U+259F).
+// В логе это шум — сводим к пробелу, как управляющие символы.
+fn is_decor(c: char) -> bool {
+    matches!(c, '\u{2500}'..='\u{259F}')
+}
+
+// Ответ одной команды — одно событие (один div панели, pre-wrap + monospace),
+// поэтому переводы строк СОХРАНЯЮТСЯ: diffstat после pull, списки файлов и
+// прочий табличный вывод остаются выровненными, как в терминале. Внутри строки
+// управляющие символы (%x1e RS, %x00 NUL у --format/-z команд) и псевдографика
+// рамок hook'ов сводятся к пробелу со схлопыванием повторов; строки, состоящие
+// из одной декорации, выбрасываются целиком.
 fn sanitize(s: &str) -> String {
     let stripped = strip_ansi(s);
-    // Спиннеры и счётчики прогресса перерисовывают строку через \r — в лог
-    // берём только финальное состояние каждой строки (текст после последнего
-    // \r), иначе все кадры анимации склеиваются в простыню.
-    let mut kept = String::with_capacity(stripped.len());
-    for (i, line) in stripped.split('\n').enumerate() {
-        if i > 0 {
-            kept.push('\n');
-        }
-        let line = line.strip_suffix('\r').unwrap_or(line);
-        kept.push_str(line.rsplit('\r').next().unwrap_or(line));
-    }
-    let mut out = String::with_capacity(kept.len());
-    let mut prev_space = false;
-    for c in kept.chars() {
-        if c.is_control() {
-            if !prev_space {
-                out.push(' ');
-                prev_space = true;
+    let mut out = String::with_capacity(stripped.len());
+    for raw_line in stripped.split('\n') {
+        // Спиннеры и счётчики прогресса перерисовывают строку через \r — в лог
+        // берём только финальное состояние (текст после последнего \r), иначе
+        // все кадры анимации склеиваются в простыню. CRLF-хвост не считается.
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let line = line.rsplit('\r').next().unwrap_or(line);
+        let mut cleaned = String::with_capacity(line.len());
+        let mut prev_space = false;
+        for c in line.chars() {
+            if c.is_control() || is_decor(c) {
+                if !prev_space {
+                    cleaned.push(' ');
+                    prev_space = true;
+                }
+            } else {
+                cleaned.push(c);
+                prev_space = false;
             }
-        } else {
-            out.push(c);
-            prev_space = false;
         }
+        if cleaned.trim().is_empty() {
+            continue;
+        }
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        out.push_str(cleaned.trim_end());
     }
     out
 }
 
 fn truncate_output(s: &str) -> String {
+    // sanitize уже выбросил пустые строки и хвостовые пробелы; ведущие пробелы
+    // строк не трогаем — это выравнивание табличного вывода (diffstat).
     let sanitized = sanitize(s);
-    let s = sanitized.trim();
+    let s = sanitized.as_str();
     let total_lines = s.lines().count();
     let mut out: String = if total_lines > MAX_OUTPUT_LINES {
         let kept: Vec<&str> = s.lines().take(MAX_OUTPUT_LINES).collect();
@@ -156,7 +169,22 @@ mod tests {
 
     #[test]
     fn crlf_line_endings_do_not_lose_text() {
-        assert_eq!(sanitize("first\r\nsecond"), "first second");
+        assert_eq!(sanitize("first\r\nsecond"), "first\nsecond");
+    }
+
+    #[test]
+    fn lefthook_box_frame_is_removed() {
+        let raw = "╭─────────────╮\n│ 🥊 lefthook v2.1.9  hook: pre-push │\n╰─────────────╯\nbranch 'master' set up to track 'origin/master'.";
+        assert_eq!(
+            sanitize(raw),
+            "  🥊 lefthook v2.1.9  hook: pre-push\nbranch 'master' set up to track 'origin/master'."
+        );
+    }
+
+    #[test]
+    fn diffstat_lines_and_alignment_are_preserved() {
+        let raw = "Fast-forward\n a/b.rs  | 16 +-\n c/d.lua |  5 +\n";
+        assert_eq!(sanitize(raw), "Fast-forward\n a/b.rs  | 16 +-\n c/d.lua |  5 +");
     }
 
     #[test]
