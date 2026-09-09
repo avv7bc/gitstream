@@ -722,25 +722,37 @@ pub fn set_branch_upstream(
     Ok(())
 }
 
-pub fn pull_args(remote: &str, branch: &str, rebase: bool) -> Vec<String> {
-    // --tags: иначе git pull тянет только теги, достижимые из подтягиваемой
-    // ветки (авто-фолловинг), и теги на сторонних ветках/коммитах не
-    // приезжают — для пользователя выглядит как «теги не затягиваются».
+/// Вторая фаза pull: влить (или перебазировать) текущую ветку `branch` в
+/// свежезафетченную `<remote>/<branch>`. Первая фаза — полный
+/// `fetch --tags <remote>` (см. `commands::do_pull`).
+///
+/// Раньше pull делался одной командой `git pull <remote> <branch>`, но она
+/// тянет с remote только указанную ветку: остальные remote-ветки
+/// (`origin/feature` и т.п.) не обновляются, новые не появляются, и панель
+/// Branches/граф остаются устаревшими до ручного Fetch. SmartGit делает
+/// Pull = Fetch всего remote + merge/rebase — повторяем это поведение.
+pub fn integrate_pulled(
+    repo_path: &Path,
+    remote: &str,
+    branch: &str,
+    rebase: bool,
+) -> Result<String, GitError> {
+    let target = format!("{}/{}", remote, branch);
+    let full_ref = format!("refs/remotes/{}", target);
+    if super::query::run_git(repo_path, &["rev-parse", "--verify", "--quiet", &full_ref]).is_err()
+    {
+        return Err(GitError::CommandFailed {
+            message: format!("Remote branch '{}' not found", target),
+            hint: Some(format!(
+                "Branch '{}' does not exist on remote '{}'. Push it first or set an upstream",
+                branch, remote
+            )),
+        });
+    }
     if rebase {
-        vec![
-            "pull".into(),
-            "--rebase".into(),
-            "--tags".into(),
-            remote.into(),
-            branch.into(),
-        ]
+        self::rebase(repo_path, &target)
     } else {
-        vec![
-            "pull".into(),
-            "--tags".into(),
-            remote.into(),
-            branch.into(),
-        ]
+        merge(repo_path, &target)
     }
 }
 
@@ -1141,18 +1153,6 @@ mod tag_tests {
     }
 
     #[test]
-    fn pull_args_rebase_toggle() {
-        assert_eq!(
-            pull_args("origin", "main", false),
-            vec!["pull", "--tags", "origin", "main"]
-        );
-        assert_eq!(
-            pull_args("origin", "main", true),
-            vec!["pull", "--rebase", "--tags", "origin", "main"]
-        );
-    }
-
-    #[test]
     fn push_args_force_toggle() {
         assert_eq!(
             push_args("origin", "main", false),
@@ -1419,6 +1419,86 @@ mod init_tests {
         init(&dir).unwrap();
         assert!(add_remote(&dir, "-x", "https://example.com/a.git").is_err());
         assert!(add_remote(&dir, "origin", "--upload-pack=evil").is_err());
+        fs::remove_dir_all(&dir).ok();
+    }
+}
+
+#[cfg(test)]
+mod pull_tests {
+    use super::*;
+    use std::fs;
+    use std::process::Command;
+
+    fn git(dir: &Path, args: &[&str]) -> String {
+        let out = Command::new("git")
+            .current_dir(dir)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    }
+
+    fn temp_repo() -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "gitstream_pull_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "-q", "-b", "main"]);
+        git(&dir, &["config", "user.email", "t@t.t"]);
+        git(&dir, &["config", "user.name", "t"]);
+        git(&dir, &["commit", "-q", "--allow-empty", "-m", "c1"]);
+        dir
+    }
+
+    #[test]
+    fn missing_remote_branch_is_reported() {
+        let dir = temp_repo();
+        let err = integrate_pulled(&dir, "origin", "main", false).unwrap_err();
+        assert!(err.to_string().contains("origin/main"), "{}", err);
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn merges_fetched_remote_branch() {
+        let dir = temp_repo();
+        // Имитируем результат fetch: remote-tracking ref указывает на коммит,
+        // которого ещё нет в локальной ветке.
+        git(&dir, &["checkout", "-q", "-b", "tmp"]);
+        git(&dir, &["commit", "-q", "--allow-empty", "-m", "c2"]);
+        let c2 = git(&dir, &["rev-parse", "HEAD"]);
+        git(&dir, &["checkout", "-q", "main"]);
+        git(&dir, &["update-ref", "refs/remotes/origin/main", &c2]);
+
+        integrate_pulled(&dir, "origin", "main", false).unwrap();
+        assert_eq!(git(&dir, &["rev-parse", "HEAD"]), c2);
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn rebases_onto_fetched_remote_branch() {
+        let dir = temp_repo();
+        git(&dir, &["checkout", "-q", "-b", "tmp"]);
+        git(&dir, &["commit", "-q", "--allow-empty", "-m", "remote"]);
+        let remote_tip = git(&dir, &["rev-parse", "HEAD"]);
+        git(&dir, &["checkout", "-q", "main"]);
+        git(&dir, &["update-ref", "refs/remotes/origin/main", &remote_tip]);
+        git(&dir, &["commit", "-q", "--allow-empty", "-m", "local"]);
+
+        integrate_pulled(&dir, "origin", "main", true).unwrap();
+        // Локальный коммит переигран поверх remote-вершины: линейная история.
+        assert_eq!(git(&dir, &["rev-parse", "HEAD~1"]), remote_tip);
+        assert_eq!(git(&dir, &["log", "-1", "--format=%s"]), "local");
         fs::remove_dir_all(&dir).ok();
     }
 }

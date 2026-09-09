@@ -581,10 +581,20 @@ pub async fn do_pull(
     rebase: bool,
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
-    let path = Path::new(&repo_path);
-    let branch = query::current_branch_name(path).map_err(|e| e.to_string())?;
-    let args = mutation::pull_args(&remote, &branch, rebase);
-    run_network_git(&app, Some(path), &args, timeout_secs, "pull").await
+    let path = PathBuf::from(&repo_path);
+    let branch = query::current_branch_name(&path).map_err(|e| e.to_string())?;
+    // Pull = полный fetch remote'а + merge/rebase (как в SmartGit), а не
+    // `git pull <remote> <branch>`: та команда тянет только одну ветку, и
+    // остальные remote-ветки в панели Branches/графе оставались устаревшими
+    // до ручного Fetch (см. mutation::integrate_pulled).
+    let fetch = mutation::fetch_args(&remote, false, false, false);
+    let fetched = run_network_git(&app, Some(&path), &fetch, timeout_secs, "pull").await?;
+    let integrated = tokio::task::spawn_blocking(move || {
+        mutation::integrate_pulled(&path, &remote, &branch, rebase).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    Ok(fetched + &integrated)
 }
 
 #[tauri::command]
