@@ -89,7 +89,7 @@ async function onBranchCheckedOut() {
 // до загрузки данных нового, иначе панель Changes показывает дифф из
 // старого репозитория (FileList обновляется через refreshFiles, а
 // currentDiff/selectedFile — нет).
-onRepoOpened(async () => {
+onRepoOpened(async (isCurrent) => {
   selectedCommit.value = null;
   selectedFile.value = null;
   clearDiff();
@@ -98,7 +98,7 @@ onRepoOpened(async () => {
   // чтобы граф сразу показывал «входящие» (приглушённые) коммиты и актуальный
   // behind-счётчик. Неблокирующе (без await) и тихо: ошибки сети уходят в Git
   // output внутри fetchRemote, интерфейс не ждёт сеть.
-  void autoFetchOnOpen();
+  if (isCurrent()) void autoFetchOnOpen();
 });
 
 // Remote по умолчанию для авто-fetch: remote текущей ветки (upstream вида
@@ -137,7 +137,7 @@ async function autoFetchOnOpen() {
 // репо как «авто-fetch выполнен», чтобы onRepoOpened не дублировал сеть.
 async function handleRepoAdded(path: string) {
   autoFetchedRepos.add(path);
-  await openRepo(path);
+  if (!await openRepo(path)) return;
   const remote = pickDefaultRemote();
   if (!remote) return; // нет remote'ов — тянуть неоткуда
   document.body.style.cursor = "wait";

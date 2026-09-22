@@ -582,7 +582,7 @@ pub async fn do_pull(
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let path = PathBuf::from(&repo_path);
-    let branch = query::current_branch_name(&path).map_err(|e| e.to_string())?;
+    let branch = query::require_current_branch_name(&path).map_err(|e| e.to_string())?;
     // Pull = полный fetch remote'а + merge/rebase (как в SmartGit), а не
     // `git pull <remote> <branch>`: та команда тянет только одну ветку, и
     // остальные remote-ветки в панели Branches/графе оставались устаревшими
@@ -606,7 +606,7 @@ pub async fn do_push(
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let path = Path::new(&repo_path);
-    let branch = query::current_branch_name(path).map_err(|e| e.to_string())?;
+    let branch = query::require_current_branch_name(path).map_err(|e| e.to_string())?;
     let args = mutation::push_args(&remote, &branch, force);
     run_network_git(&app, Some(path), &args, timeout_secs, "push").await
 }
@@ -620,7 +620,7 @@ pub fn do_diagnose_sync(
     remote: String,
 ) -> Result<Option<diagnose::Situation>, String> {
     let path = Path::new(&repo_path);
-    let branch = query::current_branch_name(path).map_err(|e| e.to_string())?;
+    let branch = query::require_current_branch_name(path).map_err(|e| e.to_string())?;
     Ok(diagnose::diagnose_sync(path, &remote, &branch))
 }
 
@@ -635,7 +635,7 @@ pub async fn do_push_force_lease(
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let path = Path::new(&repo_path);
-    let branch = query::current_branch_name(path).map_err(|e| e.to_string())?;
+    let branch = query::require_current_branch_name(path).map_err(|e| e.to_string())?;
     mutation::backup_remote_tip(path, &remote, &branch);
     let args = mutation::push_args(&remote, &branch, true);
     run_network_git(&app, Some(path), &args, timeout_secs, "push").await

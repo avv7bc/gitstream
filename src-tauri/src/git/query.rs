@@ -834,6 +834,21 @@ pub fn current_branch_name(repo_path: &Path) -> Result<String, GitError> {
     Ok(out.trim().to_string())
 }
 
+/// Возвращает имя локальной ветки, на которой можно выполнять операции,
+/// зависящие от текущего ref. В detached HEAD `branch --show-current` пуст,
+/// поэтому не даём сетевым командам строить некорректные refspec'ы вроде
+/// `origin/` или отправлять пустое имя ветки.
+pub fn require_current_branch_name(repo_path: &Path) -> Result<String, GitError> {
+    let branch = current_branch_name(repo_path)?;
+    if branch.is_empty() {
+        return Err(GitError::CommandFailed {
+            message: "Operation requires a checked-out local branch".into(),
+            hint: Some("Detached HEAD is active. Check out a local branch first".into()),
+        });
+    }
+    Ok(branch)
+}
+
 pub fn repo_info(repo_path: &Path) -> Result<RepoInfo, GitError> {
     let path = run_git(repo_path, &["rev-parse", "--show-toplevel"])?;
     let branch = run_git(repo_path, &["branch", "--show-current"])?;
@@ -1912,6 +1927,8 @@ mod edge_case_tests {
         assert_eq!(info.head_oid, first, "HEAD указывает на выбранный коммит");
         assert!(!log(&dir, 100).unwrap().is_empty(), "лог доступен в detached HEAD");
         assert_eq!(repo_state(&dir).unwrap(), "clean");
+        let err = require_current_branch_name(&dir).unwrap_err();
+        assert!(err.to_string().contains("checked-out local branch"));
 
         let _ = fs::remove_dir_all(&dir);
     }
