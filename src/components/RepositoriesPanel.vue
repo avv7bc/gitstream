@@ -450,11 +450,14 @@ watch(repoPath, (path) => {
 // Держим ярлык ветки активного репозитория в дереве в актуальном состоянии:
 // repoInfo обновляется после checkout/мутаций (refreshInfo), а узел дерева
 // иначе показывал бы ветку, загруженную при добавлении/монтировании.
+// Следим за парой путь+ветка: при переключении между репозиториями на
+// одноимённой ветке (master → master) сама строка ветки не меняется, а
+// ярлык нового активного узла может быть устаревшим.
 watch(
-  () => repoInfo.value?.current_branch,
-  (branch) => {
-    if (!repoPath.value || branch == null) return;
-    const active = findAllRepos(tree.value).find((r) => r.path === repoPath.value);
+  () => [repoPath.value, repoInfo.value?.current_branch] as const,
+  ([path, branch]) => {
+    if (!path || branch == null) return;
+    const active = findAllRepos(tree.value).find((r) => r.path === path);
     if (active && active.branch !== branch) active.branch = branch;
   },
 );
