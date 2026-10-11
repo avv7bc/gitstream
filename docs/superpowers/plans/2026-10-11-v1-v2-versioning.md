@@ -783,9 +783,9 @@ git add .github/workflows/ci.yml .github/workflows/release.yml
 git commit -m "ci: CI на release/**, prerelease-теги, latest остаётся на новейшей мажорной линии"
 ```
 
-- [ ] **Step 6: Релиз 1.1.35 — только по команде пользователя**
+- [ ] **Step 6: Релиз v1 с новой проверкой обновлений (1.1.N) — только по команде пользователя**
 
-Поднять patch-версию в `package.json`, `src-tauri/Cargo.toml` и `src-tauri/tauri.conf.json` до `1.1.35` (Cargo.lock обновит `cargo check`), коммит, тег `v1.1.35`, push ветки и тега. Этот релиз должен выйти **до** любого релиза v2, чтобы пользователи v1 успели получить новую логику обновлений.
+Поднять patch-версию в `package.json`, `src-tauri/Cargo.toml` и `src-tauri/tauri.conf.json` до следующего patch (`1.1.N`) (Cargo.lock обновит `cargo check`), коммит, тег `v1.1.N`, push ветки и тега. Этот релиз должен выйти **до** любого релиза v2, чтобы пользователи v1 успели получить новую логику обновлений.
 
 ---
 
@@ -799,7 +799,7 @@ git log --reverse --format=%h release/1.x ^main   # список коммито�
 git cherry-pick -x <sha1> <sha2> ...
 ```
 
-Коммит с подъёмом версии до 1.1.35 **не переносить**.
+Коммит с подъёмом версии **не переносить**.
 
 - [ ] **Step 2: Проверить**
 
