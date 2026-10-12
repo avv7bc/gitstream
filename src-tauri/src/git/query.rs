@@ -32,6 +32,105 @@ pub fn run_git(repo_path: &Path, args: &[&str]) -> Result<String, GitError> {
     }
 }
 
+/// Git 2.38 introduced `merge-tree --write-tree`, which lets the UI inspect a
+/// merge without touching the index or worktree. Keep this capability check in
+/// the backend so older Git installations simply hide the preview affordance.
+pub fn supports_merge_preview(version_output: &str) -> bool {
+    let Some(version) = version_output
+        .split_whitespace()
+        .find(|part| part.chars().next().is_some_and(|c| c.is_ascii_digit()))
+    else {
+        return false;
+    };
+    let mut parts = version.split('.').filter_map(|part| {
+        let digits: String = part.chars().take_while(|c| c.is_ascii_digit()).collect();
+        (!digits.is_empty()).then(|| digits.parse::<u32>().ok()).flatten()
+    });
+    let major = parts.next().unwrap_or(0);
+    let minor = parts.next().unwrap_or(0);
+    major > 2 || (major == 2 && minor >= 38)
+}
+
+/// Return a non-mutating merge preview, or `None` when Git is too old.
+pub fn preview_merge(repo_path: &Path, branch: &str) -> Result<Option<MergePreview>, GitError> {
+    if branch.is_empty() || branch.starts_with('-') {
+        return Err(GitError::CommandFailed {
+            message: "Invalid merge branch".into(),
+            hint: None,
+        });
+    }
+    let version = Command::new("git")
+        .arg("--version")
+        .output()
+        .map_err(|e| GitError::CommandFailed {
+            message: format!("Failed to run git: {e}"),
+            hint: None,
+        })?;
+    let version = String::from_utf8_lossy(&version.stdout);
+    if !supports_merge_preview(&version) {
+        return Ok(None);
+    }
+
+    let fast_forward = run_git(repo_path, &["merge-base", "--is-ancestor", "HEAD", branch]).is_ok();
+    let output = Command::new("git")
+        .args(["-c", "core.quotePath=false", "-C"])
+        .arg(repo_path)
+        .args(["merge-tree", "--write-tree", "HEAD", branch])
+        .output()
+        .map_err(|e| GitError::CommandFailed {
+            message: format!("Failed to run git merge-tree: {e}"),
+            hint: None,
+        })?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !output.status.success() && stdout.trim().is_empty() {
+        return Err(classify_git_error(&stderr));
+    }
+    Ok(Some(parse_merge_tree_output(
+        &format!("{stdout}\n{stderr}"),
+        fast_forward,
+    )))
+}
+
+pub fn parse_merge_tree_output(output: &str, fast_forward: bool) -> MergePreview {
+    let mut conflicted_files = Vec::new();
+    for line in output.lines() {
+        if let Some(path) = line.split_once("Merge conflict in ").map(|(_, path)| path.trim()) {
+            if !path.is_empty() && !conflicted_files.iter().any(|item| item == path) {
+                conflicted_files.push(path.to_string());
+            }
+        }
+    }
+    MergePreview {
+        clean: conflicted_files.is_empty(),
+        conflicted_files,
+        fast_forward,
+    }
+}
+
+#[cfg(test)]
+mod merge_preview_tests {
+    use super::{parse_merge_tree_output, supports_merge_preview};
+
+    #[test]
+    fn merge_preview_requires_git_238() {
+        assert!(!supports_merge_preview("git version 2.37.9"));
+        assert!(supports_merge_preview("git version 2.38.0"));
+        assert!(supports_merge_preview("git version 3.0.0"));
+        assert!(!supports_merge_preview("unknown"));
+    }
+
+    #[test]
+    fn parses_conflict_paths() {
+        let result = parse_merge_tree_output(
+            "CONFLICT (content): Merge conflict in src/main.rs\nCONFLICT (add/add): Merge conflict in README.md",
+            false,
+        );
+        assert!(!result.clean);
+        assert_eq!(result.conflicted_files, ["src/main.rs", "README.md"]);
+    }
+}
+
 /// Запускает git, возвращая stdout независимо от кода возврата.
 /// Нужно для `diff --no-index`, который при наличии различий выходит с кодом 1.
 fn run_git_lenient(repo_path: &Path, args: &[&str]) -> String {

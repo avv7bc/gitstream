@@ -71,6 +71,13 @@ pub struct RemoteInfo {
     pub url: String,
 }
 
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct MergePreview {
+    pub clean: bool,
+    pub conflicted_files: Vec<String>,
+    pub fast_forward: bool,
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct StashEntry {
     pub index: usize,

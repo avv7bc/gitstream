@@ -1,7 +1,7 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { computed, ref } from "vue";
-import { toast } from "@/composables/useToast";
+import { toast, dismissToast } from "@/composables/useToast";
 
 const THRESHOLD_MS = 100;
 const MAX_LOG_LINES = 200;
@@ -207,11 +207,13 @@ export async function invoke<T>(
   const kind = NETWORK_OP_KIND[cmd];
   const pathRaw = args?.repoPath;
   const repoPath = typeof pathRaw === "string" && pathRaw ? pathRaw : undefined;
+  let progressToastId: number | null = null;
 
   const timer = setTimeout(() => {
     const next = new Map(active.value);
     next.set(id, { cmd, label, startedAt: Date.now(), timeoutSecs, kind, repoPath });
     active.value = next;
+    if (kind) progressToastId = toast({ kind: "progress", title: label, timeout: null, repoPath });
     if (timeoutSecs) ensureTicker();
   }, THRESHOLD_MS);
 
@@ -224,6 +226,7 @@ export async function invoke<T>(
       next.delete(id);
       active.value = next;
     }
+    if (progressToastId !== null) dismissToast(progressToastId);
   }
 }
 

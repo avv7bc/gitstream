@@ -13,6 +13,7 @@ import { useSettings } from "@/composables/useSettings";
 import type { FileDiff, FileStatus } from "@/types";
 import { highlight } from "@/utils/highlight";
 import ContextMenu from "@/components/ContextMenu.vue";
+import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 import type { ContextMenuItem } from "@/commands/types";
 
 const emit = defineEmits<{ commit: [] }>();
@@ -145,6 +146,24 @@ function ctxLabel(verb: string): string {
   return n > 1 ? `${verb} (${n} files)` : verb;
 }
 
+const showConfirm = ref(false);
+const confirmMessage = ref("");
+const pendingConfirm = ref<{ action: "discard" | "remove" | "delete"; paths: string[] } | null>(null);
+
+async function runConfirmed() {
+  const pending = pendingConfirm.value;
+  pendingConfirm.value = null;
+  showConfirm.value = false;
+  if (!pending) return;
+  try {
+    if (pending.action === "discard") await discardFiles(pending.paths);
+    else if (pending.action === "remove") await removeFiles(pending.paths);
+    else await deleteFiles(pending.paths);
+  } catch (err) {
+    logError(`Action failed: ${err}`);
+  }
+}
+
 async function ctxRun(action: "stage" | "unstage" | "commit" | "discard" | "remove" | "delete") {
   const paths = [...selectedPaths.value];
   closeCtxMenu();
@@ -155,12 +174,10 @@ async function ctxRun(action: "stage" | "unstage" | "commit" | "discard" | "remo
     if (action === "stage") await stageFiles(paths);
     else if (action === "unstage") await unstageFiles(paths);
     else if (action === "commit") emit("commit");
-    else if (action === "discard") {
-      if (window.confirm(`Discard changes in ${what}?`)) await discardFiles(paths);
-    } else if (action === "remove") {
-      if (window.confirm(`Remove ${what} (git rm)?`)) await removeFiles(paths);
-    } else if (action === "delete") {
-      if (window.confirm(`Delete ${what} from disk?`)) await deleteFiles(paths);
+    else if (action === "discard" || action === "remove" || action === "delete") {
+      pendingConfirm.value = { action, paths };
+      confirmMessage.value = action === "discard" ? `Discard changes in ${what}?` : action === "remove" ? `Remove ${what} (git rm)?` : `Delete ${what} from disk?`;
+      showConfirm.value = true;
     }
   } catch (err) {
     logError(`Action failed: ${err}`);
@@ -857,6 +874,14 @@ function compareCommitFile(path: string) {
       :items="contextMenuItems"
       @select="ctxSelect"
       @close="closeCtxMenu"
+    />
+    <ConfirmDialog
+      v-if="showConfirm"
+      :message="confirmMessage"
+      confirm-label="Confirm"
+      danger
+      @close="showConfirm = false; pendingConfirm = null"
+      @confirm="runConfirmed"
     />
   </div>
 </template>

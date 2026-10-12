@@ -8,6 +8,7 @@ import { useVirtualList } from "@/composables/useVirtualList";
 import { useI18n } from "@/composables/useI18n";
 import { logError, logOpen, closeLog, showOutput } from "@/composables/useProgress";
 import GitOutputPanel from "./GitOutputPanel.vue";
+import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 
 const LINE_HEIGHT = 20;
 
@@ -21,6 +22,7 @@ const { leftPanelRef, rightPanelRef } = useSyncScroll();
 const { enrichAllHunks } = useSideBySideDiff();
 
 const busyHunk = ref<number | null>(null);
+const showDiscardConfirm = ref(false);
 
 // id строки = "<hunkIdx>:<lineIdxInHunkLines>"
 const selectedLines = ref<Set<string>>(new Set());
@@ -99,10 +101,15 @@ async function onSelectionAction(action: "stage" | "unstage" | "discard") {
   if (payload.length === 0) return;
   if (action === "discard") {
     const n = selectedLines.value.size;
-    if (!window.confirm(`Discard changes in the selected lines (${n})? This action cannot be undone.`)) {
-      return;
-    }
+    pendingDiscardCount.value = n;
+    showDiscardConfirm.value = true;
+    return;
   }
+  await performSelectionAction(action, payload);
+}
+
+const pendingDiscardCount = ref(0);
+async function performSelectionAction(action: "stage" | "unstage" | "discard", payload = buildSelectionPayload()) {
   busyHunk.value = -1; // блокирует все кнопки на время операции
   try {
     await applyLines(action, currentDiff.value?.header ?? "", payload);
@@ -112,6 +119,11 @@ async function onSelectionAction(action: "stage" | "unstage" | "discard") {
   } finally {
     busyHunk.value = null;
   }
+}
+
+function confirmDiscard() {
+  showDiscardConfirm.value = false;
+  void performSelectionAction("discard");
 }
 
 function onStageBtn(hi: number) {
@@ -398,6 +410,14 @@ function scrollToHunk() {
         <div :style="{ height: paddingBottom + 'px' }" />
       </div>
     </div>
+    <ConfirmDialog
+      v-if="showDiscardConfirm"
+      :message="`Discard changes in the selected lines (${pendingDiscardCount})? This action cannot be undone.`"
+      confirm-label="Discard"
+      danger
+      @close="showDiscardConfirm = false"
+      @confirm="confirmDiscard"
+    />
   </div>
 </template>
 

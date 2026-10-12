@@ -5,6 +5,8 @@ import { useRemote, isRejectedNeedsFetch } from "@/composables/useRemote";
 import { logError } from "@/composables/useProgress";
 import { highlight } from "@/utils/highlight";
 import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
+import MergeDialog from "@/components/dialogs/MergeDialog.vue";
+import RebaseDialog from "@/components/dialogs/RebaseDialog.vue";
 import RenameBranchDialog from "@/components/dialogs/RenameBranchDialog.vue";
 import StashSaveDialog from "@/components/dialogs/StashSaveDialog.vue";
 import CreateBranchDialog from "@/components/dialogs/CreateBranchDialog.vue";
@@ -137,22 +139,16 @@ function triggerMerge() {
   const b = remote ?? local;
   if (!b) return;
   targetBranch.value = b;
-  showMergeConfirm.value = true;
+  showMergeDialog.value = true;
 }
 
-async function triggerRebase() {
+function triggerRebase() {
   const remote = selectedRemoteBranches.value[0];
   const local = selectedLocalBranches.value.find((b) => !b.is_current);
   const b = remote ?? local;
   if (!b) return;
-  if (!window.confirm(`Rebase current branch onto '${b.name}'?`)) return;
-  try {
-    await rebaseOnto(b.name);
-  } catch (e) {
-    logError(`Rebase failed (resolve conflicts below if any): ${e}`);
-  } finally {
-    emit("branchesChanged");
-  }
+  rebaseTarget.value = b;
+  showRebaseDialog.value = true;
 }
 
 defineExpose({ openCreateBranch, triggerCheckoutRemote, triggerMerge, triggerRebase });
@@ -203,7 +199,9 @@ function resolveRemoteFor(branch: BranchInfo): string {
 }
 
 // --- Actions ---
-const showMergeConfirm = ref(false);
+const showMergeDialog = ref(false);
+const showRebaseDialog = ref(false);
+const rebaseTarget = ref<BranchInfo | null>(null);
 const showDeleteConfirm = ref(false);
 const showForceDeleteConfirm = ref(false);
 const showRenameDialog = ref(false);
@@ -226,21 +224,35 @@ async function handleCheckoutCtx() {
 function handleMergeCtx() {
   targetBranch.value = ctxBranch.value;
   closeCtxMenu();
-  showMergeConfirm.value = true;
+  showMergeDialog.value = true;
 }
 
-async function confirmMerge() {
+async function confirmMerge(branchName?: string) {
   const b = targetBranch.value;
-  showMergeConfirm.value = false;
+  showMergeDialog.value = false;
   if (!b) return;
   try {
-    await mergeBranch(b.name);
+    await mergeBranch(branchName || b.name);
   } catch (e) {
     logError(`Merge failed (resolve conflicts below if any): ${e}`);
   } finally {
     emit("branchesChanged");
   }
   targetBranch.value = null;
+}
+
+async function confirmRebase(branchName?: string) {
+  const b = rebaseTarget.value;
+  showRebaseDialog.value = false;
+  if (!b) return;
+  try {
+    await rebaseOnto(branchName || b.name);
+  } catch (e) {
+    logError(`Rebase failed (resolve conflicts below if any): ${e}`);
+  } finally {
+    emit("branchesChanged");
+    rebaseTarget.value = null;
+  }
 }
 
 async function handlePushCtx() {
@@ -265,14 +277,8 @@ async function handleRebaseCtx() {
   const b = ctxBranch.value;
   closeCtxMenu();
   if (!b || b.is_current) return;
-  if (!window.confirm(`Rebase current branch onto '${b.name}'?`)) return;
-  try {
-    await rebaseOnto(b.name);
-  } catch (e) {
-    logError(`Rebase failed (resolve conflicts below if any): ${e}`);
-  } finally {
-    emit("branchesChanged");
-  }
+  rebaseTarget.value = b;
+  showRebaseDialog.value = true;
 }
 
 function handleRenameCtx() {
@@ -657,7 +663,7 @@ function handleMergeRemoteCtx() {
     actions: {
       "branch.merge": () => {
         targetBranch.value = b;
-        showMergeConfirm.value = true;
+        showMergeDialog.value = true;
       },
     },
   });
@@ -671,15 +677,9 @@ async function handleRebaseRemoteCtx() {
     repoPath: repoPath.value,
     selectedBranch: b.name,
     actions: {
-      "branch.rebase": async () => {
-        if (!window.confirm(`Rebase current branch onto '${b.name}'?`)) return;
-        try {
-          await rebaseOnto(b.name);
-        } catch (e) {
-          logError(`Rebase failed (resolve conflicts below if any): ${e}`);
-        } finally {
-          emit("branchesChanged");
-        }
+      "branch.rebase": () => {
+        rebaseTarget.value = b;
+        showRebaseDialog.value = true;
       },
     },
   });
@@ -1196,12 +1196,19 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
         @contextmenu.prevent="closeCtxMenu"
       />
 
-      <ConfirmDialog
-        v-if="showMergeConfirm && targetBranch"
-        :message="`Merge branch '${targetBranch.name}' into the current branch?`"
-        confirm-label="Merge"
-        @close="showMergeConfirm = false; targetBranch = null"
+      <MergeDialog
+        v-if="showMergeDialog && targetBranch"
+        :target="targetBranch"
+        :candidates="[...selectedLocalBranches.filter((b) => !b.is_current), ...selectedRemoteBranches]"
+        @close="showMergeDialog = false; targetBranch = null"
         @confirm="confirmMerge"
+      />
+      <RebaseDialog
+        v-if="showRebaseDialog && rebaseTarget"
+        :target="rebaseTarget"
+        :candidates="[...selectedLocalBranches.filter((b) => !b.is_current), ...selectedRemoteBranches]"
+        @close="showRebaseDialog = false; rebaseTarget = null"
+        @confirm="confirmRebase"
       />
 
       <ConfirmDialog

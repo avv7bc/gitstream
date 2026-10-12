@@ -11,6 +11,7 @@ import StatusBar from "./components/StatusBar.vue";
 import ConflictBar from "./components/ConflictBar.vue";
 import SyncAssistantBar from "./components/SyncAssistantBar.vue";
 import CommitDialog from "./components/dialogs/CommitDialog.vue";
+import CommitComposer from "./components/CommitComposer.vue";
 import PushDialog from "./components/dialogs/PushDialog.vue";
 import PullDialog from "./components/dialogs/PullDialog.vue";
 import CheckoutDialog from "./components/dialogs/CheckoutDialog.vue";
@@ -608,6 +609,7 @@ function onMouseUp() {
             </div>
             <div class="resize-handle-h" @mousedown="onMouseDown($event, 'right-row')" />
             <div class="files-pane">
+              <CommitComposer @committed="refreshAll" />
               <FileList @commit="showCommitDialog = true" />
             </div>
           </div>

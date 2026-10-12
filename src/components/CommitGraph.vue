@@ -10,6 +10,7 @@ import type { RefLabel, GraphLine } from "@/types";
 import { highlight } from "@/utils/highlight";
 import { filterCommits } from "@/utils/commitFilter";
 import ContextMenu from "@/components/ContextMenu.vue";
+import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 import type { ContextMenuItem } from "@/commands/types";
 
 const emit = defineEmits<{
@@ -24,6 +25,8 @@ const emit = defineEmits<{
 const { commits, selectedCommit, hasMore, isLoadingMore, loadMore, resetTo, revertCommit, cherryPick } = useLog();
 const { branches } = useBranches();
 const currentBranch = computed(() => branches.value.find((b) => b.is_current));
+const showResetConfirm = ref(false);
+const pendingReset = ref<{ oid: string; mode: "soft" | "mixed" | "hard" } | null>(null);
 function isCurrentBranchRow(c: { refs: { kind: string }[] }): boolean {
   return c.refs.some((r) => r.kind === "current-branch");
 }
@@ -213,15 +216,28 @@ async function ctxReset(mode: "soft" | "mixed" | "hard") {
   const oid = ctxCommitOid.value;
   closeCtxMenu();
   if (!oid || oid === "__worktree__") return;
-  if (mode === "hard" && !window.confirm(
-    "Reset --hard discards all uncommitted changes. Continue?"
-  )) return;
+  if (mode === "hard") {
+    pendingReset.value = { oid, mode };
+    showResetConfirm.value = true;
+    return;
+  }
+  await performReset(oid, mode);
+}
+
+async function performReset(oid: string, mode: "soft" | "mixed" | "hard") {
   try {
     await resetTo(oid, mode);
     emit("changed");
   } catch (e) {
     logError(`Reset failed: ${e}`);
   }
+}
+
+function confirmReset() {
+  const pending = pendingReset.value;
+  pendingReset.value = null;
+  showResetConfirm.value = false;
+  if (pending) void performReset(pending.oid, pending.mode);
 }
 
 async function runRevert(oid: string | null) {
@@ -691,6 +707,14 @@ function formatDate(iso: string): string {
       :items="contextMenuItems"
       @select="ctxSelect"
       @close="closeCtxMenu"
+    />
+    <ConfirmDialog
+      v-if="showResetConfirm"
+      message="Reset --hard discards all uncommitted changes. Continue?"
+      confirm-label="Reset"
+      danger
+      @close="showResetConfirm = false; pendingReset = null"
+      @confirm="confirmReset"
     />
   </div>
 </template>

@@ -106,6 +106,12 @@ export interface RemoteInfo {
   url: string;
 }
 
+export interface MergePreview {
+  clean: boolean;
+  conflicted_files: string[];
+  fast_forward: boolean;
+}
+
 export interface DiffLine {
   kind: "context" | "added" | "removed";
   old_lineno: number | null;

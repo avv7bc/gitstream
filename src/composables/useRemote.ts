@@ -3,6 +3,7 @@ import { invoke, logError } from "@/composables/useProgress";
 import { useRepo } from "@/composables/useRepo";
 import { useSettings } from "@/composables/useSettings";
 import { useSync } from "@/composables/useSync";
+import { toast } from "@/composables/useToast";
 
 const isBusy = ref(false);
 
@@ -18,10 +19,11 @@ export function useRemote() {
 
   // Ошибки сетевых операций уходят в Git output (красным, с авто-открытием
   // панели) — без модальных окон. Возвращает true при успехе.
-  async function wrapAsync(fn: () => Promise<unknown>): Promise<boolean> {
+  async function wrapAsync(fn: () => Promise<unknown>, successTitle = "Operation complete"): Promise<boolean> {
     isBusy.value = true;
     try {
       await fn();
+      toast({ kind: "success", title: successTitle });
       return true;
     } catch (e) {
       logError(String(e));
@@ -39,7 +41,7 @@ export function useRemote() {
         remote,
         prune,
         timeoutSecs: networkTimeoutSecs.value,
-      })
+      }), `Fetched ${remote}`
     );
   }
 
@@ -57,7 +59,7 @@ export function useRemote() {
         forceTags: true,
         pruneTags: true,
         timeoutSecs: networkTimeoutSecs.value,
-      })
+      }), `Synced tags with ${remote}`
     );
   }
 
@@ -68,7 +70,7 @@ export function useRemote() {
         repoPath: repoPath.value!,
         prune,
         timeoutSecs: networkTimeoutSecs.value,
-      })
+      }), "Fetched all remotes"
     );
   }
 
@@ -80,7 +82,7 @@ export function useRemote() {
         remote,
         rebase,
         timeoutSecs: networkTimeoutSecs.value,
-      })
+      }), `Pulled from ${remote}`
     );
     // Успешный pull устраняет расхождение — гасим ассистента, если он висел
     // (например после ручного Pull в обход кнопки решения).
@@ -99,6 +101,7 @@ export function useRemote() {
       });
       // Успешный push устраняет расхождение — гасим прежнюю ситуацию.
       dismiss();
+      toast({ kind: "success", title: `Pushed to ${remote}` });
     } catch (e) {
       logError(String(e));
       // Автоматический fetch: подтягиваем удалённые коммиты, чтобы причина

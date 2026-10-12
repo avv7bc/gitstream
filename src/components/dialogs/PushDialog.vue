@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useBranches } from "@/composables/useBranches";
 import { useRepo } from "@/composables/useRepo";
 import { useDraggable } from "@/composables/useDraggable";
@@ -16,6 +16,10 @@ const { i18n } = useI18n();
 
 const selectedRemote = ref("origin");
 const forcePush = ref(false);
+
+watch(remotes, (names) => {
+  if (names.length && !names.includes(selectedRemote.value)) selectedRemote.value = names[0];
+}, { immediate: true });
 
 const currentBranch = computed(() => repoInfo.value?.current_branch ?? "");
 

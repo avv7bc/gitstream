@@ -309,6 +309,14 @@ pub fn get_remote_urls(repo_path: String) -> Result<Vec<RemoteInfo>, String> {
 }
 
 #[tauri::command]
+pub fn preview_merge(
+    repo_path: String,
+    branch: String,
+) -> Result<Option<crate::git::types::MergePreview>, String> {
+    query::preview_merge(Path::new(&repo_path), &branch).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn add_remote(repo_path: String, name: String, url: String) -> Result<(), String> {
     mutation::add_remote(Path::new(&repo_path), &name, &url).map_err(|e| e.to_string())
 }

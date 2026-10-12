@@ -19,7 +19,6 @@ const { repoPath, repoInfo } = useRepo();
 const remoteInfos = ref<RemoteInfo[]>([]);
 const selectedRemote = ref("origin");
 const pullMode = ref<"merge" | "rebase">("merge");
-const showMoreOptions = ref(false);
 
 const currentBranch = computed(() => repoInfo.value?.current_branch ?? "");
 const currentBranchInfo = computed(() => branches.value.find((b) => b.is_current));
@@ -58,6 +57,9 @@ onMounted(() => {
 });
 
 watch(repoPath, () => loadRemoteUrls());
+watch(remotes, (names) => {
+  if (names.length && !names.includes(selectedRemote.value)) selectedRemote.value = names[0];
+}, { immediate: true });
 </script>
 
 <template>
@@ -94,12 +96,7 @@ watch(repoPath, () => loadRemoteUrls());
           </select>
         </div>
 
-        <label class="more-options-toggle">
-          <input type="checkbox" v-model="showMoreOptions" />
-          <span>{{ i18n.dialog.pull.moreOptions }}</span>
-        </label>
-
-        <div v-if="showMoreOptions" class="more-options-panel">
+        <div class="more-options-panel">
           <div class="form-group">
             <label class="form-label">{{ i18n.dialog.pull.mode }}</label>
             <div class="radio-group">
