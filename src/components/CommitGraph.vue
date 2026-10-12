@@ -9,6 +9,8 @@ import { useRepo } from "@/composables/useRepo";
 import type { RefLabel, GraphLine } from "@/types";
 import { highlight } from "@/utils/highlight";
 import { filterCommits } from "@/utils/commitFilter";
+import ContextMenu from "@/components/ContextMenu.vue";
+import type { ContextMenuItem } from "@/commands/types";
 
 const emit = defineEmits<{
   commit: [];
@@ -284,6 +286,35 @@ const ctxIsWorkingTree = computed(() => ctxCommitOid.value === "__worktree__");
 const canSquash = computed(() =>
   selectedOids.value.length >= 2 && rangeIncludesHead.value
 );
+
+const contextMenuItems = computed<ContextMenuItem[]>(() => [
+  { id: "commit", label: "Commit", disabled: !ctxIsWorkingTree.value },
+  { id: "discard", label: "Discard", danger: true, disabled: !ctxIsWorkingTree.value },
+  { separator: true },
+  { id: "tag", label: "Add Tag", shortcut: "Shift+F7", disabled: ctxIsWorkingTree.value },
+  { separator: true },
+  { id: "cherry-pick", label: "Cherry-pick", shortcut: "Shift+Ctrl+M", disabled: ctxIsWorkingTree.value },
+  { id: "revert", label: "Revert", shortcut: "Shift+Alt+M", disabled: ctxIsWorkingTree.value },
+  { separator: true },
+  { id: "reset-soft", label: "Reset (soft)", disabled: ctxIsWorkingTree.value },
+  { id: "reset-mixed", label: "Reset (mixed)", disabled: ctxIsWorkingTree.value },
+  { id: "reset-hard", label: "Reset (hard)", danger: true, disabled: ctxIsWorkingTree.value },
+  { separator: true },
+  { id: "reword", label: "Edit Message…", shortcut: "F2", disabled: ctxIsWorkingTree.value },
+  { id: "squash", label: "Squash…", disabled: !canSquash.value },
+]);
+
+function ctxSelect(action: string) {
+  if (action === "commit" || action === "discard") return ctxAction(action);
+  if (action === "tag") return ctxCreateTag();
+  if (action === "cherry-pick") return ctxCherryPick();
+  if (action === "revert") return ctxRevert();
+  if (action === "reset-soft") return void ctxReset("soft");
+  if (action === "reset-mixed") return void ctxReset("mixed");
+  if (action === "reset-hard") return void ctxReset("hard");
+  if (action === "reword") return ctxReword();
+  if (action === "squash") return ctxSquash();
+}
 
 const changedCount = computed(() => files.value.length);
 const isWorkingTreeSelected = computed(() => selectedCommit.value === "__worktree__");
@@ -653,55 +684,14 @@ function formatDate(iso: string): string {
       </div>
     </div>
 
-    <!-- Context menu -->
-    <Teleport to="body">
-      <div
-        v-if="ctxMenu"
-        class="ctx-menu"
-        :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }"
-        @click.stop
-      >
-        <button class="ctx-item" :disabled="!ctxIsWorkingTree" @click="ctxAction('commit')">
-          <span class="ctx-label">Commit</span>
-        </button>
-        <button class="ctx-item ctx-danger" :disabled="!ctxIsWorkingTree" @click="ctxAction('discard')">
-          <span class="ctx-label">Discard</span>
-        </button>
-        <div class="ctx-separator" />
-        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxCreateTag">
-          <span class="ctx-label">Add Tag</span>
-          <span class="ctx-shortcut">Shift+F7</span>
-        </button>
-        <div class="ctx-separator" />
-        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxCherryPick">
-          <span class="ctx-label">Cherry-pick</span>
-          <span class="ctx-shortcut">Shift+Ctrl+M</span>
-        </button>
-        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxRevert">
-          <span class="ctx-label">Revert</span>
-          <span class="ctx-shortcut">Shift+Alt+M</span>
-        </button>
-        <div class="ctx-separator" />
-        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxReset('soft')">
-          <span class="ctx-label">Reset (soft)</span>
-        </button>
-        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxReset('mixed')">
-          <span class="ctx-label">Reset (mixed)</span>
-        </button>
-        <button class="ctx-item ctx-danger" :disabled="ctxIsWorkingTree" @click="ctxReset('hard')">
-          <span class="ctx-label">Reset (hard)</span>
-        </button>
-        <div class="ctx-separator" />
-        <button class="ctx-item" :disabled="ctxIsWorkingTree" @click="ctxReword">
-          <span class="ctx-label">Edit Message…</span>
-          <span class="ctx-shortcut">F2</span>
-        </button>
-        <button class="ctx-item" :disabled="!canSquash" @click="ctxSquash">
-          <span class="ctx-label">Squash…</span>
-        </button>
-      </div>
-      <div v-if="ctxMenu" class="ctx-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu" />
-    </Teleport>
+    <ContextMenu
+      v-if="ctxMenu"
+      :x="ctxMenu.x"
+      :y="ctxMenu.y"
+      :items="contextMenuItems"
+      @select="ctxSelect"
+      @close="closeCtxMenu"
+    />
   </div>
 </template>
 

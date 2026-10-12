@@ -1,6 +1,7 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { computed, ref } from "vue";
+import { toast } from "@/composables/useToast";
 
 const THRESHOLD_MS = 100;
 const MAX_LOG_LINES = 200;
@@ -116,7 +117,7 @@ export function logError(message: string, detail?: string[]) {
   const items: LogLine[] = [{ text: `${timestamp()} ${message}`, isError: true }];
   if (detail) for (const d of detail) if (d) items.push({ text: d, isError: true });
   pushLines(items);
-  logOpen.value = true;
+  toast({ kind: "error", title: message, detail: detail?.filter(Boolean).join("\n"), timeout: null });
 }
 
 export function toggleLog() {

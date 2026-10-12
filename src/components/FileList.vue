@@ -12,6 +12,8 @@ import { useBlame } from "@/composables/useBlame";
 import { useSettings } from "@/composables/useSettings";
 import type { FileDiff, FileStatus } from "@/types";
 import { highlight } from "@/utils/highlight";
+import ContextMenu from "@/components/ContextMenu.vue";
+import type { ContextMenuItem } from "@/commands/types";
 
 const emit = defineEmits<{ commit: [] }>();
 
@@ -170,6 +172,25 @@ function ctxHistory() {
   const path = selectedPaths.value[0];
   closeCtxMenu();
   if (path) openFileHistory(path);
+}
+
+const contextMenuItems = computed<ContextMenuItem[]>(() => [
+  { id: "stage", label: ctxLabel("Stage"), disabled: !canStage.value },
+  { id: "unstage", label: ctxLabel("Unstage"), disabled: !canUnstage.value },
+  { separator: true },
+  { id: "commit", label: i18n.value.files.commitCtx },
+  { id: "history", label: i18n.value.files.historyCtx, disabled: selectedPaths.value.length !== 1 },
+  { id: "blame", label: i18n.value.files.blameCtx, disabled: selectedPaths.value.length !== 1 },
+  { separator: true },
+  { id: "discard", label: ctxLabel("Discard"), danger: true },
+  { id: "remove", label: ctxLabel("Remove"), danger: true },
+  { id: "delete", label: ctxLabel("Delete"), danger: true },
+]);
+
+function ctxSelect(action: string) {
+  if (action === "history") return ctxHistory();
+  if (action === "blame") return ctxBlame();
+  void ctxRun(action as "stage" | "unstage" | "commit" | "discard" | "remove" | "delete");
 }
 
 const { openFor: openBlame } = useBlame();
@@ -829,42 +850,14 @@ function compareCommitFile(path: string) {
       </div>
     </div>
 
-    <Teleport to="body">
-      <div
-        v-if="ctxMenu"
-        class="ctx-menu"
-        :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }"
-        @click.stop
-      >
-        <button class="ctx-item" :disabled="!canStage" @click="ctxRun('stage')">
-          <span class="ctx-label">{{ ctxLabel('Stage') }}</span>
-        </button>
-        <button class="ctx-item" :disabled="!canUnstage" @click="ctxRun('unstage')">
-          <span class="ctx-label">{{ ctxLabel('Unstage') }}</span>
-        </button>
-        <div class="ctx-separator" />
-        <button class="ctx-item" @click="ctxRun('commit')">
-          <span class="ctx-label">{{ i18n.files.commitCtx }}</span>
-        </button>
-        <button class="ctx-item" :disabled="selectedPaths.length !== 1" @click="ctxHistory">
-          <span class="ctx-label">{{ i18n.files.historyCtx }}</span>
-        </button>
-        <button class="ctx-item" :disabled="selectedPaths.length !== 1" @click="ctxBlame">
-          <span class="ctx-label">{{ i18n.files.blameCtx }}</span>
-        </button>
-        <div class="ctx-separator" />
-        <button class="ctx-item ctx-danger" @click="ctxRun('discard')">
-          <span class="ctx-label">{{ ctxLabel('Discard') }}</span>
-        </button>
-        <button class="ctx-item ctx-danger" @click="ctxRun('remove')">
-          <span class="ctx-label">{{ ctxLabel('Remove') }}</span>
-        </button>
-        <button class="ctx-item ctx-danger" @click="ctxRun('delete')">
-          <span class="ctx-label">{{ ctxLabel('Delete') }}</span>
-        </button>
-      </div>
-      <div v-if="ctxMenu" class="ctx-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu" />
-    </Teleport>
+    <ContextMenu
+      v-if="ctxMenu"
+      :x="ctxMenu.x"
+      :y="ctxMenu.y"
+      :items="contextMenuItems"
+      @select="ctxSelect"
+      @close="closeCtxMenu"
+    />
   </div>
 </template>
 

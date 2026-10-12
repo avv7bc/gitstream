@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { ref, watch, onMounted, onUnmounted } from "vue";
 import AppToolbar from "./components/AppToolbar.vue";
 import RepositoriesPanel from "./components/RepositoriesPanel.vue";
 import BranchPanel from "./components/BranchPanel.vue";
@@ -30,6 +30,7 @@ import FileCompareDialog from "./components/dialogs/FileCompareDialog.vue";
 import AddTagDialog from "./components/dialogs/AddTagDialog.vue";
 import StashSaveDialog from "./components/dialogs/StashSaveDialog.vue";
 import UpdateBanner from "./components/UpdateBanner.vue";
+import ToastStack from "./components/ToastStack.vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useUpdate } from "@/composables/useUpdate";
 import type { CommitInfo } from "@/types";
@@ -42,6 +43,8 @@ import { useDiff } from "@/composables/useDiff";
 import { useRemote } from "@/composables/useRemote";
 import { useConflicts } from "@/composables/useConflicts";
 import { toggleLog, logError } from "@/composables/useProgress";
+import { dispatchHotkey } from "@/commands/hotkeys";
+import type { CommandContext } from "@/commands/types";
 
 const { repoPath, openRepo, onRepoOpened, restoreLastRepo } = useRepo();
 const { refresh: refreshFiles, selectedFile, files, stageFiles, unstageFiles } = useFiles();
@@ -52,19 +55,6 @@ const { pull, push, fetchRemote, fetchAll } = useRemote();
 const { target: compareTarget, close: closeFileCompare } = useFileCompare();
 const { refresh: refreshConflicts } = useConflicts();
 const { updateInfo, nextMajorInfo, checkForUpdate, dismissNextMajor } = useUpdate();
-
-const selectedFileStatus = computed(() =>
-  files.value.find((f) => f.path === selectedFile.value) ?? null,
-);
-const canStageGlobal = computed(
-  () => !!selectedFileStatus.value && selectedFileStatus.value.staged !== "staged",
-);
-const canUnstageGlobal = computed(
-  () =>
-    !!selectedFileStatus.value &&
-    (selectedFileStatus.value.staged === "staged" ||
-      selectedFileStatus.value.staged === "partial"),
-);
 
 async function refreshAll() {
   await Promise.all([
@@ -389,6 +379,24 @@ function onEscapeCapture(e: KeyboardEvent) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  const commandContext: CommandContext = {
+    repoPath: repoPath.value,
+    selectedFile: selectedFile.value,
+    selectedFileStaged: files.value.find((file) => file.path === selectedFile.value)?.staged,
+    actions: {
+      "file.stage": () => { if (selectedFile.value) return stageFiles([selectedFile.value]); },
+      "file.unstage": () => { if (selectedFile.value) return unstageFiles([selectedFile.value]); },
+      "commit.open": () => { showCommitDialog.value = true; },
+      "branch.checkout": () => branchPanelRef.value?.triggerCheckoutRemote(),
+      "branch.merge": () => branchPanelRef.value?.triggerMerge(),
+      "branch.rebase": () => branchPanelRef.value?.triggerRebase(),
+      "remote.pull": () => { showPullDialog.value = true; },
+      "remote.push": () => handlePushRequest("origin", false),
+      "settings.open": () => { showSettingsDialog.value = !showSettingsDialog.value; },
+      "remote.fetch": () => handleToolbarFetch(),
+    },
+  };
+  if (dispatchHotkey(e, commandContext)) return;
   if (e.altKey && e.key === "PageDown") {
     e.preventDefault();
     if (repoPath.value) showPullDialog.value = true;
@@ -397,10 +405,6 @@ function onKeydown(e: KeyboardEvent) {
     e.preventDefault();
     if (repoPath.value) handlePushRequest("origin", false);
   }
-  if ((e.ctrlKey || e.metaKey || e.altKey) && !e.shiftKey && e.code === "KeyP") {
-    e.preventDefault();
-    showSettingsDialog.value = !showSettingsDialog.value;
-  }
   if (e.key === "F7" && !e.shiftKey) {
     e.preventDefault();
     if (repoPath.value) branchPanelRef.value?.openCreateBranch(null);
@@ -408,30 +412,6 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === "F7" && e.shiftKey) {
     e.preventDefault();
     if (repoPath.value) openAddTag(null);
-  }
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "t" || e.key === "T" || e.code === "KeyT")) {
-    e.preventDefault();
-    if (canStageGlobal.value && selectedFile.value) stageFiles([selectedFile.value]);
-  }
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "t" || e.key === "T" || e.code === "KeyT")) {
-    e.preventDefault();
-    if (canUnstageGlobal.value && selectedFile.value) unstageFiles([selectedFile.value]);
-  }
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "k" || e.key === "K" || e.code === "KeyK")) {
-    e.preventDefault();
-    if (repoPath.value) showCommitDialog.value = true;
-  }
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "g" || e.key === "G" || e.code === "KeyG")) {
-    e.preventDefault();
-    if (repoPath.value) branchPanelRef.value?.triggerCheckoutRemote();
-  }
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "m" || e.key === "M" || e.code === "KeyM")) {
-    e.preventDefault();
-    if (repoPath.value) branchPanelRef.value?.triggerMerge();
-  }
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "d" || e.key === "D" || e.code === "KeyD")) {
-    e.preventDefault();
-    if (repoPath.value) branchPanelRef.value?.triggerRebase();
   }
   if ((e.altKey || e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyO") {
     e.preventDefault();
@@ -720,6 +700,7 @@ function onMouseUp() {
       kind="next-major"
       @dismiss="dismissNextMajor"
     />
+    <ToastStack />
   </div>
 </template>
 
