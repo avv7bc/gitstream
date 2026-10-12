@@ -6,6 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -246,10 +248,25 @@ fn capture(repo: &Path) -> Result<RepoSnapshot, GitError> {
     let _ = fs::remove_file(&temp);
     Ok(snapshot)
 }
+fn oplog_namespace(repo: &Path) -> Result<String, GitError> {
+    let stream = git_path(repo, "gitstream")?;
+    let dir = stream.parent().ok_or_else(|| error("Missing Git worktree directory"))?;
+    let canonical = fs::canonicalize(dir).map_err(io_error)?;
+    #[cfg(unix)]
+    let bytes = canonical.as_os_str().as_bytes().to_vec();
+    #[cfg(not(unix))]
+    let bytes = canonical.to_string_lossy().as_bytes().to_vec();
+    // Hex encoding is injective for the canonical worktree directory bytes,
+    // avoiding collisions from lossy basename sanitization.
+    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
+}
+
 fn protect(repo: &Path, id: u64, phase: &str, state: &RepoSnapshot) -> Result<(), GitError> {
-    let mut key = git_path(repo, "gitstream").ok().and_then(|p| p.parent().and_then(|x| x.file_name()).map(|n| n.to_string_lossy().into_owned())).unwrap_or_else(|| "main".into());
-    if key == ".git" { key = "main".into(); } else { key = key.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect(); }
+    let key = oplog_namespace(repo)?;
     let base = format!("refs/gitstream/{key}/oplog/{id}/{phase}");
+    if !state.head_sha.is_empty() {
+        run(repo, &["update-ref", &format!("{base}/head"), &state.head_sha])?;
+    }
     // Keep every ref tip verbatim, including annotated tag objects.
     for (idx, (_, oid)) in state.refs.iter().enumerate() {
         run(repo, &["update-ref", &format!("{base}/ref/{idx}"), oid])?;
@@ -336,8 +353,11 @@ fn append(repo: &Path, op: &OpSnapshot) -> Result<(), GitError> {
     file.sync_all().map_err(io_error)?;
     fs::rename(&temp, &path).map_err(io_error)?;
     let kept: BTreeSet<u64> = ops.iter().map(|o| o.id).collect();
-    for name in run(repo, &["for-each-ref", "--format=%(refname)", "refs/gitstream/"])?.lines() {
-        if name.split('/').nth(3).and_then(|n| n.parse::<u64>().ok()).is_some_and(|id| !kept.contains(&id)) { run(repo, &["update-ref", "-d", name])?; }
+    let namespace = oplog_namespace(repo)?;
+    let prefix = format!("refs/gitstream/{namespace}/oplog/");
+    for name in run(repo, &["for-each-ref", "--format=%(refname)", &prefix])?.lines() {
+        let id = name.strip_prefix(&prefix).and_then(|rest| rest.split('/').next()).and_then(|n| n.parse::<u64>().ok());
+        if id.is_some_and(|id| !kept.contains(&id)) { run(repo, &["update-ref", "-d", name])?; }
     }
     Ok(())
 }
@@ -443,7 +463,7 @@ fn restore(repo: &Path, target: &RepoSnapshot, current: &RepoSnapshot) -> Result
             parent = dir.parent();
         }
         if let Ok(meta) = fs::symlink_metadata(&path) {
-            if !current_paths.contains(entry.path.as_str()) || (meta.is_dir() && entry.mode != "040000") {
+            if !current_paths.contains(entry.path.as_str()) || (meta.is_dir() && entry.mode != "160000") {
                 return Err(error(format!("Restore blocked by existing path: {}", entry.path)));
             }
         }
@@ -787,6 +807,57 @@ mod tests {
         for _ in 0..52 {mutate(p, "noop", || Ok(())).unwrap();}
         let data = fs::read(git_path(p, "gitstream/oplog.jsonl").unwrap()).unwrap();
         assert!(data.split(|b| *b == b'\n').filter(|l| !l.is_empty()).count() <= 50);
+    }
+    #[test]
+    fn hardening_detached_head_commit_survives_gc_and_undo() {
+        let repo = Repo::new(); let p = &repo.0;
+        fs::write(p.join("file"), "second\n").unwrap();
+        run_git(p, &["add", "file"]).unwrap();
+        run_git(p, &["commit", "-qm", "second"]).unwrap();
+        let second = run_git(p, &["rev-parse", "HEAD"]).unwrap();
+        let branch = run_git(p, &["symbolic-ref", "--short", "HEAD"]).unwrap().trim().to_owned();
+        run_git(p, &["checkout", "-q", "--detach", "HEAD"]).unwrap();
+        run_git(p, &["branch", "-D", &branch]).unwrap();
+        mutation::reset(p, "HEAD~1", "hard").unwrap();
+        run_git(p, &["reflog", "expire", "--expire=now", "--all"]).unwrap();
+        run_git(p, &["gc", "--prune=now"]).unwrap();
+        let id = get_oplog(p).unwrap()[0].id;
+        undo(p, id, None).unwrap();
+        assert_eq!(run_git(p, &["rev-parse", "HEAD"]).unwrap(), second);
+    }
+    #[test]
+    fn hardening_ref_cleanup_uses_namespace_id_segment() {
+        let repo = Repo::new(); let p = &repo.0;
+        for _ in 0..52 { mutate(p, "noop", || Ok(())).unwrap(); }
+        let refs = run_git(p, &["for-each-ref", "--format=%(refname)", "refs/gitstream"]).unwrap();
+        for name in refs.lines() {
+            let parts: Vec<_> = name.split('/').collect();
+            let id = parts.windows(2).find(|w| w[0] == "oplog").and_then(|w| w[1].parse::<u64>().ok()).unwrap();
+            assert!(id > 2);
+        }
+    }
+    #[test]
+    fn hardening_linked_worktree_namespaces_are_collision_proof() {
+        let repo = Repo::new(); let p = &repo.0;
+        let one = p.with_file_name(format!("{}-a-b", p.file_name().unwrap().to_string_lossy()));
+        let two = p.with_file_name(format!("{}-a_b", p.file_name().unwrap().to_string_lossy()));
+        run_git(p, &["worktree", "add", "-q", "-b", "linked-a", one.to_str().unwrap()]).unwrap();
+        run_git(p, &["worktree", "add", "-q", "-b", "linked-b", two.to_str().unwrap()]).unwrap();
+        assert_ne!(oplog_namespace(&one).unwrap(), oplog_namespace(&two).unwrap());
+        run_git(p, &["worktree", "remove", "--force", one.to_str().unwrap()]).unwrap();
+        run_git(p, &["worktree", "remove", "--force", two.to_str().unwrap()]).unwrap();
+    }
+
+    #[test]
+    fn hardening_submodule_gitlink_directory_is_not_an_obstruction() {
+        let repo = Repo::new(); let p = &repo.0;
+        fs::create_dir_all(p.join("sub")).unwrap();
+        let entry = Entry { path: "sub".into(), mode: "160000".into(), oid: "0123456789012345678901234567890123456789".into(), stage: "0".into() };
+        let config = read_optional(&git_path(p, "config").unwrap()).unwrap();
+        let head = run(p, &["symbolic-ref", "-q", "HEAD"]).unwrap();
+        let current = RepoSnapshot { head: head.clone(), head_sha: run(p, &["rev-parse", "HEAD"]).unwrap(), refs: vec![], index: vec![entry.clone()], files: vec![entry.clone()], stash_log: vec![], config: config.clone(), index_tree: String::new() };
+        restore(p, &current, &current).unwrap();
+        assert!(p.join("sub").is_dir());
     }
 
 }

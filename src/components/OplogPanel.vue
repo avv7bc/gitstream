@@ -13,7 +13,7 @@ async function restore(id: number) { try { await undo(id); } catch { /* command 
     <ol v-else>
       <li v-for="entry in entries" :key="entry.id" :class="{ undone: entry.undone }">
         <span>{{ entry.label }}</span><time>{{ new Date(entry.at * 1000).toLocaleString() }}</time>
-        <button v-if="entry.kind !== 'undo' && !entry.undone" type="button" @click="restore(entry.id)">Undo</button>
+        <button v-if="entry.kind !== 'undo' && !entry.undone && entry.eligible !== false" type="button" @click="restore(entry.id)">Undo</button>
       </li>
     </ol>
     <button v-if="canRedo" type="button" @click="redo()">Redo</button>

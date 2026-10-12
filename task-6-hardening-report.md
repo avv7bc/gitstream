@@ -1,13 +1,17 @@
-# Task 6 hardening report
 
-Implemented backend oplog durability corrections in `src-tauri/src/git/oplog.rs`.
+## Fix round (review 56276b6)
 
-Validation performed:
+- Detached HEAD commits are protected by a dedicated snapshot ref and recover after reflog expiry plus `git gc --prune=now`.
+- Oplog cleanup parses `refs/gitstream/<namespace>/oplog/<id>/...` correctly and removes refs outside the retained 50 operation IDs.
+- Linked-worktree namespaces use injective hex encoding of canonical worktree Git directories, avoiding basename sanitization collisions while keeping common-dir isolation.
+- Restore preflight permits existing directories for gitlink (`160000`) entries; a focused temporary repository test covers this.
+- `useOplog` consumes `OpSummary.eligible`, guards refresh responses against repository switches, and avoids refreshing after undo/redo when the repository changed. Added two Vitest tests for eligibility and response races.
 
-- `cargo test --manifest-path src-tauri/Cargo.toml hardening_ -- --test-threads=1` — 5/5 passing.
-- `cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1` — 111/111 passing.
+Fix-round validation:
+
+- `cargo test --manifest-path src-tauri/Cargo.toml hardening_ -- --test-threads=1` — 9/9 passing.
+- `cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1` — 120/120 passing.
 - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` — passing.
+- `npm test -- --run` — 8 files, 59 tests passing.
 
-The focused integration tests exercise temporary repositories for index-lock safety, literal backslash paths, bounded preview tokens, repeated undo/redo, 50-operation disk retention, annotated tag and multiple stash recovery after `gc --prune=now`, and ignored-file exclusion. Existing oplog tests cover staged/unstaged/binary/symlink/untracked restoration and stale dirty-state confirmation.
-
-Known limitations: Tauri command handlers remain synchronous; mutation serialization currently uses a process-wide mutex (safe but more conservative than per-common-directory locking). The Tauri `get_oplog` command now returns a summary DTO with eligibility; full snapshots remain internal to the Rust recovery path.
+UI follow-up: `OplogPanel.vue` now hides Undo for summary entries with `eligible: false`; `useOplog` continues to guard stale repository responses. `npm run build` passed after this adjustment.
