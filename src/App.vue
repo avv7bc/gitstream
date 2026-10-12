@@ -35,6 +35,7 @@ import ToastStack from "./components/ToastStack.vue";
 import OplogPanel from "./components/OplogPanel.vue";
 import WorktreePanel from "./components/WorktreePanel.vue";
 import InteractiveRebaseDialog from "./components/dialogs/InteractiveRebaseDialog.vue";
+import ConflictResolverDialog from "./components/dialogs/ConflictResolverDialog.vue";
 import CommandPalette from "./components/CommandPalette.vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useUpdate } from "@/composables/useUpdate";
@@ -63,6 +64,7 @@ const { refresh: refreshConflicts } = useConflicts();
 const { undo, redo } = useOplog();
 const showOplog = ref(false);
 const showInteractiveRebase = ref(false);
+const conflictResolverPath = ref<string | null>(null);
 const showCommandPalette = ref(false);
 const { updateInfo, nextMajorInfo, checkForUpdate, dismissNextMajor } = useUpdate();
 
@@ -593,7 +595,7 @@ function onMouseUp() {
       @interactive-rebase="showInteractiveRebase = true"
     />
 
-    <ConflictBar @changed="refreshAll()" />
+    <ConflictBar @changed="refreshAll()" @resolve="conflictResolverPath = $event" />
     <SyncAssistantBar @changed="refreshAll()" />
 
     <!-- Main body -->
@@ -715,6 +717,7 @@ function onMouseUp() {
       @confirm="doReword($event)"
       @close="rewordPayload = null"
     />
+    <ConflictResolverDialog v-if="conflictResolverPath" :path="conflictResolverPath" @close="conflictResolverPath = null" @saved="conflictResolverPath = null; refreshAll()" />
     <InteractiveRebaseDialog v-if="showInteractiveRebase" :commits="commits" @close="showInteractiveRebase = false" @done="showInteractiveRebase = false; refreshAll()" />
     <FileCompareDialog v-if="compareTarget" />
     <FileHistoryDialog v-if="fileHistoryOpen" />

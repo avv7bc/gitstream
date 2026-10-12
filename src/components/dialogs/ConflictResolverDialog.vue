@@ -1,0 +1,13 @@
+<script setup lang="ts">
+import { onMounted, ref } from "vue";
+import { invoke } from "@/composables/useProgress";
+import { useRepo } from "@/composables/useRepo";
+const props = defineProps<{ path: string }>(); const emit = defineEmits<{ close: []; saved: [] }>(); const { repoPath } = useRepo();
+interface Side { content: string | null; binary: boolean; size: number; oid?: string | null; mode?: string | null }
+const sides = ref<{ base: Side; ours: Side; theirs: Side; merged_draft: string | null } | null>(null); const result = ref(""); const mark = ref(true); const busy = ref(false);
+onMounted(async () => { if (!repoPath.value) return; sides.value = await invoke("get_conflict_sides", { repoPath: repoPath.value, path: props.path }); result.value = sides.value?.merged_draft ?? sides.value?.ours.content ?? ""; });
+function take(side: "ours" | "theirs") { result.value = sides.value?.[side].content ?? ""; }
+async function save() { if (!repoPath.value) return; busy.value = true; try { await invoke("save_resolved", { repoPath: repoPath.value, path: props.path, content: result.value, markResolved: mark.value }); emit("saved"); } finally { busy.value = false; } }
+</script>
+<template><div class="modal-overlay" @click.self="emit('close')"><div class="modal-dialog" style="width: min(900px, 95vw)"><div class="dialog-header"><h3>Resolve {{ path }}</h3><button class="close-btn" @click="emit('close')">×</button></div><div v-if="sides" class="dialog-body"><div v-if="sides.ours.binary || sides.theirs.binary" class="confirm-message">Binary conflict (ours {{ sides.ours.size }} bytes, theirs {{ sides.theirs.size }} bytes)</div><div v-else class="resolver-grid"><section><h4>Ours</h4><pre>{{ sides.ours.content }}</pre><button @click="take('ours')">Use ours</button></section><section><h4>Result</h4><textarea v-model="result" rows="16" /></section><section><h4>Theirs</h4><pre>{{ sides.theirs.content }}</pre><button @click="take('theirs')">Use theirs</button></section></div><label><input v-model="mark" type="checkbox" /> Mark resolved (git add)</label></div><div class="dialog-footer"><button class="btn btn-secondary" @click="emit('close')">Cancel</button><button class="btn btn-primary" :disabled="busy || !sides" @click="save">Save</button></div></div></div></template>
+<style scoped>.resolver-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.resolver-grid pre,.resolver-grid textarea{width:100%;min-height:260px;box-sizing:border-box;background:var(--bg-tertiary);color:var(--text-primary);font:var(--font-mono);white-space:pre-wrap;overflow:auto}.resolver-grid textarea{padding:6px}h4{margin:0 0 4px}</style>

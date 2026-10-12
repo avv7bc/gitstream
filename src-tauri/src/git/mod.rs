@@ -10,3 +10,5 @@ pub mod reflog;
 
 pub mod history;
 pub mod worktree;
+
+pub mod resolver;

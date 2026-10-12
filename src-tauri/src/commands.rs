@@ -8,7 +8,7 @@ use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
 
-use crate::git::{diagnose, history, mutation, oplog, query, reflog, types::*, worktree};
+use crate::git::{diagnose, history, mutation, oplog, query, reflog, resolver, types::*, worktree};
 use crate::update::{self, UpdateCheck};
 
 #[derive(serde::Serialize, Clone)]
@@ -404,6 +404,25 @@ pub async fn get_diff_commit_file(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub fn get_conflict_sides(
+    repo_path: String,
+    path: String,
+) -> Result<resolver::ConflictSides, String> {
+    resolver::get_conflict_sides(Path::new(&repo_path), &path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_resolved(
+    repo_path: String,
+    path: String,
+    content: String,
+    mark_resolved: bool,
+) -> Result<(), String> {
+    resolver::save_resolved(Path::new(&repo_path), &path, &content, mark_resolved)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

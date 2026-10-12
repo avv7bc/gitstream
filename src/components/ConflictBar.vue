@@ -5,7 +5,7 @@ import { logError } from "@/composables/useProgress";
 import { useFiles } from "@/composables/useFiles";
 import { useI18n } from "@/composables/useI18n";
 
-const emit = defineEmits<{ changed: [] }>();
+const emit = defineEmits<{ changed: []; resolve: [path: string] }>();
 
 const { repoState, acceptOurs, acceptTheirs, abort, cont } = useConflicts();
 const { files } = useFiles();
@@ -67,6 +67,7 @@ const onContinue = () => run(cont);
       <div v-for="path in conflicted" :key="path" class="conflict-file">
         <span class="cf-path" :title="path">{{ path }}</span>
         <span class="cf-btns">
+          <button class="cb-btn" :disabled="busy" @click="emit('resolve', path)">Resolver</button>
           <button class="cb-btn" :disabled="busy" @click="resolveOurs(path)">{{ i18n.conflict.useOurs }}</button>
           <button class="cb-btn" :disabled="busy" @click="resolveTheirs(path)">{{ i18n.conflict.useTheirs }}</button>
         </span>

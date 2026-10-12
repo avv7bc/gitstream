@@ -44,6 +44,8 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_repo_info,
+            commands::get_conflict_sides,
+            commands::save_resolved,
             commands::get_oplog,
             commands::preview_undo,
             commands::do_undo,
