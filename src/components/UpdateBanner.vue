@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { UpdateInfo } from "@/types";
 import { useI18n } from "@/composables/useI18n";
 
-const props = defineProps<{ info: UpdateInfo }>();
+const props = defineProps<{ info: UpdateInfo; kind?: "update" | "next-major" }>();
 const emit = defineEmits<{ dismiss: [] }>();
 const { i18n } = useI18n();
 
@@ -27,16 +27,16 @@ async function download() {
     <div class="update-icon">↑</div>
     <div class="update-content">
       <div class="update-title">
-        GitStream update available (v{{ info.version }})
+        {{ props.kind === "next-major" ? i18n.update.nextMajor : i18n.update.available }} (v{{ info.version }})
       </div>
       <button class="update-changelog" @click="openUrl(info.release_url)">
-        Changelog ›
+        {{ i18n.update.changelog }} ›
       </button>
     </div>
     <div class="update-actions">
       <button class="btn btn-primary" @click="download">{{ i18n.update.download }}</button>
       <button class="btn btn-secondary" @click="emit('dismiss')">
-        Dismiss
+        {{ i18n.update.dismiss }}
       </button>
     </div>
   </div>

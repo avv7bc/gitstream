@@ -148,6 +148,10 @@ export const en: Translations = {
   },
   update: {
     download: "Download",
+    available: "Update available",
+    nextMajor: "New major version available",
+    changelog: "Changelog",
+    dismiss: "Later",
   },
   diff: {
     oldVersion: "Old Version",

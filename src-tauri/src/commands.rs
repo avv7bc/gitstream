@@ -9,6 +9,7 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
 
 use crate::git::{diagnose, mutation, query, types::*};
+use crate::update::{self, UpdateCheck};
 
 #[derive(serde::Serialize, Clone)]
 struct NetworkProgressEvent {
@@ -26,17 +27,6 @@ pub(crate) fn effective_timeout_secs(timeout_secs: Option<u64>) -> u64 {
         .filter(|&s| s > 0)
         .map(|s| s.min(MAX_NETWORK_TIMEOUT_SECS))
         .unwrap_or(DEFAULT_NETWORK_TIMEOUT_SECS)
-}
-
-fn version_gt(latest: &str, current: &str) -> bool {
-    let parse = |s: &str| -> Vec<u32> {
-        s.trim_start_matches('v')
-            .splitn(4, '.')
-            .take(3)
-            .filter_map(|x| x.split('-').next().and_then(|n| n.parse().ok()))
-            .collect()
-    };
-    parse(latest) > parse(current)
 }
 
 /// Запускает `git` для сетевой операции с таймаутом. Стримит stderr как
@@ -847,7 +837,7 @@ pub fn check_repo_path(path: String) -> Result<RepoPathCheck, String> {
 }
 
 #[tauri::command]
-pub async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
+pub async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateCheck, String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
         .user_agent("gitstream-app")
@@ -855,42 +845,26 @@ pub async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo
         .map_err(|e| e.to_string())?;
 
     let resp = match client
-        .get("https://api.github.com/repos/avv7bc/gitstream/releases/latest")
+        .get("https://api.github.com/repos/avv7bc/gitstream/releases?per_page=100")
         .send()
         .await
     {
         Ok(r) => r,
-        Err(_) => return Ok(None),
+        Err(_) => return Ok(UpdateCheck::default()),
     };
 
     if !resp.status().is_success() {
-        return Ok(None);
+        return Ok(UpdateCheck::default());
     }
 
-    let json: serde_json::Value = match resp.json().await {
-        Ok(j) => j,
-        Err(_) => return Ok(None),
+    let releases: Vec<update::ReleaseEntry> = match resp.json().await {
+        Ok(releases) => releases,
+        Err(_) => return Ok(UpdateCheck::default()),
     };
 
-    let tag_name = match json["tag_name"].as_str() {
-        Some(t) => t.to_string(),
-        None => return Ok(None),
-    };
-
-    let html_url = match json["html_url"].as_str().filter(|s| !s.is_empty()) {
-        Some(u) => u.to_string(),
-        None => return Ok(None),
-    };
-    let current = app.package_info().version.to_string();
-
-    if version_gt(&tag_name, &current) {
-        Ok(Some(UpdateInfo {
-            version: tag_name.trim_start_matches('v').to_string(),
-            release_url: html_url,
-        }))
-    } else {
-        Ok(None)
-    }
+    let current = semver::Version::parse(&app.package_info().version.to_string())
+        .map_err(|e| format!("invalid application version: {e}"))?;
+    Ok(update::pick_update(&releases, &current))
 }
 
 #[tauri::command]
@@ -1002,40 +976,5 @@ mod network_timeout_tests {
             MAX_NETWORK_TIMEOUT_SECS
         );
         assert_eq!(effective_timeout_secs(Some(600)), 600);
-    }
-}
-
-#[cfg(test)]
-mod update_tests {
-    use super::version_gt;
-
-    #[test]
-    fn newer_patch_is_gt() {
-        assert!(version_gt("v0.4.2", "0.4.1"));
-    }
-
-    #[test]
-    fn newer_minor_is_gt() {
-        assert!(version_gt("v0.5.0", "0.4.9"));
-    }
-
-    #[test]
-    fn newer_major_is_gt() {
-        assert!(version_gt("v1.0.0", "0.9.9"));
-    }
-
-    #[test]
-    fn same_version_is_not_gt() {
-        assert!(!version_gt("v0.4.1", "0.4.1"));
-    }
-
-    #[test]
-    fn older_version_is_not_gt() {
-        assert!(!version_gt("v0.4.0", "0.4.1"));
-    }
-
-    #[test]
-    fn no_v_prefix_works() {
-        assert!(version_gt("0.4.2", "0.4.1"));
     }
 }

@@ -192,3 +192,8 @@ export interface UpdateInfo {
   version: string;
   release_url: string;
 }
+
+export interface UpdateCheck {
+  update: UpdateInfo | null;
+  next_major: UpdateInfo | null;
+}
