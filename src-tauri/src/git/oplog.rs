@@ -120,7 +120,12 @@ fn validate(path: &str) -> Result<(), GitError> {
     }
     Ok(())
 }
-fn walk(repo: &Path, dir: &Path, entries: &mut Vec<Entry>) -> Result<(), GitError> {
+fn walk(
+    repo: &Path,
+    dir: &Path,
+    entries: &mut Vec<Entry>,
+    tracked: &BTreeSet<String>,
+) -> Result<(), GitError> {
     for item in fs::read_dir(dir).map_err(io_error)? {
         let item = item.map_err(io_error)?;
         let path = item.path();
@@ -136,13 +141,19 @@ fn walk(repo: &Path, dir: &Path, entries: &mut Vec<Entry>) -> Result<(), GitErro
         validate(&rel)?;
         let meta = fs::symlink_metadata(&path).map_err(io_error)?;
         if meta.is_dir() {
-            if path.join(".git").exists() {
-                return Err(error(format!(
-                    "Nested repositories/submodules need a separate snapshot: {rel}"
-                )));
+            // Nested repositories and submodules are represented by their gitlink
+            // index entry. Never recurse into their private working trees.
+            if path.join(".git").exists() || path.join(".git").is_file() {
+                continue;
             }
-            walk(repo, &path, entries)?;
+            if !has_tracked_descendant(tracked, &rel) && ignored(repo, &rel) {
+                continue;
+            }
+            walk(repo, &path, entries, tracked)?;
         } else {
+            if !tracked.contains(&rel) && ignored(repo, &rel) {
+                continue;
+            }
             let (mode, bytes) = if meta.file_type().is_symlink() {
                 let target = fs::read_link(&path).map_err(io_error)?;
                 (
@@ -188,6 +199,20 @@ fn walk(repo: &Path, dir: &Path, entries: &mut Vec<Entry>) -> Result<(), GitErro
     entries.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(())
 }
+fn ignored(repo: &Path, path: &str) -> bool {
+    Command::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(["check-ignore", "--no-index", "-q", "--", path])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+fn has_tracked_descendant(tracked: &BTreeSet<String>, path: &str) -> bool {
+    tracked
+        .iter()
+        .any(|entry| entry == path || entry.starts_with(&format!("{path}/")))
+}
 fn read_optional(path: &Path) -> Result<Vec<u8>, GitError> {
     match fs::read(path) {
         Ok(data) => Ok(data),
@@ -199,19 +224,16 @@ fn capture(repo: &Path) -> Result<RepoSnapshot, GitError> {
     // Canonical entries avoid false conflicts from Git's index stat-cache refresh.
     let bytes = git(repo, &["ls-files", "--stage", "-z"], None, None)?;
     let mut index = vec![];
+    let mut tracked = BTreeSet::new();
     for row in bytes.split(|b| *b == 0).filter(|r| !r.is_empty()) {
         let row = std::str::from_utf8(row).map_err(io_error)?;
         let (meta, path) = row
             .split_once('\t')
             .ok_or_else(|| error("Invalid index entry"))?;
         validate(path)?;
+        tracked.insert(path.to_owned());
         let mut fields = meta.split_whitespace();
         let mode = fields.next().ok_or_else(|| error("Missing mode"))?;
-        if mode == "160000" {
-            return Err(error(
-                "Submodule undo is not supported; no mutation performed",
-            ));
-        }
         index.push(Entry {
             path: path.into(),
             mode: mode.into(),
@@ -220,7 +242,14 @@ fn capture(repo: &Path) -> Result<RepoSnapshot, GitError> {
         });
     }
     let mut files = vec![];
-    walk(repo, repo, &mut files)?;
+    // Gitlinks have no regular worktree blob; retain their index entry so refs
+    // and the index can be restored without descending into the submodule.
+    for entry in &index {
+        if entry.mode == "160000" {
+            files.push(entry.clone());
+        }
+    }
+    walk(repo, repo, &mut files, &tracked)?;
     let head_sha = run(repo, &["rev-parse", "--verify", "HEAD"]).unwrap_or_default();
     let head = run(repo, &["symbolic-ref", "-q", "HEAD"])
         .unwrap_or_else(|_| format!("detached:{head_sha}"));
@@ -274,11 +303,51 @@ fn capture(repo: &Path) -> Result<RepoSnapshot, GitError> {
             .map_err(io_error)
     })();
     let _ = fs::remove_file(&temp);
-    snapshot.index_tree = result?;
+    snapshot.index_tree = result.unwrap_or_default();
     Ok(snapshot)
 }
 fn protect(repo: &Path, id: u64, phase: &str, state: &RepoSnapshot) -> Result<(), GitError> {
-    let mut owned = vec!["commit-tree".into(), state.index_tree.clone()];
+    // Reachability of the index tree alone does not protect untracked blobs.
+    // Build a composite worktree tree, then make the index tree a parent commit
+    // so both staged and unstaged objects survive `git gc`.
+    let temp = git_path(repo, "gitstream/protect-index")?;
+    fs::create_dir_all(temp.parent().unwrap()).map_err(io_error)?;
+    let _ = fs::remove_file(&temp);
+    git(repo, &["read-tree", "--empty"], None, Some(&temp))?;
+    let mut info = Vec::new();
+    for entry in &state.files {
+        info.extend_from_slice(
+            format!("{} {} 0\t{}\0", entry.mode, entry.oid, entry.path).as_bytes(),
+        );
+    }
+    git(
+        repo,
+        &["update-index", "-z", "--index-info"],
+        Some(&info),
+        Some(&temp),
+    )?;
+    let worktree_tree = String::from_utf8(git(repo, &["write-tree"], None, Some(&temp))?)
+        .map_err(io_error)?
+        .trim()
+        .to_owned();
+    let _ = fs::remove_file(&temp);
+    let index_commit = if state.index_tree.is_empty() {
+        String::new()
+    } else {
+        String::from_utf8(git(
+            repo,
+            &["commit-tree", &state.index_tree],
+            Some(b"GitStream index snapshot\n"),
+            None,
+        )?)
+        .map_err(io_error)?
+        .trim()
+        .to_owned()
+    };
+    let mut owned = vec!["commit-tree".into(), worktree_tree];
+    if !index_commit.is_empty() {
+        owned.extend(["-p".into(), index_commit]);
+    }
     let mut parents = BTreeSet::new();
     for oid in state
         .refs
@@ -447,14 +516,33 @@ fn restore(repo: &Path, target: &RepoSnapshot, current: &RepoSnapshot) -> Result
     let mut blobs = vec![];
     for entry in &target.files {
         validate(&entry.path)?;
-        blobs.push(git(repo, &["cat-file", "blob", &entry.oid], None, None)?);
+        if entry.mode != "160000" {
+            blobs.push(Some(git(
+                repo,
+                &["cat-file", "blob", &entry.oid],
+                None,
+                None,
+            )?));
+        } else {
+            blobs.push(None);
+        }
     }
     for entry in &current.files {
         validate(&entry.path)?;
     }
     for entry in current.files.iter().rev() {
-        fs::remove_file(repo.join(&entry.path)).map_err(io_error)?;
-        let mut parent = repo.join(&entry.path);
+        if entry.mode == "160000" {
+            continue;
+        }
+        let path = repo.join(&entry.path);
+        if fs::symlink_metadata(&path)
+            .map(|m| m.is_dir())
+            .unwrap_or(false)
+        {
+            continue;
+        }
+        fs::remove_file(&path).map_err(io_error)?;
+        let mut parent = path;
         parent.pop();
         while parent != repo {
             if fs::remove_dir(&parent).is_err() {
@@ -464,6 +552,9 @@ fn restore(repo: &Path, target: &RepoSnapshot, current: &RepoSnapshot) -> Result
         }
     }
     for (entry, bytes) in target.files.iter().zip(blobs) {
+        let Some(bytes) = bytes else {
+            continue;
+        };
         let path = repo.join(&entry.path);
         fs::create_dir_all(path.parent().unwrap()).map_err(io_error)?;
         if entry.mode == "120000" {
@@ -642,6 +733,7 @@ mod tests {
         #[cfg(unix)]
         std::os::unix::fs::symlink("file", p.join("link")).unwrap();
         mutation::reset(p, "HEAD", "hard").unwrap();
+        run_git(p, &["gc", "--prune=now"]).unwrap();
         let id = get_oplog(p).unwrap()[0].id;
         undo(p, id, None).unwrap();
         assert_eq!(fs::read(p.join("file")).unwrap(), b"unstaged\n");
@@ -673,5 +765,34 @@ mod tests {
         undo(p, id, Some(&check.token)).unwrap();
         redo(p, None).unwrap();
         assert_eq!(fs::read_to_string(p.join("another")).unwrap(), "newer work");
+    }
+
+    #[test]
+    fn ignored_files_are_not_recorded_and_conflict_index_can_be_snapshotted() {
+        let repo = Repo::new();
+        let p = &repo.0;
+        fs::write(p.join(".gitignore"), "ignored\n").unwrap();
+        fs::write(p.join("ignored"), "do not journal").unwrap();
+        run_git(p, &["add", ".gitignore"]).unwrap();
+        run_git(p, &["commit", "-qm", "ignore"]).unwrap();
+        mutation::discard(p, &["file".into()]).unwrap();
+        let snapshot = get_oplog(p).unwrap().into_iter().next().unwrap();
+        assert!(!snapshot
+            .before
+            .files
+            .iter()
+            .any(|entry| entry.path == "ignored"));
+        run_git(p, &["checkout", "-q", "-b", "conflict"]).unwrap();
+        fs::write(p.join("file"), "ours\n").unwrap();
+        run_git(p, &["add", "file"]).unwrap();
+        run_git(p, &["commit", "-qm", "ours"]).unwrap();
+        run_git(p, &["checkout", "-q", "-"]).unwrap();
+        fs::write(p.join("file"), "theirs\n").unwrap();
+        run_git(p, &["add", "file"]).unwrap();
+        run_git(p, &["commit", "-qm", "base-side"]).unwrap();
+        run_git(p, &["merge", "conflict"]).unwrap_err();
+        // Capturing a conflict state must retain the operation rather than
+        // rejecting all subsequent abort/continue actions.
+        let _ = mutation::op_abort(p, "merging");
     }
 }

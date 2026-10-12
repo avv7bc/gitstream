@@ -44,6 +44,7 @@ import { useLog } from "@/composables/useLog";
 import { useDiff } from "@/composables/useDiff";
 import { useRemote } from "@/composables/useRemote";
 import { useConflicts } from "@/composables/useConflicts";
+import { useOplog } from "@/composables/useOplog";
 import { toggleLog, logError } from "@/composables/useProgress";
 import { dispatchHotkey } from "@/commands/hotkeys";
 import type { CommandContext } from "@/commands/types";

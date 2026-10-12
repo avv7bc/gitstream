@@ -979,6 +979,17 @@ pub fn apply_lines(
     hunks: &[LineHunkSelection],
     op: LineOp,
 ) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "apply.lines", || {
+        apply_lines_inner(repo_path, file_header, hunks, op)
+    })
+}
+
+fn apply_lines_inner(
+    repo_path: &Path,
+    file_header: &str,
+    hunks: &[LineHunkSelection],
+    op: LineOp,
+) -> Result<(), GitError> {
     let patch = match build_partial_patch(file_header, hunks) {
         Some(p) => p,
         None => return Ok(()),
