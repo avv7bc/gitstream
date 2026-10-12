@@ -1,0 +1,138 @@
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../assets/fonts/IBMPlexSans-400-cyrillic.woff2") format("woff2");
+  unicode-range: U+0400-04FF;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../assets/fonts/IBMPlexSans-400-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-024F, U+1E00-1EFF;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../assets/fonts/IBMPlexSans-400-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/JetBrainsMono-400-cyrillic.woff2") format("woff2");
+  unicode-range: U+0400-04FF;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/JetBrainsMono-400-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-024F, U+1E00-1EFF;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/JetBrainsMono-400-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF;
+}
+
+:root {
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-size: 13px;
+  --font-size-sm: 12px;
+  --font-size-xs: 11px;
+  --font-size-diff: 12.5px;
+  --radius: 4px;
+  --radius-lg: 6px;
+  --toolbar-height: 44px;
+  --statusbar-height: 26px;
+
+  /* Semantic layer used by the A presentation. Components consume these
+     names instead of choosing colors locally. */
+  --surface-app: var(--bg-primary);
+  --surface-panel: var(--bg-secondary);
+  --surface-raised: var(--bg-surface);
+  --surface-input: var(--bg-tertiary);
+  --surface-hover: var(--bg-hover);
+  --surface-selected: var(--bg-active);
+  --line: var(--border);
+  --line-subtle: var(--border-subtle);
+  --fg: var(--text-primary);
+  --fg-secondary: var(--text-secondary);
+  --fg-muted: var(--text-muted);
+  --ok: var(--green);
+  --danger: var(--red);
+  --warn: var(--yellow);
+  --info: var(--blue);
+  --ref-local: var(--accent);
+  --ref-remote: var(--green);
+  --ref-tag: var(--yellow);
+  --ref-stash: var(--purple);
+  --statusbar-bg: var(--surface-panel);
+  --statusbar-fg: var(--fg-secondary);
+  --statusbar-fg-muted: var(--fg-muted);
+  --statusbar-hover: var(--surface-hover);
+}
+
+/* Design A: Graphite. Other themes remain available from Settings; this is
+   the v3 default and matches docs/design/A/main.html. */
+:root[data-theme="graphite"],
+:root:not([data-theme]) {
+  --bg-primary: #14161b;
+  --bg-secondary: #1a1d23;
+  --bg-tertiary: #20242c;
+  --bg-surface: #20242c;
+  --bg-hover: #262b34;
+  --bg-active: #233250;
+  --text-primary: #e4e7ec;
+  --text-secondary: #a9b0bc;
+  --text-muted: #7d8594;
+  --border: #2b303a;
+  --border-subtle: #22262e;
+  --accent: #5b9bff;
+  --accent-hover: #3d7ef0;
+  --green: #4cc38a;
+  --red: #f2707a;
+  --yellow: #e8b85a;
+  --blue: #5b9bff;
+  --purple: #b392f0;
+  --teal: #4fc1c9;
+  --orange: #f0955a;
+  --unpushed: #e8b85a;
+  --diff-added-bg: color-mix(in srgb, #4cc38a 16%, transparent);
+  --diff-added-line: color-mix(in srgb, #4cc38a 8%, transparent);
+  --diff-removed-bg: color-mix(in srgb, #f2707a 16%, transparent);
+  --diff-removed-line: color-mix(in srgb, #f2707a 8%, transparent);
+  --diff-word-added-bg: color-mix(in srgb, #4cc38a 35%, transparent);
+  --diff-word-removed-bg: color-mix(in srgb, #f2707a 35%, transparent);
+}
+
+/* A keeps controls compact and calm. The selector is global so legacy
+   components inherit the same density without changing their behavior. */
+:root[data-theme="graphite"] body,
+:root[data-theme="graphite"] button,
+:root[data-theme="graphite"] input,
+:root[data-theme="graphite"] textarea,
+:root[data-theme="graphite"] select {
+  font-family: var(--font-sans);
+}
+
+:root[data-theme="graphite"] .mono,
+:root[data-theme="graphite"] pre,
+:root[data-theme="graphite"] code,
+:root[data-theme="graphite"] .commit-hash,
+:root[data-theme="graphite"] .file-path {
+  font-family: var(--font-mono);
+}

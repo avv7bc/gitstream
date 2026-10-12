@@ -38,6 +38,7 @@ import InteractiveRebaseDialog from "./components/dialogs/InteractiveRebaseDialo
 import ConflictResolverDialog from "./components/dialogs/ConflictResolverDialog.vue";
 import ReflogPanel from "./components/ReflogPanel.vue";
 import CommandPalette from "./components/CommandPalette.vue";
+import WelcomeScreen from "./components/WelcomeScreen.vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useUpdate } from "@/composables/useUpdate";
 import type { CommitInfo } from "@/types";
@@ -623,13 +624,20 @@ function onMouseUp() {
       @oplog="showOplog = !showOplog"
       @interactive-rebase="showInteractiveRebase = true"
       @reflog="showReflog = !showReflog"
+      @palette="showCommandPalette = true"
     />
 
     <ConflictBar @changed="refreshAll()" @resolve="conflictResolverPath = $event" />
     <SyncAssistantBar @changed="refreshAll()" />
 
     <!-- Main body -->
-    <div class="app-body">
+    <WelcomeScreen
+      v-if="!repoPath"
+      @open="handleAddRepository"
+      @clone="handleCloneRepository"
+      @init="handleAddRepository"
+    />
+    <div v-else class="app-body">
       <!-- LEFT SIDEBAR -->
       <aside class="left-sidebar" :style="{ width: sidebarWidth + 'px' }">
         <div

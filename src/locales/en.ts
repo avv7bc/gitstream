@@ -21,6 +21,7 @@ export const en: Translations = {
     addRepository: "Add Repository",
     cloneRepository: "Clone Repository",
     addGroup: "Add Group",
+    commandPalette: "Commands, branches…",
   },
   branches: {
     title: "Branches",
@@ -189,6 +190,7 @@ export const en: Translations = {
     netTimeoutLabel: "Network: Timeout (sec)",
     netTimeoutDesc: "Maximum time for a network git operation (fetch, pull, push). The operation is aborted when this time expires.",
     themeSystem: "System",
+    themeGraphite: "Graphite (design A)",
     themeLight: "Light",
     themeDark: "Dark+ (VSCode)",
     themeMaterial: "Material",

@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useLog } from "@/composables/useLog";
 import { useI18n } from "@/composables/useI18n";
+import EmptyState from "@/components/EmptyState.vue";
 
 const { commits, selectedCommit } = useLog();
 const { i18n } = useI18n();
@@ -66,6 +67,12 @@ const formattedDate = computed(() => {
 
       <p class="commit-msg">{{ commit.message }}</p>
     </div>
+    <EmptyState
+      v-else
+      icon="·"
+      title="Select a commit"
+      description="Choose a commit in the graph to inspect its metadata."
+    />
   </div>
 </template>
 

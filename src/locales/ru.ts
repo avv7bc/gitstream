@@ -26,6 +26,7 @@ const _ru = {
     addRepository: "Add Repository",
     cloneRepository: "Clone Repository",
     addGroup: "Add Group",
+    commandPalette: "Commands, branches…",
   },
   branches: {
     title: "Branches",
@@ -194,6 +195,7 @@ const _ru = {
     netTimeoutLabel: "Network: Timeout (сек)",
     netTimeoutDesc: "Максимальное время сетевой git-операции (fetch, pull, push). По истечении операция прерывается, а зависший процесс git принудительно завершается.",
     themeSystem: "System (как в ОС)",
+    themeGraphite: "Graphite (дизайн A)",
     themeLight: "Light",
     themeDark: "Dark+ (VSCode)",
     themeMaterial: "Material",

@@ -3,6 +3,8 @@ import App from "./App.vue";
 import { tooltip } from "./directives/tooltip";
 import { logError } from "./composables/useProgress";
 import "./styles/main.css";
+import "./styles/tokens.css";
+import "./styles/themes/graphite.css";
 import "./styles/dialogs.css";
 
 // Страховочная сеть: любая необработанная ошибка (в т.ч. отклонённый промис

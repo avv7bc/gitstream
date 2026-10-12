@@ -12,6 +12,7 @@ import { filterCommits } from "@/utils/commitFilter";
 import ContextMenu from "@/components/ContextMenu.vue";
 import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 import type { ContextMenuItem } from "@/commands/types";
+import EmptyState from "@/components/EmptyState.vue";
 
 const emit = defineEmits<{
   commit: [];
@@ -714,6 +715,13 @@ function formatDate(iso: string): string {
         <span class="date-col" v-html="highlight(formatDate(commit.date), graphFilter)" />
       </div>
       </template>
+
+      <EmptyState
+        v-if="!filteredCommits.length"
+        icon="⌁"
+        :title="graphFilter ? 'No matching commits' : 'No commits yet'"
+        :description="graphFilter ? 'Adjust the history filter to see more commits.' : 'Create the first commit to start the history.'"
+      />
 
       <div
         v-if="hasMore && !graphFilter"

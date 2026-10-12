@@ -15,6 +15,7 @@ import { highlight } from "@/utils/highlight";
 import ContextMenu from "@/components/ContextMenu.vue";
 import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 import type { ContextMenuItem } from "@/commands/types";
+import EmptyState from "@/components/EmptyState.vue";
 
 const emit = defineEmits<{ commit: [] }>();
 
@@ -864,6 +865,12 @@ function compareCommitFile(path: string) {
           </span>
         </div>
       </template>
+      <EmptyState
+        v-if="displayCount === 0"
+        icon="✓"
+        title="No files to show"
+        :description="fileFilter ? 'Try a different filter.' : 'The selected revision has no changed files.'"
+      />
       </div>
     </div>
 

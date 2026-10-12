@@ -7,6 +7,7 @@ import { useProgress, logOpen, toggleLog } from "@/composables/useProgress";
 const { repoInfo } = useRepo();
 const { isWorking, progressLabel, networkProgressLog } = useProgress();
 const { branches } = useBranches();
+const appVersion = __APP_VERSION__;
 
 const currentBranchInfo = computed(() => branches.value.find((b) => b.is_current));
 const ahead = computed(() => currentBranchInfo.value?.ahead ?? 0);
@@ -31,6 +32,7 @@ const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
           <span v-if="ahead > 0" class="ahead">{{ ahead }}</span>
         </span>
       </template>
+      <span v-else class="statusbar-empty">No open repository</span>
     </div>
 
     <div class="statusbar-center">
@@ -49,6 +51,7 @@ const behind = computed(() => currentBranchInfo.value?.behind ?? 0);
     </div>
 
     <div class="statusbar-right">
+      <span v-if="!repoInfo" class="statusbar-version">GitStream v{{ appVersion }}</span>
       <span class="git-output-btn" :class="{ active: logOpen }" title="Git output (Alt+O)" @click="toggleLog">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
           <path fill-rule="evenodd" clip-rule="evenodd" d="M2 2.5A.5.5 0 0 1 2.5 2h11a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5H9.207l-2.854 2.854A.5.5 0 0 1 5.5 14.5V12H2.5a.5.5 0 0 1-.5-.5v-9zm1 .5v8h3.5a.5.5 0 0 1 .5.5v2.293L9.293 11.5a.5.5 0 0 1 .354-.146H13V3H3zm1 2h7v1H4V5zm0 2h7v1H4V7zm0 2h4v1H4V9z"/>

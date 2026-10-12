@@ -134,6 +134,7 @@ const edFontSizes = Array.from({ length: 15 }, (_, i) => i + 10); // 10..24
 
 const themes = computed(() => [
   { value: "system" as const, label: i18n.value.settings.themeSystem },
+  { value: "graphite" as const, label: i18n.value.settings.themeGraphite },
   { value: "light" as const, label: i18n.value.settings.themeLight },
   { value: "dark" as const, label: i18n.value.settings.themeDark },
   { value: "material" as const, label: i18n.value.settings.themeMaterial },

@@ -29,6 +29,7 @@ const emit = defineEmits<{
   oplog: [];
   interactiveRebase: [];
   reflog: [];
+  palette: [];
 }>();
 
 const { files, selectedFile, stageFiles, unstageFiles } = useFiles();
@@ -80,6 +81,7 @@ async function runCommand(id: string) {
       "oplog.open": () => emit("oplog"),
       "history.interactive": () => emit("interactiveRebase"),
       "reflog.open": () => emit("reflog"),
+      "palette.open": () => emit("palette"),
     },
   };
   if (command.visible && !command.visible(context)) return;
@@ -332,8 +334,15 @@ function closeBranchMenu() {
     </div>
 
     <div class="toolbar-group-center">
+      <button class="toolbar-btn-action action-commit" type="button" :disabled="!repoPath" @click="runCommand('commit.open')" :title="i18n.toolbar.commit">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="8" cy="8" r="2.8" />
+          <path d="M1.5 8h3.7M10.8 8h3.7" />
+        </svg>
+        <span>{{ i18n.toolbar.commit }}</span>
+      </button>
       <div class="menu-button-wrapper" ref="fetchWrapper">
-        <button class="toolbar-btn-action action-green fetch-split" @click="runCommand('remote.fetch')" :title="i18n.toolbar.fetch">
+        <button class="toolbar-btn-action action-green fetch-split" :disabled="!repoPath" @click="runCommand('remote.fetch')" :title="i18n.toolbar.fetch">
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
             <path d="M13 8a5 5 0 1 1-1.46-3.54"/>
             <path d="M13 2.5V5h-2.5"/>
@@ -359,13 +368,13 @@ function closeBranchMenu() {
         </div>
       </div>
 
-      <button class="toolbar-btn-action action-green" @click="runCommand('remote.pull')" data-shortcut="Alt+PageDown">
+      <button class="toolbar-btn-action action-green" :disabled="!repoPath" @click="runCommand('remote.pull')" data-shortcut="Alt+PageDown">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
         </svg>
         <span>{{ i18n.toolbar.pull }}</span>
       </button>
-      <button class="toolbar-btn-action action-red" @click="runCommand('remote.push')" data-shortcut="Alt+PageUp">
+      <button class="toolbar-btn-action action-red" :disabled="!repoPath" @click="runCommand('remote.push')" data-shortcut="Alt+PageUp">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 3l4 4H9.5v5h-3V7H4L8 3z"/>
         </svg>
@@ -376,6 +385,14 @@ function closeBranchMenu() {
     <div class="toolbar-spacer" />
 
     <div class="toolbar-group">
+      <button class="toolbar-palette" type="button" @click="runCommand('palette.open')" :title="i18n.toolbar.commandPalette">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <circle cx="7" cy="7" r="4.5" />
+          <path d="m10.5 10.5 3.5 3.5" />
+        </svg>
+        <span>{{ i18n.toolbar.commandPalette }}</span>
+        <kbd>Ctrl ⇧ P</kbd>
+      </button>
       <button class="toolbar-btn icon-only" @click="runCommand('stats.open')" title="Repository Statistics">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <rect x="2" y="10" width="3" height="4" rx="0.5"/>
@@ -520,6 +537,37 @@ function closeBranchMenu() {
   display: flex;
   align-items: center;
   gap: 2px;
+}
+
+.toolbar-palette {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 238px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  text-align: left;
+  cursor: pointer;
+}
+.toolbar-palette:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+.toolbar-palette kbd {
+  margin-left: auto;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  color: var(--text-muted);
+  font: 500 10px/1 var(--font-mono);
+  white-space: nowrap;
 }
 
 .toolbar-btn {
