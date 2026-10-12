@@ -1,5 +1,13 @@
 # GitStream
 
+## Линии разработки
+
+- `v1` — текущий стабильный legacy-интерфейс.
+- `v2` — функциональная линия без полного визуального редизайна.
+- `v3` — дизайн A «Графит» поверх принятого функционального набора v2.
+
+Точные версии обозначаются Git-тегами (`v1.x.y`, `v2.x.y`, `v3.x.y`); рабочая ветка не заменяет release tag.
+
 A desktop Git GUI focused on everyday Git workflows — commits, branches, push/pull, diff review — without blocking the UI or unnecessary complexity.
 
 ![GitStream](docs/screenshot.png)
