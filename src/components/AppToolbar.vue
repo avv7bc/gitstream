@@ -28,6 +28,7 @@ const emit = defineEmits<{
   redo: [];
   oplog: [];
   interactiveRebase: [];
+  reflog: [];
 }>();
 
 const { files, selectedFile, stageFiles, unstageFiles } = useFiles();
@@ -78,6 +79,7 @@ async function runCommand(id: string) {
       "oplog.redo": () => emit("redo"),
       "oplog.open": () => emit("oplog"),
       "history.interactive": () => emit("interactiveRebase"),
+      "reflog.open": () => emit("reflog"),
     },
   };
   if (command.visible && !command.visible(context)) return;
@@ -326,6 +328,7 @@ function closeBranchMenu() {
       <button class="toolbar-btn icon-only" @click="runCommand('oplog.redo')" title="Redo (Ctrl+Shift+Z)">↷</button>
       <button class="toolbar-btn icon-only" @click="runCommand('oplog.open')" title="Operations">≡</button>
       <button class="toolbar-btn icon-only" @click="runCommand('history.interactive')" title="Interactive rebase">↕</button>
+      <button class="toolbar-btn icon-only" @click="runCommand('reflog.open')" title="Reflog">R</button>
     </div>
 
     <div class="toolbar-group-center">

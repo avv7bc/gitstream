@@ -407,6 +407,15 @@ pub async fn get_diff_commit_file(
 }
 
 #[tauri::command]
+pub fn git_grep(
+    repo_path: String,
+    text: String,
+    path: Option<String>,
+) -> Result<Vec<query::GrepMatch>, String> {
+    query::git_grep(Path::new(&repo_path), &text, path.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn get_conflict_sides(
     repo_path: String,
     path: String,

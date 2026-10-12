@@ -55,6 +55,7 @@ const builtIns: Command[] = [
   { id: "oplog.redo", label: "Redo", scope: ["global", "toolbar"], shortcut: ["Ctrl+Shift+Z", "Meta+Shift+Z"], enabled: hasRepo, execute: action("oplog.redo") },
   { id: "oplog.open", label: "Operations", scope: ["global", "toolbar"], enabled: hasRepo, shortcut: "Ctrl+Alt+Z", execute: action("oplog.open") },
   { id: "history.interactive", label: "Interactive rebase", scope: ["global", "toolbar"], enabled: hasRepo, execute: action("history.interactive") },
+  { id: "reflog.open", label: "Reflog", scope: ["global", "toolbar"], enabled: hasRepo, execute: action("reflog.open") },
 ];
 
 for (const command of builtIns) commands.set(command.id, command);

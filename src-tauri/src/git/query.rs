@@ -2343,3 +2343,73 @@ eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\trefs/tags/v4.0^{}";
         assert_eq!(get("v4.0"), Some("remote_only"));
     }
 }
+
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct GrepMatch {
+    pub path: String,
+    pub line: u32,
+    pub content: String,
+}
+
+pub fn git_grep(
+    repo_path: &Path,
+    text: &str,
+    path: Option<&str>,
+) -> Result<Vec<GrepMatch>, GitError> {
+    if text.is_empty() || text.starts_with('-') || text.contains('\0') {
+        return Err(GitError::CommandFailed {
+            message: "Invalid search text".into(),
+            hint: None,
+        });
+    }
+    if let Some(path) = path {
+        if path.starts_with('/') || path.split('/').any(|part| part == "..") || path.contains('\0')
+        {
+            return Err(GitError::CommandFailed {
+                message: "Invalid search path".into(),
+                hint: None,
+            });
+        }
+    }
+    let mut args = vec!["grep", "-n", "-I", "--", text];
+    if let Some(path) = path {
+        args.push(path);
+    }
+    let out = std::process::Command::new("git")
+        .args(["-C"])
+        .arg(repo_path)
+        .args(&args)
+        .output()
+        .map_err(|e| GitError::CommandFailed {
+            message: e.to_string(),
+            hint: None,
+        })?;
+    if !out.status.success() && out.status.code() != Some(1) {
+        return Err(super::error::classify_git_error(&String::from_utf8_lossy(
+            &out.stderr,
+        )));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|line| {
+            let (path, rest) = line.split_once(':')?;
+            let (line, content) = rest.split_once(':')?;
+            Some(GrepMatch {
+                path: path.to_owned(),
+                line: line.parse().ok()?,
+                content: content.to_owned(),
+            })
+        })
+        .collect())
+}
+
+#[cfg(test)]
+mod grep_tests {
+    use super::*;
+    #[test]
+    fn git_grep_rejects_unsafe_paths() {
+        let path = std::env::current_dir().unwrap();
+        assert!(git_grep(&path, "x", Some("../secret")).is_err());
+        assert!(git_grep(&path, "", None).is_err());
+    }
+}

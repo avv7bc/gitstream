@@ -36,6 +36,7 @@ import OplogPanel from "./components/OplogPanel.vue";
 import WorktreePanel from "./components/WorktreePanel.vue";
 import InteractiveRebaseDialog from "./components/dialogs/InteractiveRebaseDialog.vue";
 import ConflictResolverDialog from "./components/dialogs/ConflictResolverDialog.vue";
+import ReflogPanel from "./components/ReflogPanel.vue";
 import CommandPalette from "./components/CommandPalette.vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useUpdate } from "@/composables/useUpdate";
@@ -64,6 +65,7 @@ const { refresh: refreshConflicts } = useConflicts();
 const { undo, redo } = useOplog();
 const showOplog = ref(false);
 const showInteractiveRebase = ref(false);
+const showReflog = ref(false);
 const conflictResolverPath = ref<string | null>(null);
 const showCommandPalette = ref(false);
 const { updateInfo, nextMajorInfo, checkForUpdate, dismissNextMajor } = useUpdate();
@@ -428,6 +430,7 @@ function buildCommandContext(): CommandContext {
       "oplog.redo": () => redoLast(),
       "oplog.open": () => { showOplog.value = !showOplog.value; },
       "history.interactive": () => { showInteractiveRebase.value = true; },
+      "reflog.open": () => { showReflog.value = !showReflog.value; },
       "remote.pull": () => { showPullDialog.value = true; },
       "remote.push": () => { showPushDialog.value = true; },
       "palette.open": () => { showCommandPalette.value = true; },
@@ -593,6 +596,7 @@ function onMouseUp() {
       @redo="redoLast"
       @oplog="showOplog = !showOplog"
       @interactive-rebase="showInteractiveRebase = true"
+      @reflog="showReflog = !showReflog"
     />
 
     <ConflictBar @changed="refreshAll()" @resolve="conflictResolverPath = $event" />
@@ -673,6 +677,7 @@ function onMouseUp() {
 
     <!-- Status Bar -->
     <OplogPanel v-if="showOplog" @close="showOplog = false" />
+    <ReflogPanel v-if="showReflog" @close="showReflog = false" />
     <StatusBar />
 
     <!-- Dialogs -->
