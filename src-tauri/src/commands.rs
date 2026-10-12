@@ -435,8 +435,8 @@ pub fn save_resolved(
 }
 
 #[tauri::command]
-pub fn get_oplog(repo_path: String) -> Result<Vec<oplog::OpSnapshot>, String> {
-    oplog::get_oplog(Path::new(&repo_path)).map_err(|e| e.to_string())
+pub fn get_oplog(repo_path: String) -> Result<Vec<oplog::OpSummary>, String> {
+    oplog::get_oplog_summary(Path::new(&repo_path)).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
