@@ -51,7 +51,7 @@ const { clearDiff } = useDiff();
 const { pull, push, fetchRemote, fetchAll } = useRemote();
 const { target: compareTarget, close: closeFileCompare } = useFileCompare();
 const { refresh: refreshConflicts } = useConflicts();
-const { updateInfo, checkForUpdate } = useUpdate();
+const { updateInfo, nextMajorInfo, checkForUpdate, dismissNextMajor } = useUpdate();
 
 const selectedFileStatus = computed(() =>
   files.value.find((f) => f.path === selectedFile.value) ?? null,
@@ -711,7 +711,14 @@ function onMouseUp() {
     <UpdateBanner
       v-if="updateInfo"
       :info="updateInfo"
+      kind="update"
       @dismiss="updateInfo = null"
+    />
+    <UpdateBanner
+      v-if="nextMajorInfo"
+      :info="nextMajorInfo"
+      kind="next-major"
+      @dismiss="dismissNextMajor"
     />
   </div>
 </template>

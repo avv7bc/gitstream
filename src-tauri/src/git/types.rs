@@ -179,8 +179,14 @@ pub struct RepoStats {
     pub by_day: Vec<DayEntry>,
 }
 
-#[derive(Debug, serde::Serialize, Clone)]
+#[derive(Debug, serde::Serialize, Clone, PartialEq)]
 pub struct UpdateInfo {
     pub version: String,
     pub release_url: String,
+}
+
+#[derive(Debug, serde::Serialize, Clone, PartialEq, Default)]
+pub struct UpdateCheck {
+    pub update: Option<UpdateInfo>,
+    pub next_major: Option<UpdateInfo>,
 }

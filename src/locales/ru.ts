@@ -153,6 +153,10 @@ const _ru = {
   },
   update: {
     download: "Download",
+    available: "Доступно обновление",
+    nextMajor: "Доступна новая версия",
+    changelog: "Список изменений",
+    dismiss: "Позже",
   },
   diff: {
     oldVersion: "Old Version",

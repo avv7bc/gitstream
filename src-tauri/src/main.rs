@@ -5,6 +5,7 @@ mod askpass;
 mod commands;
 mod git;
 mod settings;
+mod update;
 
 fn main() {
     // Если нас запустил git как GIT_ASKPASS/SSH_ASKPASS — обрабатываем запрос и
