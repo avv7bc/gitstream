@@ -501,7 +501,115 @@ fn stash_save_inner(
     message: Option<&str>,
     include_untracked: bool,
 ) -> Result<(), GitError> {
+    stash_save_subset_inner(repo_path, message, include_untracked, false, &[])
+}
+
+fn supports_staged_stash(version_output: &str) -> bool {
+    let Some(version) = version_output
+        .split_whitespace()
+        .find(|part| part.chars().next().is_some_and(|c| c.is_ascii_digit()))
+    else {
+        return false;
+    };
+    let mut parts = version.split('.').filter_map(|part| {
+        let digits: String = part.chars().take_while(|c| c.is_ascii_digit()).collect();
+        (!digits.is_empty()).then(|| digits.parse::<u32>().ok()).flatten()
+    });
+    let major = parts.next().unwrap_or(0);
+    let minor = parts.next().unwrap_or(0);
+    major > 2 || (major == 2 && minor >= 35)
+}
+
+#[cfg(test)]
+mod stash_subset_tests {
+    use super::{stash_save_subset_inner, supports_staged_stash};
+    use std::fs;
+    use std::process::Command;
+
+    fn repo(tag: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!("gitstream-stash-{tag}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&path);
+        fs::create_dir_all(&path).unwrap();
+        let run = |args: &[&str]| {
+            assert!(Command::new("git").current_dir(&path).args(args).status().unwrap().success());
+        };
+        run(&["init", "-q"]);
+        run(&["config", "user.name", "T"]);
+        run(&["config", "user.email", "t@e"]);
+        fs::write(path.join("a"), "base\n").unwrap();
+        fs::write(path.join("b"), "base\n").unwrap();
+        run(&["add", "."]);
+        run(&["commit", "-qm", "base"]);
+        path
+    }
+
+    #[test]
+    fn staged_stash_requires_git_235() {
+        assert!(!supports_staged_stash("git version 2.34.9"));
+        assert!(supports_staged_stash("git version 2.35.0"));
+        assert!(supports_staged_stash("git version 3.0.0"));
+        assert!(!supports_staged_stash("unknown"));
+    }
+
+    #[test]
+    fn selected_stash_leaves_other_paths_dirty() {
+        let path = repo("selected");
+        fs::write(path.join("a"), "selected\n").unwrap();
+        fs::write(path.join("b"), "kept\n").unwrap();
+        stash_save_subset_inner(&path, Some("selected"), false, false, &["a".into()]).unwrap();
+        assert_eq!(fs::read_to_string(path.join("a")).unwrap(), "base\n");
+        assert_eq!(fs::read_to_string(path.join("b")).unwrap(), "kept\n");
+        let _ = fs::remove_dir_all(path);
+    }
+
+    #[test]
+    fn staged_stash_leaves_unstaged_changes() {
+        let path = repo("staged");
+        fs::write(path.join("a"), "staged\n").unwrap();
+        fs::write(path.join("b"), "unstaged\n").unwrap();
+        Command::new("git").current_dir(&path).args(["add", "a"]).status().unwrap();
+        stash_save_subset_inner(&path, Some("staged"), false, true, &[]).unwrap();
+        assert_eq!(fs::read_to_string(path.join("a")).unwrap(), "base\n");
+        assert_eq!(fs::read_to_string(path.join("b")).unwrap(), "unstaged\n");
+        let _ = fs::remove_dir_all(path);
+    }
+}
+
+fn stash_save_subset_inner(
+    repo_path: &Path,
+    message: Option<&str>,
+    include_untracked: bool,
+    staged: bool,
+    paths: &[String],
+) -> Result<(), GitError> {
+    if staged && !paths.is_empty() {
+        return Err(GitError::CommandFailed {
+            message: "Staged stash cannot be combined with selected paths".into(),
+            hint: Some("Choose either staged changes or selected files".into()),
+        });
+    }
+    for path in paths {
+        validate_file_path(path)?;
+    }
+    if staged {
+        let version = Command::new("git")
+            .arg("--version")
+            .output()
+            .map_err(|e| GitError::CommandFailed {
+                message: format!("Failed to run git: {e}"),
+                hint: None,
+            })?;
+        if !supports_staged_stash(&String::from_utf8_lossy(&version.stdout)) {
+            return Err(GitError::CommandFailed {
+                message: "This Git version does not support stashing staged changes".into(),
+                hint: Some("Git 2.35 or newer is required".into()),
+            });
+        }
+    }
     let mut args: Vec<&str> = vec!["stash", "push"];
+    if staged {
+        args.push("--staged");
+    }
     if include_untracked {
         args.push("--include-untracked");
     }
@@ -510,6 +618,10 @@ fn stash_save_inner(
             args.push("-m");
             args.push(msg);
         }
+    }
+    if !paths.is_empty() {
+        args.push("--");
+        args.extend(paths.iter().map(String::as_str));
     }
     run_git_mut(repo_path, &args)?;
     Ok(())
@@ -553,6 +665,45 @@ fn create_branch_inner(
         }
     }
     run_git_mut(repo_path, &args)?;
+    Ok(())
+}
+
+fn spin_off_inner(repo_path: &Path, new_branch: &str) -> Result<(), GitError> {
+    validate_ref_name(new_branch)?;
+    let original = super::query::require_current_branch_name(repo_path)?;
+    if original == new_branch {
+        return Err(GitError::CommandFailed {
+            message: "Spin-off branch must have a different name".into(),
+            hint: None,
+        });
+    }
+    let upstream = super::query::run_git(
+        repo_path,
+        &["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+    )
+    .map_err(|_| GitError::CommandFailed {
+        message: format!("Branch '{original}' has no upstream"),
+        hint: Some("Configure an upstream before spinning off unpublished commits".into()),
+    })?;
+    let upstream = upstream.trim();
+    if upstream.is_empty() {
+        return Err(GitError::CommandFailed {
+            message: format!("Branch '{original}' has no upstream"),
+            hint: Some("Configure an upstream before spinning off unpublished commits".into()),
+        });
+    }
+    let ahead = super::query::run_git(repo_path, &["rev-list", "--count", &format!("{upstream}..HEAD")])
+        .ok()
+        .and_then(|value| value.trim().parse::<u32>().ok())
+        .unwrap_or(0);
+    if ahead == 0 {
+        return Err(GitError::CommandFailed {
+            message: format!("Branch '{original}' has no unpublished commits"),
+            hint: None,
+        });
+    }
+    run_git_mut(repo_path, &["switch", "-c", new_branch])?;
+    run_git_mut(repo_path, &["branch", "-f", &original, upstream])?;
     Ok(())
 }
 
@@ -1693,6 +1844,18 @@ pub fn stash_save(
     })
 }
 
+pub fn stash_save_subset(
+    repo_path: &Path,
+    message: Option<&str>,
+    include_untracked: bool,
+    staged: bool,
+    paths: &[String],
+) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "stash.save.subset", || {
+        stash_save_subset_inner(repo_path, message, include_untracked, staged, paths)
+    })
+}
+
 pub fn stash_apply(repo_path: &Path, index: usize) -> Result<(), GitError> {
     super::oplog::mutate(repo_path, "stash.apply", || {
         stash_apply_inner(repo_path, index)
@@ -1718,6 +1881,10 @@ pub fn create_branch(
     super::oplog::mutate(repo_path, "create.branch", || {
         create_branch_inner(repo_path, name, start_point, checkout)
     })
+}
+
+pub fn spin_off(repo_path: &Path, new_branch: &str) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "spin.off", || spin_off_inner(repo_path, new_branch))
 }
 
 pub fn rename_branch(repo_path: &Path, old_name: &str, new_name: &str) -> Result<(), GitError> {
@@ -1759,4 +1926,49 @@ pub fn integrate_pulled(
     super::oplog::mutate(repo_path, "integrate.pulled", || {
         integrate_pulled_inner(repo_path, remote, branch, rebase)
     })
+}
+
+#[cfg(test)]
+mod spin_off_tests {
+    use super::spin_off_inner;
+    use std::fs;
+    use std::path::Path;
+    use std::process::Command;
+
+    fn git(dir: &Path, args: &[&str]) -> String {
+        let out = Command::new("git")
+            .current_dir(dir)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {:?}: {}", args, String::from_utf8_lossy(&out.stderr));
+        String::from_utf8_lossy(&out.stdout).trim().to_owned()
+    }
+
+    #[test]
+    fn spin_off_moves_unpublished_commits_and_resets_original() {
+        let root = std::env::temp_dir().join(format!("gitstream-spin-off-{}", std::process::id()));
+        let remote = root.join("remote.git");
+        let work = root.join("work");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&work).unwrap();
+        git(&root, &["init", "--bare", "remote.git"]);
+        git(&work, &["init", "-q"]);
+        git(&work, &["config", "user.name", "T"]);
+        git(&work, &["config", "user.email", "t@e"]);
+        fs::write(work.join("f"), "base\n").unwrap();
+        git(&work, &["add", "f"]);
+        git(&work, &["commit", "-qm", "base"]);
+        git(&work, &["branch", "-M", "main"]);
+        git(&work, &["remote", "add", "origin", remote.to_str().unwrap()]);
+        git(&work, &["push", "-qu", "origin", "main"]);
+        fs::write(work.join("f"), "unpublished\n").unwrap();
+        git(&work, &["commit", "-aqm", "unpublished"]);
+
+        spin_off_inner(&work, "feature").unwrap();
+        assert_eq!(git(&work, &["branch", "--show-current"]), "feature");
+        assert_eq!(git(&work, &["rev-parse", "main"]), git(&work, &["rev-parse", "origin/main"]));
+        assert_ne!(git(&work, &["rev-parse", "feature"]), git(&work, &["rev-parse", "main"]));
+        let _ = fs::remove_dir_all(root);
+    }
 }

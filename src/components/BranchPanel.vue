@@ -9,6 +9,7 @@ import MergeDialog from "@/components/dialogs/MergeDialog.vue";
 import RebaseDialog from "@/components/dialogs/RebaseDialog.vue";
 import RenameBranchDialog from "@/components/dialogs/RenameBranchDialog.vue";
 import StashSaveDialog from "@/components/dialogs/StashSaveDialog.vue";
+import SpinOffDialog from "@/components/dialogs/SpinOffDialog.vue";
 import CreateBranchDialog from "@/components/dialogs/CreateBranchDialog.vue";
 import RemoteDialog from "@/components/dialogs/RemoteDialog.vue";
 import SetUpstreamDialog from "@/components/dialogs/SetUpstreamDialog.vue";
@@ -44,8 +45,9 @@ async function handleLocalDblClick(branch: { name: string; is_current: boolean }
 }
 
 const {
-  branches, tags, stashes, remotes, remoteUrls,
+  branches, tags, stashes, remotes, remoteUrls, hygiene,
   checkout, createBranch, mergeBranch, rebaseOnto, renameBranch, deleteBranch, deleteRemoteBranch, pushBranch,
+  spinOff,
   deleteTag, pushTag, getTagSyncStatus,
   stashSave, stashApply, stashPop, stashDrop,
   addRemote, removeRemote, renameRemote, setRemoteUrl, setBranchUpstream,
@@ -206,6 +208,8 @@ const rebaseTarget = ref<BranchInfo | null>(null);
 const showDeleteConfirm = ref(false);
 const showForceDeleteConfirm = ref(false);
 const showRenameDialog = ref(false);
+const showSpinOffDialog = ref(false);
+const spinOffBranch = ref<BranchInfo | null>(null);
 const targetBranch = ref<BranchInfo | null>(null);
 const targetBranches = ref<BranchInfo[]>([]);
 const notMergedBranches = ref<BranchInfo[]>([]);
@@ -288,6 +292,25 @@ function handleRenameCtx() {
   targetBranch.value = ctxBranch.value;
   closeCtxMenu();
   showRenameDialog.value = true;
+}
+
+function handleSpinOffCtx() {
+  const branch = ctxBranch.value;
+  if (!branch || !branch.is_current || !branch.upstream || branch.ahead <= 0) return;
+  spinOffBranch.value = branch;
+  closeCtxMenu();
+  showSpinOffDialog.value = true;
+}
+
+async function confirmSpinOff(name: string) {
+  showSpinOffDialog.value = false;
+  try {
+    await spinOff(name);
+    emit("branchesChanged");
+  } catch (e) {
+    logError(`Spin-off failed: ${e}`);
+  }
+  spinOffBranch.value = null;
 }
 
 async function confirmRename(newName: string) {
@@ -791,9 +814,13 @@ async function confirmDropStash() {
 async function confirmStashSave(payload: {
   message: string | null;
   includeUntracked: boolean;
+  scope: "all" | "selected" | "staged";
 }) {
   showStashSaveDialog.value = false;
   try {
+    // The branch panel has no file selection, so only the all-changes mode is
+    // meaningful here. The dialog still exposes the shared scope UI for
+    // consistency with the toolbar entry point.
     await stashSave(payload.message, payload.includeUntracked);
     emit("branchesChanged");
   } catch (e) {
@@ -813,7 +840,7 @@ const expandedSections = ref({
 const q = computed(() => filter.value.toLowerCase());
 
 const localBranches = computed(() => {
-  const list = branches.value.filter((b) => !b.is_remote);
+  const list = branches.value.filter((b) => !b.is_remote && matchesHygiene(b.name));
   if (!q.value) return list;
   return list.filter((b) =>
     b.name.toLowerCase().includes(q.value) ||
@@ -922,6 +949,46 @@ const deletableBranches = computed(() =>
   selectedLocalBranches.value.filter((b) => !b.is_current),
 );
 const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
+
+const hygieneFilter = ref<"all" | "merged" | "gone" | "stale">("all");
+const hygieneByName = computed(() => new Map(hygiene.value.map((item) => [item.name, item])));
+const hygieneCounts = computed(() => ({
+  merged: hygiene.value.filter((item) => item.merged).length,
+  gone: hygiene.value.filter((item) => item.gone).length,
+  stale: hygiene.value.filter((item) => item.stale).length,
+}));
+function matchesHygiene(name: string): boolean {
+  if (hygieneFilter.value === "all") return true;
+  const item = hygieneByName.value.get(name);
+  return !!item?.[hygieneFilter.value];
+}
+
+const dragBranch = ref<BranchInfo | null>(null);
+const dragOverBranch = ref<string | null>(null);
+function onBranchDragStart(event: DragEvent, branch: BranchInfo) {
+  dragBranch.value = branch;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/gitstream-branch", branch.name);
+  }
+}
+function onBranchDragEnd() {
+  dragBranch.value = null;
+  dragOverBranch.value = null;
+}
+function onBranchDragOver(event: DragEvent, target: BranchInfo) {
+  if (!dragBranch.value || dragBranch.value.name === target.name || !target.is_current) return;
+  event.preventDefault();
+  dragOverBranch.value = target.name;
+}
+function onBranchDrop(event: DragEvent, target: BranchInfo) {
+  event.preventDefault();
+  const source = dragBranch.value;
+  onBranchDragEnd();
+  if (!source || source.name === target.name || !target.is_current) return;
+  targetBranch.value = source;
+  showMergeDialog.value = true;
+}
 </script>
 
 <template>
@@ -934,6 +1001,12 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
         :placeholder="i18n.branches.filter"
         class="filter-input"
       />
+    </div>
+    <div class="hygiene-filters" aria-label="Branch hygiene filters">
+      <button type="button" :class="{ active: hygieneFilter === 'all' }" @click="hygieneFilter = 'all'">All</button>
+      <button type="button" :class="{ active: hygieneFilter === 'merged' }" @click="hygieneFilter = 'merged'">Merged <span>{{ hygieneCounts.merged }}</span></button>
+      <button type="button" :class="{ active: hygieneFilter === 'gone' }" @click="hygieneFilter = 'gone'">Gone <span>{{ hygieneCounts.gone }}</span></button>
+      <button type="button" :class="{ active: hygieneFilter === 'stale' }" @click="hygieneFilter = 'stale'">Stale <span>{{ hygieneCounts.stale }}</span></button>
     </div>
 
     <div class="sections" @selectstart.prevent>
@@ -960,11 +1033,17 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
             v-for="branch in localBranches"
             :key="branch.name"
             class="branch-item"
-            :class="{ current: branch.is_current, selected: selectedKeys.has(`local:${branch.name}`) }"
+            :class="{ current: branch.is_current, selected: selectedKeys.has(`local:${branch.name}`), 'drop-target': dragOverBranch === branch.name }"
+            draggable="true"
             v-tooltip="branchTooltip(branch)"
             @mousedown="selectItem(`local:${branch.name}`, $event)"
             @dblclick="handleLocalDblClick(branch)"
             @contextmenu="onBranchContextMenu($event, branch)"
+            @dragstart="onBranchDragStart($event, branch)"
+            @dragend="onBranchDragEnd"
+            @dragover="onBranchDragOver($event, branch)"
+            @dragleave="dragOverBranch = null"
+            @drop="onBranchDrop($event, branch)"
           >
             <RefIcon kind="local-branch" class="bp-icon bp-icon--branch" />
             <span class="branch-arrow">›</span>
@@ -998,10 +1077,13 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
             :key="branch.name"
             class="branch-item"
             :class="{ selected: selectedKeys.has(`remote:${branch.name}`) }"
+            draggable="true"
             v-tooltip="branchTooltip(branch)"
             @mousedown="selectItem(`remote:${branch.name}`, $event)"
             @dblclick="emit('checkoutRemote', branch.name)"
             @contextmenu="onRemoteBranchContextMenu($event, branch)"
+            @dragstart="onBranchDragStart($event, branch)"
+            @dragend="onBranchDragEnd"
           >
             <RefIcon kind="remote-branch" class="bp-icon bp-icon--remote" />
             <span class="branch-name" v-html="highlight(branch.name, filter)" />
@@ -1187,6 +1269,11 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
           @click="handleSetUpstreamCtx"
         >{{ i18n.branches.setUpstream }}</button>
         <button
+          class="ctx-item"
+          :disabled="!ctxBranch?.is_current || !ctxBranch?.upstream || !(ctxBranch?.ahead ?? 0)"
+          @click="handleSpinOffCtx"
+        >Spin off unpublished commits</button>
+        <button
           class="ctx-item ctx-danger"
           :disabled="!deletableBranches.length"
           @click="handleDeleteCtx"
@@ -1243,6 +1330,12 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
         :old-name="targetBranch.name"
         @close="showRenameDialog = false; targetBranch = null"
         @confirm="confirmRename"
+      />
+      <SpinOffDialog
+        v-if="showSpinOffDialog && spinOffBranch"
+        :current-branch="spinOffBranch.name"
+        @close="showSpinOffDialog = false; spinOffBranch = null"
+        @confirm="confirmSpinOff"
       />
 
       <div
@@ -1447,11 +1540,30 @@ const multiBranch = computed(() => selectedLocalBranches.value.length > 1);
   user-select: none;
   flex-shrink: 0;
 }
+.hygiene-filters {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+}
+.hygiene-filters button {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  padding: 2px 7px;
+}
+.hygiene-filters button.active { border-color: var(--accent); color: var(--text-primary); }
+.hygiene-filters span { opacity: .7; }
 .branch-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
+.branch-item.drop-target { outline: 1px dashed var(--accent); outline-offset: -2px; }
 
 .filter-input {
   width: 120px;

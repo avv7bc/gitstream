@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 
@@ -134,11 +136,47 @@ pub fn preview_rebase(repo_path: &Path, onto: &str) -> Result<Option<MergePrevie
     // the commit/tree distinction and lets Git perform a real three-way replay
     // without touching refs, the index, or the worktree.
     let mut base = onto.to_string();
+    // Keep synthetic commits in a throw-away object database. Writing them to
+    // the repository's normal object store would leave unreachable preview
+    // objects behind until the next aggressive GC.
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| GitError::CommandFailed {
+            message: e.to_string(),
+            hint: None,
+        })?
+        .as_nanos();
+    let preview_root =
+        std::env::temp_dir().join(format!("gitstream-preview-{}-{stamp}", std::process::id()));
+    let preview_objects = preview_root.join("objects");
+    fs::create_dir_all(&preview_objects).map_err(|e| GitError::CommandFailed {
+        message: format!("create preview object store: {e}"),
+        hint: None,
+    })?;
+    let source_objects_raw = run_git(repo_path, &["rev-parse", "--git-path", "objects"])?;
+    let source_objects_path = std::path::PathBuf::from(source_objects_raw.trim());
+    let source_objects = if source_objects_path.is_absolute() {
+        source_objects_path
+    } else {
+        repo_path.join(source_objects_path)
+    };
+    let source_objects = source_objects.to_string_lossy().into_owned();
     for commit in commits {
+        let parent = run_git(repo_path, &["rev-parse", &format!("{commit}^1")])?
+            .trim()
+            .to_owned();
         let output = Command::new("git")
             .args(["-c", "core.quotePath=false", "-C"])
             .arg(repo_path)
-            .args(["merge-tree", "--write-tree", &base, commit])
+            .args([
+                "merge-tree",
+                "--write-tree",
+                &format!("--merge-base={parent}"),
+                &base,
+                commit,
+            ])
+            .env("GIT_OBJECT_DIRECTORY", &preview_objects)
+            .env("GIT_ALTERNATE_OBJECT_DIRECTORIES", &source_objects)
             .output()
             .map_err(|e| GitError::CommandFailed {
                 message: format!("Failed to run git merge-tree: {e}"),
@@ -148,20 +186,20 @@ pub fn preview_rebase(repo_path: &Path, onto: &str) -> Result<Option<MergePrevie
         let stderr = String::from_utf8_lossy(&output.stderr);
         let output_text = format!("{stdout}\n{stderr}");
         if !output.status.success() {
-            return Ok(Some(parse_merge_tree_output_with_status(
-                &output_text,
-                false,
-                true,
-            )));
+            let result = parse_merge_tree_output_with_status(&output_text, false, true);
+            let _ = fs::remove_dir_all(&preview_root);
+            return Ok(Some(result));
         }
         let Some(tree) = stdout.lines().next().map(str::trim).filter(|line| {
             (40..=64).contains(&line.len()) && line.chars().all(|c| c.is_ascii_hexdigit())
         }) else {
-            return Ok(Some(MergePreview {
+            let result = MergePreview {
                 clean: false,
                 conflicted_files: Vec::new(),
                 fast_forward: false,
-            }));
+            };
+            let _ = fs::remove_dir_all(&preview_root);
+            return Ok(Some(result));
         };
         let synthetic = Command::new("git")
             .args(["-C"])
@@ -172,21 +210,26 @@ pub fn preview_rebase(repo_path: &Path, onto: &str) -> Result<Option<MergePrevie
             .env("GIT_COMMITTER_NAME", "GitStream Preview")
             .env("GIT_COMMITTER_EMAIL", "preview@gitstream.invalid")
             .env("GIT_EDITOR", "true")
+            .env("GIT_OBJECT_DIRECTORY", &preview_objects)
+            .env("GIT_ALTERNATE_OBJECT_DIRECTORIES", &source_objects)
             .output()
             .map_err(|e| GitError::CommandFailed {
                 message: format!("Failed to create preview commit: {e}"),
                 hint: None,
             })?;
         if !synthetic.status.success() {
+            let _ = fs::remove_dir_all(&preview_root);
             return Ok(None);
         }
         base = String::from_utf8_lossy(&synthetic.stdout).trim().to_owned();
     }
-    Ok(Some(MergePreview {
+    let result = MergePreview {
         clean: true,
         conflicted_files: Vec::new(),
         fast_forward: !had_commits,
-    }))
+    };
+    let _ = fs::remove_dir_all(&preview_root);
+    Ok(Some(result))
 }
 
 /// Parse merge-tree output when the caller only has its text. This keeps the
@@ -287,9 +330,16 @@ mod merge_preview_tests {
         let base = super::run_git(&dir, &["rev-parse", "HEAD"]).unwrap();
         fs::write(dir.join("f"), "one\ntwo\n").unwrap();
         git(&["commit", "-qam", "two"]);
+        fs::write(dir.join("f"), "one\ntwo\nthree\n").unwrap();
+        git(&["commit", "-qam", "three"]);
+        let before_objects = super::run_git(&dir, &["count-objects", "-v"]).unwrap();
         let preview = preview_rebase(&dir, base.trim()).unwrap().unwrap();
         assert!(preview.clean);
         assert!(!preview.fast_forward);
+        assert_eq!(
+            super::run_git(&dir, &["count-objects", "-v"]).unwrap(),
+            before_objects
+        );
         let _ = fs::remove_dir_all(dir);
     }
 }
@@ -661,6 +711,7 @@ pub fn log_with_filter(
             args.push(format!("--until={value}"));
         }
         if let Some(value) = f.grep.as_deref().filter(|v| !v.is_empty()) {
+            args.push("--regexp-ignore-case".into());
             args.push(format!("--grep={value}"));
         }
         if let Some(value) = f.pickaxe.as_deref().filter(|v| !v.is_empty()) {
@@ -935,6 +986,59 @@ pub fn branches(repo_path: &Path) -> Result<Vec<BranchInfo>, GitError> {
             behind,
             is_current,
             author,
+        });
+    }
+    Ok(result)
+}
+
+/// Classify local branches for cleanup suggestions. The result is read-only;
+/// deletion remains an explicit, confirmed action in the legacy UI.
+pub fn branch_hygiene(repo_path: &Path, stale_days: u64) -> Result<Vec<BranchHygiene>, GitError> {
+    let output = Command::new("git")
+        .env("LC_ALL", "C")
+        .args(["-c", "core.quotePath=false", "-C"])
+        .arg(repo_path)
+        .args([
+            "for-each-ref",
+            "--format=%(refname:short)%00%(committerdate:unix)%00%(upstream:track)",
+            "refs/heads",
+        ])
+        .output()
+        .map_err(|e| GitError::CommandFailed {
+            message: format!("Failed to run git: {e}"),
+            hint: None,
+        })?;
+    if !output.status.success() {
+        return Err(classify_git_error(&String::from_utf8_lossy(&output.stderr)));
+    }
+    let merged = run_git(repo_path, &["branch", "--merged"])?
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("* ").or(Some(line.trim())))
+        .map(str::to_owned)
+        .collect::<HashSet<_>>();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| GitError::CommandFailed {
+            message: format!("System clock error: {e}"),
+            hint: None,
+        })?
+        .as_secs() as i64;
+    let threshold = (stale_days.saturating_mul(86_400)) as i64;
+    let mut result = Vec::new();
+    for record in String::from_utf8_lossy(&output.stdout).split('\n') {
+        if record.is_empty() {
+            continue;
+        }
+        let mut fields = record.split('\0');
+        let Some(name) = fields.next().filter(|name| !name.is_empty()) else { continue };
+        let last_commit = fields.next().and_then(|value| value.parse().ok()).unwrap_or(0);
+        let track = fields.next().unwrap_or_default();
+        result.push(BranchHygiene {
+            name: name.to_owned(),
+            merged: merged.contains(name),
+            gone: track.contains("gone"),
+            stale: stale_days > 0 && last_commit > 0 && now.saturating_sub(last_commit) > threshold,
+            last_commit,
         });
     }
     Ok(result)
@@ -2494,7 +2598,9 @@ pub fn git_grep(
             });
         }
     }
-    let mut args = vec!["grep", "-n", "-I", "--", text];
+    // NUL-delimited output keeps filenames containing ':' (and newlines)
+    // unambiguous. The record format is `path\0line\0content\n`.
+    let mut args = vec!["grep", "-n", "-I", "-z", "--", text];
     if let Some(path) = path {
         args.push(path);
     }
@@ -2512,27 +2618,104 @@ pub fn git_grep(
             &out.stderr,
         )));
     }
-    Ok(String::from_utf8_lossy(&out.stdout)
-        .lines()
-        .filter_map(|line| {
-            let (path, rest) = line.split_once(':')?;
-            let (line, content) = rest.split_once(':')?;
-            Some(GrepMatch {
-                path: path.to_owned(),
-                line: line.parse().ok()?,
-                content: content.to_owned(),
-            })
-        })
-        .collect())
+    let bytes = &out.stdout;
+    let mut matches = Vec::new();
+    let mut cursor = 0;
+    while cursor < bytes.len() {
+        let Some(path_end) = bytes[cursor..].iter().position(|&b| b == 0) else {
+            break;
+        };
+        let path_end = cursor + path_end;
+        let path = String::from_utf8_lossy(&bytes[cursor..path_end]).into_owned();
+        cursor = path_end + 1;
+        let Some(line_end) = bytes[cursor..].iter().position(|&b| b == 0) else {
+            break;
+        };
+        let line_end = cursor + line_end;
+        let line = String::from_utf8_lossy(&bytes[cursor..line_end])
+            .parse()
+            .ok();
+        cursor = line_end + 1;
+        let Some(content_end) = bytes[cursor..].iter().position(|&b| b == b'\n') else {
+            break;
+        };
+        let content_end = cursor + content_end;
+        if let Some(line) = line {
+            matches.push(GrepMatch {
+                path,
+                line,
+                content: String::from_utf8_lossy(&bytes[cursor..content_end]).into_owned(),
+            });
+        }
+        cursor = content_end + 1;
+    }
+    Ok(matches)
 }
 
 #[cfg(test)]
 mod grep_tests {
     use super::*;
+    use std::fs;
+    use std::process::Command;
     #[test]
     fn git_grep_rejects_unsafe_paths() {
         let path = std::env::current_dir().unwrap();
         assert!(git_grep(&path, "x", Some("../secret")).is_err());
         assert!(git_grep(&path, "", None).is_err());
+    }
+
+    #[test]
+    fn git_grep_parses_colons_in_filename() {
+        let path = std::env::temp_dir().join(format!("gitstream-grep-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&path);
+        fs::create_dir_all(path.join("a:b")).unwrap();
+        let run = |args: &[&str]| {
+            assert!(Command::new("git")
+                .current_dir(&path)
+                .args(args)
+                .status()
+                .unwrap()
+                .success());
+        };
+        run(&["init", "-q"]);
+        run(&["config", "user.name", "T"]);
+        run(&["config", "user.email", "t@e"]);
+        fs::write(path.join("a:b/file:x"), "needle\n").unwrap();
+        run(&["add", "."]);
+        run(&["commit", "-qm", "grep"]);
+        let found = git_grep(&path, "needle", None).unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].path, "a:b/file:x");
+        assert_eq!(found[0].line, 1);
+        let _ = fs::remove_dir_all(path);
+    }
+
+    #[test]
+    fn log_grep_is_case_insensitive() {
+        let path =
+            std::env::temp_dir().join(format!("gitstream-log-filter-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&path);
+        fs::create_dir_all(&path).unwrap();
+        let run = |args: &[&str]| {
+            assert!(Command::new("git")
+                .current_dir(&path)
+                .args(args)
+                .status()
+                .unwrap()
+                .success());
+        };
+        run(&["init", "-q"]);
+        run(&["config", "user.name", "T"]);
+        run(&["config", "user.email", "t@e"]);
+        fs::write(path.join("f"), "one\n").unwrap();
+        run(&["add", "."]);
+        run(&["commit", "-qm", "UPPER Needle"]);
+        let filter = LogFilter {
+            grep: Some("upper needle".into()),
+            ..Default::default()
+        };
+        let commits = log_with_filter(&path, 10, Some(&filter)).unwrap();
+        assert_eq!(commits.len(), 1);
+        let _ = fs::remove_dir_all(path);
     }
 }

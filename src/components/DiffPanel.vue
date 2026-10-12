@@ -1,19 +1,37 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import type { DiffHunkWithWordDiff } from "@/composables/useSideBySideDiff";
+import { useCodeHighlight } from "@/composables/useCodeHighlight";
 
 interface Props {
   hunks: DiffHunkWithWordDiff[];
   isOldVersion: boolean;
 }
 
-withDefaults(defineProps<Props>(), {});
-
 const panelRef = ref<HTMLDivElement | null>(null);
+const props = withDefaults(defineProps<Props>(), {});
+const sourceLines = computed(() => props.hunks.flatMap((hunk) => hunk.lines.map((line) => line.content)));
+const language = computed(() => (props.hunks.length ? "source" : ""));
+const visibleRange = ref({ start: 0, count: 200 });
+const { highlighted } = useCodeHighlight(sourceLines, language, visibleRange);
+function updateVisibleRange() {
+  const element = panelRef.value;
+  if (!element) return;
+  const rowHeight = 20;
+  const start = Math.max(0, Math.floor(element.scrollTop / rowHeight) - 24);
+  const count = Math.min(260, Math.ceil(element.clientHeight / rowHeight) + 48);
+  visibleRange.value = { start, count };
+}
+function highlightedLine(hunkIndex: number, lineIndex: number): string | undefined {
+  let index = 0;
+  for (let i = 0; i < hunkIndex; i++) index += props.hunks[i]?.lines.length ?? 0;
+  index += lineIndex;
+  return highlighted.value[index];
+}
 </script>
 
 <template>
-  <div ref="panelRef" class="diff-panel">
+  <div ref="panelRef" class="diff-panel" @scroll="updateVisibleRange">
     <div v-for="(hunk, hunkIdx) in hunks" :key="hunkIdx" class="diff-hunk">
       <div class="hunk-header">{{ hunk.header }}</div>
       <div
@@ -35,7 +53,8 @@ const panelRef = ref<HTMLDivElement | null>(null);
               <span v-for="(span, spanIdx) in line.wordDiffs" :key="spanIdx" :class="['word-diff', span.kind]">{{ span.text }}</span>
             </template>
             <template v-else>
-              {{ line.content }}
+              <span v-if="highlightedLine(hunkIdx, lineIdx)" v-html="highlightedLine(hunkIdx, lineIdx)" />
+              <template v-else>{{ line.content }}</template>
             </template>
           </span>
         </div>

@@ -298,6 +298,17 @@ pub fn get_branches(repo_path: String) -> Result<Vec<BranchInfo>, String> {
 }
 
 #[tauri::command]
+pub fn get_branch_hygiene(repo_path: String, stale_days: Option<u64>) -> Result<Vec<BranchHygiene>, String> {
+    query::branch_hygiene(Path::new(&repo_path), stale_days.unwrap_or(90))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn open_mergetool(repo_path: String, path: String) -> Result<(), String> {
+    resolver::open_mergetool(Path::new(&repo_path), &path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn get_tags(repo_path: String) -> Result<Vec<TagInfo>, String> {
     query::tags(Path::new(&repo_path)).map_err(|e| e.to_string())
 }
@@ -597,6 +608,11 @@ pub fn do_create_branch(
 }
 
 #[tauri::command]
+pub fn do_spin_off(repo_path: String, new_branch: String) -> Result<(), String> {
+    mutation::spin_off(Path::new(&repo_path), &new_branch).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn do_stash_save(
     repo_path: String,
     message: Option<String>,
@@ -604,6 +620,24 @@ pub fn do_stash_save(
 ) -> Result<(), String> {
     mutation::stash_save(Path::new(&repo_path), message.as_deref(), include_untracked)
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_stash_save_subset(
+    repo_path: String,
+    message: Option<String>,
+    include_untracked: bool,
+    staged: bool,
+    paths: Vec<String>,
+) -> Result<(), String> {
+    mutation::stash_save_subset(
+        Path::new(&repo_path),
+        message.as_deref(),
+        include_untracked,
+        staged,
+        &paths,
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

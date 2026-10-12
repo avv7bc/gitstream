@@ -84,6 +84,14 @@ export interface BranchInfo {
   author: string | null;
 }
 
+export interface BranchHygiene {
+  name: string;
+  merged: boolean;
+  gone: boolean;
+  stale: boolean;
+  last_commit: number;
+}
+
 export interface TagInfo {
   name: string;
   oid: string;

@@ -6,7 +6,7 @@ import { useBranches } from "@/composables/useBranches";
 import RefIcon from "@/components/RefIcon.vue";
 import { useFiles } from "@/composables/useFiles";
 import { useRepo } from "@/composables/useRepo";
-import type { RefLabel, GraphLine } from "@/types";
+import type { RefLabel, GraphLine, LogFilter } from "@/types";
 import { highlight } from "@/utils/highlight";
 import { filterCommits } from "@/utils/commitFilter";
 import ContextMenu from "@/components/ContextMenu.vue";
@@ -137,6 +137,13 @@ watch(repoPath, () => {
 });
 
 const graphFilter = ref("");
+const showLogFilters = ref(false);
+const logFilter = ref<LogFilter>({});
+let logFilterTimer: ReturnType<typeof setTimeout> | null = null;
+function applyLogFilters() {
+  if (logFilterTimer) clearTimeout(logFilterTimer);
+  logFilterTimer = setTimeout(() => { void setFilter({ ...logFilter.value, grep: graphFilter.value.trim() || undefined }); }, 150);
+}
 
 const repoName = computed(() => {
   if (!repoPath.value) return "";
@@ -512,9 +519,9 @@ const filteredCommits = computed(() => filterCommits(commits.value, graphFilter.
 let filterTimer: ReturnType<typeof setTimeout> | null = null;
 watch(graphFilter, (value) => {
   if (filterTimer) clearTimeout(filterTimer);
-  filterTimer = setTimeout(() => { void setFilter(value.trim() ? { grep: value.trim() } : {}); }, 250);
+  filterTimer = setTimeout(() => { void setFilter({ ...logFilter.value, grep: value.trim() || undefined }); }, 250);
 });
-onUnmounted(() => { if (filterTimer) clearTimeout(filterTimer); });
+onUnmounted(() => { if (filterTimer) clearTimeout(filterTimer); if (logFilterTimer) clearTimeout(logFilterTimer); });
 
 function refClass(r: RefLabel): string {
   return `ref-label ref-${r.kind}`;
@@ -541,7 +548,18 @@ function formatDate(iso: string): string {
       <span class="panel-title">Graph<template v-if="repoName"> | {{ repoName }}</template></span>
       <div class="graph-toolbar">
         <input v-model="graphFilter" type="text" placeholder="Filter" class="graph-filter" />
+        <button class="filter-toggle" type="button" :aria-expanded="showLogFilters" @click="showLogFilters = !showLogFilters">⚙</button>
       </div>
+    </div>
+    <div v-if="showLogFilters" class="log-filter-panel">
+      <input v-model="logFilter.author" placeholder="Author" @change="applyLogFilters" />
+      <input v-model="logFilter.since" placeholder="Since (e.g. 2 weeks ago)" @change="applyLogFilters" />
+      <input v-model="logFilter.until" placeholder="Until" @change="applyLogFilters" />
+      <input v-model="logFilter.path" placeholder="Path" @change="applyLogFilters" />
+      <input v-model="logFilter.pickaxe" placeholder="Changed text (-S)" @change="applyLogFilters" />
+      <input v-model="logFilter.regex" placeholder="Changed pattern (-G)" @change="applyLogFilters" />
+      <label><input v-model="logFilter.all_branches" type="checkbox" @change="applyLogFilters" /> All branches</label>
+      <button type="button" @click="logFilter = {}; graphFilter = ''; applyLogFilters()">Clear</button>
     </div>
 
 
@@ -757,6 +775,30 @@ function formatDate(iso: string): string {
   height: 20px;
   border-color: var(--border);
 }
+.filter-toggle {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  height: 20px;
+}
+.log-filter-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.log-filter-panel input:not([type="checkbox"]) {
+  min-width: 100px;
+  height: 20px;
+  padding: 1px 5px;
+  font-size: var(--font-size-xs);
+}
+.log-filter-panel label, .log-filter-panel button { font-size: var(--font-size-xs); color: var(--text-muted); }
 
 .graph-header {
   display: flex;

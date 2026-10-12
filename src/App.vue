@@ -55,8 +55,8 @@ import { dispatchHotkey } from "@/commands/hotkeys";
 import type { CommandContext } from "@/commands/types";
 
 const { repoPath, openRepo, onRepoOpened, restoreLastRepo } = useRepo();
-const { refresh: refreshFiles, selectedFile, files, stageFiles, unstageFiles } = useFiles();
-const { refresh: refreshBranches, createTag, stashSave, branches, remotes } = useBranches();
+const { refresh: refreshFiles, selectedFile, selectedPaths, files, stageFiles, unstageFiles } = useFiles();
+const { refresh: refreshBranches, createTag, stashSave, stashSaveSubset, stashApply, checkout, checkoutRemote, branches, tags, stashes, remotes } = useBranches();
 const { refresh: refreshLog, selectedCommit, commits, squashCommits, rewordCommit } = useLog();
 const { clearDiff } = useDiff();
 const { pull, push, fetchRemote, fetchAll } = useRemote();
@@ -251,10 +251,11 @@ async function handleCreateTag(payload: {
   addTagTarget.value = null;
 }
 
-async function handleStashSave(payload: { message: string | null; includeUntracked: boolean }) {
+async function handleStashSave(payload: { message: string | null; includeUntracked: boolean; scope: "all" | "selected" | "staged" }) {
   showStashSaveDialog.value = false;
   try {
-    await stashSave(payload.message, payload.includeUntracked);
+    if (payload.scope === "all") await stashSave(payload.message, payload.includeUntracked);
+    else await stashSaveSubset(payload.message, payload.includeUntracked, payload.scope === "staged", payload.scope === "selected" ? [...selectedPaths.value] : []);
     await refreshAll();
   } catch (e) {
     logError(String(e));
@@ -415,6 +416,13 @@ function buildCommandContext(): CommandContext {
     repoPath: repoPath.value,
     selectedFile: selectedFile.value,
     selectedFileStaged: files.value.find((file) => file.path === selectedFile.value)?.staged,
+    refs: [
+      ...branches.value.map((branch) => ({ id: `${branch.is_remote ? 'remote' : 'branch'}:${branch.name}`, label: `Checkout ${branch.is_remote ? 'remote branch' : 'branch'}: ${branch.name}` })),
+      ...tags.value.map((tag) => ({ id: `tag:${tag.name}`, label: `Checkout tag (detached): ${tag.name}` })),
+      ...stashes.value.map((stash) => ({ id: `stash:${stash.index}`, label: `Apply stash@{${stash.index}}: ${stash.message}` })),
+    ],
+    files: files.value.map((file) => file.path),
+    commits: commits.value.map((commit) => ({ oid: commit.oid, label: `${commit.short_oid} ${commit.message.split("\n")[0]}` })),
     modalOpen: modalRegistry.some((modal) => modal.isOpen()),
     actions: {
       "file.stage": () => { if (selectedFile.value) return stageFiles([selectedFile.value]); },
@@ -438,6 +446,24 @@ function buildCommandContext(): CommandContext {
       "remote.fetch": () => handleToolbarFetch(),
     },
   };
+}
+
+async function handlePaletteSelect(entry: { kind: string; id: string; label: string }) {
+  if (entry.kind === "file") selectedFile.value = entry.label;
+  else if (entry.kind === "commit") selectedCommit.value = entry.id;
+  else if (entry.kind === "ref") {
+    const separator = entry.id.indexOf(":");
+    const kind = entry.id.slice(0, separator);
+    const value = entry.id.slice(separator + 1);
+    try {
+      if (kind === "remote") { checkoutRemoteTarget.value = value; return; }
+      if (kind === "branch") await checkout(value);
+      else if (kind === "tag") await checkoutRemote(`refs/tags/${value}`, null);
+      else if (kind === "stash") { await stashApply(Number(value)); await refreshAll(); return; }
+      else return;
+      await onBranchCheckedOut();
+    } catch (error) { logError(`Palette action failed: ${error}`); }
+  }
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -681,7 +707,7 @@ function onMouseUp() {
     <StatusBar />
 
     <!-- Dialogs -->
-    <CommandPalette v-if="showCommandPalette" :context="buildCommandContext()" @close="showCommandPalette = false" />
+    <CommandPalette v-if="showCommandPalette" :context="buildCommandContext()" @close="showCommandPalette = false" @select="handlePaletteSelect" />
     <CommitDialog v-if="showCommitDialog" @close="showCommitDialog = false; refreshAll()" />
     <PushDialog v-if="showPushDialog" @close="showPushDialog = false" @push="handlePushRequest" />
     <PullDialog v-if="showPullDialog" @close="showPullDialog = false" @pull="handlePullRequest" @fetch="handleFetchRequest" />
@@ -698,7 +724,7 @@ function onMouseUp() {
       @close="showConfirmDialog = false"
     />
     <DiscardDialog v-if="showDiscardDialog" @close="showDiscardDialog = false; refreshAll()" />
-    <StashSaveDialog v-if="showStashSaveDialog" @close="showStashSaveDialog = false" @confirm="handleStashSave" />
+    <StashSaveDialog v-if="showStashSaveDialog" :selected-paths="selectedPaths" @close="showStashSaveDialog = false" @confirm="handleStashSave" />
     <SettingsDialog v-if="showSettingsDialog" @close="showSettingsDialog = false" />
     <StatsDialog v-if="showStatsDialog" @close="showStatsDialog = false" />
     <AddTagDialog

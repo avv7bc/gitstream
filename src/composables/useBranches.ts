@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { invoke } from "@/composables/useProgress";
-import type { BranchInfo, TagInfo, StashEntry, RemoteInfo, TagSyncStatus } from "@/types";
+import type { BranchInfo, BranchHygiene, TagInfo, StashEntry, RemoteInfo, TagSyncStatus } from "@/types";
 import { useRepo } from "@/composables/useRepo";
 import { useSettings } from "@/composables/useSettings";
 
@@ -9,6 +9,7 @@ const tags = ref<TagInfo[]>([]);
 const stashes = ref<StashEntry[]>([]);
 const remotes = ref<string[]>([]);
 const remoteUrls = ref<RemoteInfo[]>([]);
+const hygiene = ref<BranchHygiene[]>([]);
 
 // Защита от гонки перекрывающихся refresh: применяем только самый свежий ответ.
 let refreshSeq = 0;
@@ -27,15 +28,17 @@ export function useBranches() {
       stashes.value = [];
       remotes.value = [];
       remoteUrls.value = [];
+      hygiene.value = [];
       return;
     }
     const seq = ++refreshSeq;
-    const [b, t, s, r, ru] = await Promise.all([
+    const [b, t, s, r, ru, h] = await Promise.all([
       invoke<BranchInfo[]>("get_branches", { repoPath: repoPath.value }),
       invoke<TagInfo[]>("get_tags", { repoPath: repoPath.value }),
       invoke<StashEntry[]>("get_stashes", { repoPath: repoPath.value }),
       invoke<string[]>("get_remotes", { repoPath: repoPath.value }),
       invoke<RemoteInfo[]>("get_remote_urls", { repoPath: repoPath.value }),
+      invoke<BranchHygiene[]>("get_branch_hygiene", { repoPath: repoPath.value, staleDays: 90 }),
     ]);
     // Более новый refresh уже стартовал — отбрасываем устаревший ответ.
     if (seq !== refreshSeq) return;
@@ -44,6 +47,7 @@ export function useBranches() {
     stashes.value = s;
     remotes.value = r;
     remoteUrls.value = ru;
+    hygiene.value = h;
   }
 
   async function addRemote(name: string, url: string) {
@@ -114,6 +118,11 @@ export function useBranches() {
     await invoke("do_rename_branch", { repoPath: repoPath.value, oldName, newName });
   }
 
+  async function spinOff(newBranch: string) {
+    if (!repoPath.value) return;
+    await invoke("do_spin_off", { repoPath: repoPath.value, newBranch });
+  }
+
   async function deleteBranch(branch: string, force: boolean) {
     if (!repoPath.value) return;
     await invoke("do_delete_branch", { repoPath: repoPath.value, branch, force });
@@ -165,6 +174,22 @@ export function useBranches() {
     });
   }
 
+  async function stashSaveSubset(
+    message: string | null,
+    includeUntracked: boolean,
+    staged: boolean,
+    paths: string[],
+  ) {
+    if (!repoPath.value) return;
+    await invoke("do_stash_save_subset", {
+      repoPath: repoPath.value,
+      message,
+      includeUntracked,
+      staged,
+      paths,
+    });
+  }
+
   async function stashApply(index: number) {
     if (!repoPath.value) return;
     await invoke("do_stash_apply", { repoPath: repoPath.value, index });
@@ -209,11 +234,11 @@ export function useBranches() {
   }
 
   return {
-    branches, tags, stashes, remotes, remoteUrls,
+    branches, tags, stashes, remotes, remoteUrls, hygiene,
     refresh, checkout, checkoutRemote,
-    createBranch, mergeBranch, rebaseOnto, renameBranch, deleteBranch, deleteRemoteBranch, pushBranch,
+    createBranch, mergeBranch, rebaseOnto, renameBranch, spinOff, deleteBranch, deleteRemoteBranch, pushBranch,
     createTag, deleteTag, pushTag, getTagSyncStatus,
-    stashSave, stashApply, stashPop, stashDrop,
+    stashSave, stashSaveSubset, stashApply, stashPop, stashDrop,
     addRemote, removeRemote, renameRemote, setRemoteUrl, setBranchUpstream,
   };
 }

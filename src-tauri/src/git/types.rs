@@ -51,6 +51,15 @@ pub struct BranchInfo {
 }
 
 #[derive(Serialize, Clone, Debug)]
+pub struct BranchHygiene {
+    pub name: String,
+    pub merged: bool,
+    pub gone: bool,
+    pub stale: bool,
+    pub last_commit: i64,
+}
+
+#[derive(Serialize, Clone, Debug)]
 pub struct TagInfo {
     pub name: String,
     pub oid: String,
