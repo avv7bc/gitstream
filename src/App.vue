@@ -383,6 +383,7 @@ function onKeydown(e: KeyboardEvent) {
     repoPath: repoPath.value,
     selectedFile: selectedFile.value,
     selectedFileStaged: files.value.find((file) => file.path === selectedFile.value)?.staged,
+    modalOpen: modalRegistry.some((modal) => modal.isOpen()),
     actions: {
       "file.stage": () => { if (selectedFile.value) return stageFiles([selectedFile.value]); },
       "file.unstage": () => { if (selectedFile.value) return unstageFiles([selectedFile.value]); },
@@ -390,6 +391,9 @@ function onKeydown(e: KeyboardEvent) {
       "branch.checkout": () => branchPanelRef.value?.triggerCheckoutRemote(),
       "branch.merge": () => branchPanelRef.value?.triggerMerge(),
       "branch.rebase": () => branchPanelRef.value?.triggerRebase(),
+      "branch.create": () => { if (repoPath.value) branchPanelRef.value?.openCreateBranch(null); },
+      "tag.create": () => { if (repoPath.value) openAddTag(null); },
+      "log.toggle": () => toggleLog(),
       "remote.pull": () => { showPullDialog.value = true; },
       "remote.push": () => handlePushRequest("origin", false),
       "settings.open": () => { showSettingsDialog.value = !showSettingsDialog.value; },
@@ -397,26 +401,6 @@ function onKeydown(e: KeyboardEvent) {
     },
   };
   if (dispatchHotkey(e, commandContext)) return;
-  if (e.altKey && e.key === "PageDown") {
-    e.preventDefault();
-    if (repoPath.value) showPullDialog.value = true;
-  }
-  if (e.altKey && e.key === "PageUp") {
-    e.preventDefault();
-    if (repoPath.value) handlePushRequest("origin", false);
-  }
-  if (e.key === "F7" && !e.shiftKey) {
-    e.preventDefault();
-    if (repoPath.value) branchPanelRef.value?.openCreateBranch(null);
-  }
-  if (e.key === "F7" && e.shiftKey) {
-    e.preventDefault();
-    if (repoPath.value) openAddTag(null);
-  }
-  if ((e.altKey || e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyO") {
-    e.preventDefault();
-    toggleLog();
-  }
 }
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let pollStopped = false;

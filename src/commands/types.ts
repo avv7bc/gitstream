@@ -8,6 +8,8 @@ export interface CommandContext {
   selectedFiles?: string[];
   selectedCommit?: string | null;
   selectedBranch?: string | null;
+  /** Global keyboard dispatch is suppressed while a modal is active. */
+  modalOpen?: boolean;
   [key: string]: unknown;
 }
 

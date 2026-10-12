@@ -1,6 +1,12 @@
 import { commandMatchesShortcut, allCommands } from "./registry";
 import type { Command, CommandContext } from "./types";
 
+function reportCommandError(error: unknown): void {
+  // Keep global keyboard dispatch independent from the Tauri progress module;
+  // command implementations may still surface the error in Git output/toast.
+  console.error("Command execution failed", error);
+}
+
 function eventShortcut(event: KeyboardEvent): string {
   const modifiers: string[] = [];
   if (event.ctrlKey) modifiers.push("Ctrl");
@@ -17,6 +23,10 @@ function eventShortcut(event: KeyboardEvent): string {
 }
 
 export function dispatchHotkey(event: KeyboardEvent, context: CommandContext = {}): Command | undefined {
+  if (event.defaultPrevented || event.isComposing || (event as KeyboardEvent & { keyCode?: number }).keyCode === 229) return undefined;
+  if (context.modalOpen) return undefined;
+  const target = event.target as HTMLElement | null;
+  if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return undefined;
   const shortcut = eventShortcut(event);
   const command = allCommands().find((item) => {
     if (!commandMatchesShortcut(item, shortcut)) return false;
@@ -25,7 +35,14 @@ export function dispatchHotkey(event: KeyboardEvent, context: CommandContext = {
   });
   if (!command) return undefined;
   event.preventDefault();
-  void command.execute(context);
+  try {
+    const result = command.execute(context);
+    if (result && typeof (result as Promise<void>).catch === "function") {
+      void (result as Promise<void>).catch(reportCommandError);
+    }
+  } catch (error) {
+    reportCommandError(error);
+  }
   return command;
 }
 

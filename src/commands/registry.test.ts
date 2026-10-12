@@ -46,6 +46,25 @@ describe("command registry", () => {
     unregisterCommand("test.shortcut");
   });
 
+  it("preserves Meta aliases for legacy Ctrl shortcuts", () => {
+    const execute = vi.fn();
+    registerCommand({
+      id: "test.meta",
+      label: "Meta alias",
+      scope: "global",
+      shortcut: "Ctrl+K",
+      execute,
+    });
+    const event = {
+      key: "k", code: "KeyK", ctrlKey: false, metaKey: true, altKey: false,
+      shiftKey: false, preventDefault: vi.fn(), target: null,
+    } as unknown as KeyboardEvent;
+
+    expect(dispatchHotkey(event, {})).toMatchObject({ id: "test.meta" });
+    expect(execute).toHaveBeenCalled();
+    unregisterCommand("test.meta");
+  });
+
   it("keeps unavailable shortcuts inert", () => {
     const execute = vi.fn();
     registerCommand({
@@ -65,10 +84,36 @@ describe("command registry", () => {
     unregisterCommand("test.disabled");
   });
 
+  it("suppresses dispatch in modal, composing, and editable contexts", () => {
+    const execute = vi.fn();
+    registerCommand({ id: "test.suppressed", label: "Suppressed", scope: "global", shortcut: "Ctrl+L", execute });
+    const base = { key: "l", code: "KeyL", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false, preventDefault: vi.fn(), target: null };
+    expect(dispatchHotkey(base as unknown as KeyboardEvent, { modalOpen: true })).toBeUndefined();
+    expect(dispatchHotkey({ ...base, isComposing: true } as unknown as KeyboardEvent, {})).toBeUndefined();
+    expect(dispatchHotkey({ ...base, target: { tagName: "INPUT", isContentEditable: false } } as unknown as KeyboardEvent, {})).toBeUndefined();
+    expect(execute).not.toHaveBeenCalled();
+    unregisterCommand("test.suppressed");
+  });
+
+  it("logs synchronous and asynchronous command failures", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    registerCommand({ id: "test.failure", label: "Failure", scope: "global", shortcut: "Ctrl+L", execute: async () => { throw new Error("boom"); } });
+    const event = { key: "l", code: "KeyL", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false, preventDefault: vi.fn(), target: null } as unknown as KeyboardEvent;
+    expect(dispatchHotkey(event, {})?.id).toBe("test.failure");
+    await Promise.resolve();
+    expect(error).toHaveBeenCalledWith("Command execution failed", expect.any(Error));
+    error.mockRestore();
+    unregisterCommand("test.failure");
+  });
+
   it("exposes built-in legacy commands", () => {
     expect(getCommand("file.stage")?.scope).toContain("file");
     expect(getCommand("branch.checkout")?.scope).toContain("branch");
     expect(getCommand("settings.open")?.shortcut).toContain("Ctrl+P");
+    expect(getCommand("file.stage")?.shortcut).toContain("Meta+T");
+    const toolbarWithoutRepo = commandsForScope("toolbar", {});
+    expect(toolbarWithoutRepo.find((item) => item.id === "commit.open")?.enabled).toBe(false);
+    expect(toolbarWithoutRepo.find((item) => item.id === "file.stage")).toBeUndefined();
   });
 });
 

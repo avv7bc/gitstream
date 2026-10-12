@@ -13,6 +13,9 @@ import SetUpstreamDialog from "@/components/dialogs/SetUpstreamDialog.vue";
 import RefIcon from "@/components/RefIcon.vue";
 import type { BranchInfo, TagInfo, StashEntry, RemoteInfo, TagSyncState } from "@/types";
 import { useI18n } from "@/composables/useI18n";
+import { useRepo } from "@/composables/useRepo";
+import { getCommand } from "@/commands/registry";
+import type { CommandContext } from "@/commands/types";
 const { i18n } = useI18n();
 
 // Текст подсказки для ветки: имя + автор tip-коммита (ближайшее, что Git даёт
@@ -45,6 +48,21 @@ const {
   addRemote, removeRemote, renameRemote, setRemoteUrl, setBranchUpstream,
 } = useBranches();
 const { fetchRemote, fetchAll, syncTags } = useRemote();
+const { repoPath } = useRepo();
+
+async function runCommand(id: string, context: CommandContext): Promise<boolean> {
+  const command = getCommand(id);
+  if (!command) return false;
+  if (command.visible && !command.visible(context)) return false;
+  if (command.enabled && !command.enabled(context)) return false;
+  try {
+    await command.execute(context);
+    return true;
+  } catch (e) {
+    logError(String(e));
+    return false;
+  }
+}
 
 // Статус каждого тега относительно remote (заполняется по «Проверить теги»):
 // имя → synced/diverged/local_only/remote_only. Пусто, пока не проверяли.
@@ -453,18 +471,38 @@ function openAddRemote() {
   showRemoteDialog.value = true;
 }
 
-function openEditRemoteUrl() {
-  remoteDialogTarget.value = ctxRemote.value;
-  remoteDialogMode.value = "editUrl";
+async function openEditRemoteUrl() {
+  const target = ctxRemote.value;
   closeRemoteMgmtCtxMenu();
-  showRemoteDialog.value = true;
+  if (!target) return;
+  await runCommand("remote.edit", {
+    repoPath: repoPath.value,
+    selectedRemote: target.name,
+    actions: {
+      "remote.edit": () => {
+        remoteDialogTarget.value = target;
+        remoteDialogMode.value = "editUrl";
+        showRemoteDialog.value = true;
+      },
+    },
+  });
 }
 
-function openRenameRemote() {
-  remoteDialogTarget.value = ctxRemote.value;
-  remoteDialogMode.value = "rename";
+async function openRenameRemote() {
+  const target = ctxRemote.value;
   closeRemoteMgmtCtxMenu();
-  showRemoteDialog.value = true;
+  if (!target) return;
+  await runCommand("remote.rename", {
+    repoPath: repoPath.value,
+    selectedRemote: target.name,
+    actions: {
+      "remote.rename": () => {
+        remoteDialogTarget.value = target;
+        remoteDialogMode.value = "rename";
+        showRemoteDialog.value = true;
+      },
+    },
+  });
 }
 
 async function confirmRemoteDialog(name: string, url: string) {
@@ -482,11 +520,20 @@ async function confirmRemoteDialog(name: string, url: string) {
   remoteDialogTarget.value = null;
 }
 
-function handleRemoveRemoteCtx() {
-  remoteDialogTarget.value = ctxRemote.value;
+async function handleRemoveRemoteCtx() {
+  const target = ctxRemote.value;
   closeRemoteMgmtCtxMenu();
-  if (!remoteDialogTarget.value) return;
-  showRemoveRemoteConfirm.value = true;
+  if (!target) return;
+  await runCommand("remote.remove", {
+    repoPath: repoPath.value,
+    selectedRemote: target.name,
+    actions: {
+      "remote.remove": () => {
+        remoteDialogTarget.value = target;
+        showRemoveRemoteConfirm.value = true;
+      },
+    },
+  });
 }
 
 async function confirmRemoveRemote() {
@@ -506,8 +553,14 @@ async function handleFetchRemoteCtx(prune: boolean) {
   const r = ctxRemote.value;
   closeRemoteMgmtCtxMenu();
   if (!r) return;
-  await fetchRemote(r.name, prune);
-  emit("branchesChanged");
+  await runCommand(prune ? "remote.fetch.prune" : "remote.fetch", {
+    repoPath: repoPath.value,
+    selectedRemote: r.name,
+    actions: {
+      "remote.fetch": async () => { await fetchRemote(r.name, false); emit("branchesChanged"); },
+      "remote.fetch.prune": async () => { await fetchRemote(r.name, true); emit("branchesChanged"); },
+    },
+  });
 }
 
 async function handleFetchAllCtx() {
@@ -587,36 +640,65 @@ function handleCheckoutRemoteCtx() {
   const b = remoteCtxBranch.value;
   closeRemoteCtxMenu();
   if (!b) return;
-  emit("checkoutRemote", b.name);
+  void runCommand("branch.checkout", {
+    repoPath: repoPath.value,
+    selectedBranch: b.name,
+    actions: { "branch.checkout": () => emit("checkoutRemote", b.name) },
+  });
 }
 
 function handleMergeRemoteCtx() {
   const b = remoteCtxBranch.value;
   closeRemoteCtxMenu();
   if (!b) return;
-  targetBranch.value = b;
-  showMergeConfirm.value = true;
+  void runCommand("branch.merge", {
+    repoPath: repoPath.value,
+    selectedBranch: b.name,
+    actions: {
+      "branch.merge": () => {
+        targetBranch.value = b;
+        showMergeConfirm.value = true;
+      },
+    },
+  });
 }
 
 async function handleRebaseRemoteCtx() {
   const b = remoteCtxBranch.value;
   closeRemoteCtxMenu();
   if (!b) return;
-  if (!window.confirm(`Rebase current branch onto '${b.name}'?`)) return;
-  try {
-    await rebaseOnto(b.name);
-  } catch (e) {
-    logError(`Rebase failed (resolve conflicts below if any): ${e}`);
-  } finally {
-    emit("branchesChanged");
-  }
+  await runCommand("branch.rebase", {
+    repoPath: repoPath.value,
+    selectedBranch: b.name,
+    actions: {
+      "branch.rebase": async () => {
+        if (!window.confirm(`Rebase current branch onto '${b.name}'?`)) return;
+        try {
+          await rebaseOnto(b.name);
+        } catch (e) {
+          logError(`Rebase failed (resolve conflicts below if any): ${e}`);
+        } finally {
+          emit("branchesChanged");
+        }
+      },
+    },
+  });
 }
 
-function handleDeleteRemoteCtx() {
-  targetRemoteBranches.value = [...selectedRemoteBranches.value];
+async function handleDeleteRemoteCtx() {
+  const targets = [...selectedRemoteBranches.value];
   closeRemoteCtxMenu();
-  if (!targetRemoteBranches.value.length) return;
-  showDeleteRemoteConfirm.value = true;
+  if (!targets.length) return;
+  await runCommand("remote.branch.delete", {
+    repoPath: repoPath.value,
+    selectedBranch: targets[0]?.name,
+    actions: {
+      "remote.branch.delete": () => {
+        targetRemoteBranches.value = targets;
+        showDeleteRemoteConfirm.value = true;
+      },
+    },
+  });
 }
 
 async function confirmDeleteRemote() {

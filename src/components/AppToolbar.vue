@@ -3,9 +3,12 @@ import { ref, computed, watch, onUnmounted } from "vue";
 import { useFiles } from "@/composables/useFiles";
 import { logError } from "@/composables/useProgress";
 import { useI18n } from "@/composables/useI18n";
+import { useRepo } from "@/composables/useRepo";
+import { getCommand } from "@/commands/registry";
+import type { CommandContext } from "@/commands/types";
 const { i18n } = useI18n();
 
-defineEmits<{
+const emit = defineEmits<{
   commit: [];
   push: [];
   pull: [];
@@ -24,6 +27,7 @@ defineEmits<{
 }>();
 
 const { files, selectedFile, stageFiles, unstageFiles } = useFiles();
+const { repoPath } = useRepo();
 
 const selectedStatus = computed(() =>
   files.value.find((f) => f.path === selectedFile.value) ?? null,
@@ -40,18 +44,38 @@ const canUnstage = computed(
 );
 const canDiscard = computed(() => !!selectedStatus.value);
 
-async function doStage() {
-  if (!(canStage.value && selectedFile.value)) return;
+async function runCommand(id: string) {
+  const command = getCommand(id);
+  if (!command) return;
+  const context: CommandContext = {
+    repoPath: repoPath.value,
+    selectedFile: selectedFile.value,
+    selectedFileStaged: selectedStatus.value?.staged,
+    actions: {
+      "file.stage": async () => { if (selectedFile.value) await stageFiles([selectedFile.value]); },
+      "file.unstage": async () => { if (selectedFile.value) await unstageFiles([selectedFile.value]); },
+      "file.discard": () => emit("discard"),
+      "commit.open": () => emit("commit"),
+      "branch.checkout.local": () => emit("checkout"),
+      "branch.merge": () => emit("merge"),
+      "branch.rebase": () => emit("rebase"),
+      "remote.fetch": () => emit("fetch"),
+      "remote.fetchAll": () => emit("fetchAll", false),
+      "remote.fetchAllPrune": () => emit("fetchAll", true),
+      "remote.pull": () => emit("pull"),
+      "remote.push": () => emit("push"),
+      "settings.open": () => emit("settings"),
+      "repository.clone": () => emit("cloneRepository"),
+      "repository.add": () => emit("addRepository"),
+      "repository.group.add": () => emit("addGroup"),
+      "stats.open": () => emit("stats"),
+      "stash.open": () => emit("stash"),
+    },
+  };
+  if (command.visible && !command.visible(context)) return;
+  if (command.enabled && !command.enabled(context)) return;
   try {
-    await stageFiles([selectedFile.value]);
-  } catch (e) {
-    logError(String(e));
-  }
-}
-async function doUnstage() {
-  if (!(canUnstage.value && selectedFile.value)) return;
-  try {
-    await unstageFiles([selectedFile.value]);
+    await command.execute(context);
   } catch (e) {
     logError(String(e));
   }
@@ -152,7 +176,7 @@ function closeBranchMenu() {
         </button>
 
         <div v-if="showRepoMenu" class="dropdown-menu" @click.stop>
-          <button class="dropdown-item" @click="$emit('cloneRepository'); closeMenu()">
+          <button class="dropdown-item" @click="runCommand('repository.clone'); closeMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M3 6a2 2 0 0 1 2-2h3l2 2h3a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6z"/>
               <path d="M8 8v3M6.5 9.5L8 11l1.5-1.5"/>
@@ -160,13 +184,13 @@ function closeBranchMenu() {
             {{ i18n.toolbar.cloneRepository }}
           </button>
           <div class="dropdown-separator" />
-          <button class="dropdown-item" @click="$emit('addGroup'); closeMenu()">
+          <button class="dropdown-item" @click="runCommand('repository.group.add'); closeMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M8 3v10M3 8h10"/>
             </svg>
             {{ i18n.toolbar.addGroup }}
           </button>
-          <button class="dropdown-item" @click="$emit('addRepository'); closeMenu()">
+          <button class="dropdown-item" @click="runCommand('repository.add'); closeMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M8 3v10M3 8h10"/>
             </svg>
@@ -194,7 +218,7 @@ function closeBranchMenu() {
         </button>
 
         <div v-if="showLocalMenu" class="dropdown-menu" @click.stop>
-          <button class="dropdown-item" @click="$emit('commit'); closeLocalMenu()">
+          <button class="dropdown-item" @click="runCommand('commit.open'); closeLocalMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="8" cy="8" r="3"/>
               <path d="M8 1v4M8 11v4M1 8h4M11 8h4"/>
@@ -202,28 +226,28 @@ function closeBranchMenu() {
             {{ i18n.toolbar.commit }}
             <span class="dropdown-shortcut">Ctrl+K</span>
           </button>
-          <button class="dropdown-item" @click="$emit('checkout'); closeLocalMenu()">
+          <button class="dropdown-item" @click="runCommand('branch.checkout.local'); closeLocalMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M4 4v8M4 8h5l3-3M12 5v3h-3"/>
             </svg>
             {{ i18n.toolbar.checkout }}
           </button>
           <div class="dropdown-separator" />
-          <button class="dropdown-item" :disabled="!canStage" @click="doStage(); closeLocalMenu()">
+          <button class="dropdown-item" :disabled="!canStage" @click="runCommand('file.stage'); closeLocalMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M3 8l3 3 7-7"/>
             </svg>
             {{ i18n.toolbar.stage }}
             <span class="dropdown-shortcut">Ctrl+T</span>
           </button>
-          <button class="dropdown-item" :disabled="!canUnstage" @click="doUnstage(); closeLocalMenu()">
+          <button class="dropdown-item" :disabled="!canUnstage" @click="runCommand('file.unstage'); closeLocalMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M4 4l8 8M12 4l-8 8"/>
             </svg>
             {{ i18n.toolbar.unstage }}
             <span class="dropdown-shortcut">⇧Ctrl+T</span>
           </button>
-          <button class="dropdown-item" :disabled="!canDiscard" @click="$emit('discard'); closeLocalMenu()">
+          <button class="dropdown-item" :disabled="!canDiscard" @click="runCommand('file.discard'); closeLocalMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M3 5h10l-1 9H4L3 5zM6 2h4M2 5h12"/>
             </svg>
@@ -251,7 +275,7 @@ function closeBranchMenu() {
         </button>
 
         <div v-if="showBranchMenu" class="dropdown-menu" @click.stop>
-          <button class="dropdown-item" disabled @click="$emit('merge'); closeBranchMenu()">
+          <button class="dropdown-item" disabled @click="runCommand('branch.merge'); closeBranchMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="4" cy="4" r="1.5"/>
               <circle cx="12" cy="4" r="1.5"/>
@@ -261,7 +285,7 @@ function closeBranchMenu() {
             {{ i18n.toolbar.merge }}
             <span class="dropdown-shortcut">Ctrl+M</span>
           </button>
-          <button class="dropdown-item" disabled @click="$emit('rebase'); closeBranchMenu()">
+          <button class="dropdown-item" disabled @click="runCommand('branch.rebase'); closeBranchMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="4" cy="3" r="1.5" fill="currentColor" stroke="none"/>
               <circle cx="4" cy="8" r="1.5" fill="currentColor" stroke="none"/>
@@ -273,7 +297,7 @@ function closeBranchMenu() {
             <span class="dropdown-shortcut">Ctrl+D</span>
           </button>
           <div class="dropdown-separator" />
-          <button class="dropdown-item" @click="$emit('stash'); closeBranchMenu()">
+          <button class="dropdown-item" @click="runCommand('stash.open'); closeBranchMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
               <rect x="3" y="2" width="10" height="3" rx="1"/>
               <rect x="3" y="6.5" width="10" height="3" rx="1"/>
@@ -291,7 +315,7 @@ function closeBranchMenu() {
 
     <div class="toolbar-group-center">
       <div class="menu-button-wrapper" ref="fetchWrapper">
-        <button class="toolbar-btn-action action-green fetch-split" @click="$emit('fetch')" :title="i18n.toolbar.fetch">
+        <button class="toolbar-btn-action action-green fetch-split" @click="runCommand('remote.fetch')" :title="i18n.toolbar.fetch">
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
             <path d="M13 8a5 5 0 1 1-1.46-3.54"/>
             <path d="M13 2.5V5h-2.5"/>
@@ -305,25 +329,25 @@ function closeBranchMenu() {
         </button>
 
         <div v-if="showFetchMenu" class="dropdown-menu" @click.stop>
-          <button class="dropdown-item" @click="$emit('fetch'); closeFetchMenu()">
+          <button class="dropdown-item" @click="runCommand('remote.fetch'); closeFetchMenu()">
             {{ i18n.toolbar.fetch }}
           </button>
-          <button class="dropdown-item" @click="$emit('fetchAll', false); closeFetchMenu()">
+          <button class="dropdown-item" @click="runCommand('remote.fetchAll'); closeFetchMenu()">
             {{ i18n.toolbar.fetchAll }}
           </button>
-          <button class="dropdown-item" @click="$emit('fetchAll', true); closeFetchMenu()">
+          <button class="dropdown-item" @click="runCommand('remote.fetchAllPrune'); closeFetchMenu()">
             {{ i18n.toolbar.fetchAllPrune }}
           </button>
         </div>
       </div>
 
-      <button class="toolbar-btn-action action-green" @click="$emit('pull')" data-shortcut="Alt+PageDown">
+      <button class="toolbar-btn-action action-green" @click="runCommand('remote.pull')" data-shortcut="Alt+PageDown">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
         </svg>
         <span>{{ i18n.toolbar.pull }}</span>
       </button>
-      <button class="toolbar-btn-action action-red" @click="$emit('push')" data-shortcut="Alt+PageUp">
+      <button class="toolbar-btn-action action-red" @click="runCommand('remote.push')" data-shortcut="Alt+PageUp">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 3l4 4H9.5v5h-3V7H4L8 3z"/>
         </svg>
@@ -334,14 +358,14 @@ function closeBranchMenu() {
     <div class="toolbar-spacer" />
 
     <div class="toolbar-group">
-      <button class="toolbar-btn icon-only" @click="$emit('stats')" title="Repository Statistics">
+      <button class="toolbar-btn icon-only" @click="runCommand('stats.open')" title="Repository Statistics">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <rect x="2" y="10" width="3" height="4" rx="0.5"/>
           <rect x="6.5" y="6" width="3" height="8" rx="0.5"/>
           <rect x="11" y="2" width="3" height="12" rx="0.5"/>
         </svg>
       </button>
-      <button class="toolbar-btn icon-only" @click="$emit('settings')" title="Settings">
+      <button class="toolbar-btn icon-only" @click="runCommand('settings.open')" title="Settings">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
           <line x1="2" y1="4" x2="7.5" y2="4"/>
           <line x1="12.5" y1="4" x2="14" y2="4"/>
