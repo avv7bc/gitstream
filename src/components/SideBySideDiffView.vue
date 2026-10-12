@@ -23,6 +23,7 @@ const { enrichAllHunks } = useSideBySideDiff();
 
 const busyHunk = ref<number | null>(null);
 const showDiscardConfirm = ref(false);
+const pendingDiscardPayload = ref<{ raw: string; selected: number[] }[]>([]);
 
 // id строки = "<hunkIdx>:<lineIdxInHunkLines>"
 const selectedLines = ref<Set<string>>(new Set());
@@ -100,7 +101,13 @@ async function onSelectionAction(action: "stage" | "unstage" | "discard") {
   const payload = buildSelectionPayload();
   if (payload.length === 0) return;
   if (action === "discard") {
-    const n = selectedLines.value.size;
+    // Keep the exact patch payload that the user reviewed. Rebuilding it
+    // after the confirmation dialog can silently use a changed selection.
+    pendingDiscardPayload.value = payload.map((h) => ({
+      raw: h.raw,
+      selected: [...h.selected],
+    }));
+    const n = payload.reduce((count, h) => count + h.selected.length, 0);
     pendingDiscardCount.value = n;
     showDiscardConfirm.value = true;
     return;
@@ -123,7 +130,9 @@ async function performSelectionAction(action: "stage" | "unstage" | "discard", p
 
 function confirmDiscard() {
   showDiscardConfirm.value = false;
-  void performSelectionAction("discard");
+  const payload = pendingDiscardPayload.value;
+  pendingDiscardPayload.value = [];
+  void performSelectionAction("discard", payload);
 }
 
 function onStageBtn(hi: number) {
@@ -415,7 +424,7 @@ function scrollToHunk() {
       :message="`Discard changes in the selected lines (${pendingDiscardCount})? This action cannot be undone.`"
       confirm-label="Discard"
       danger
-      @close="showDiscardConfirm = false"
+      @close="showDiscardConfirm = false; pendingDiscardPayload = []"
       @confirm="confirmDiscard"
     />
   </div>

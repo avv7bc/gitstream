@@ -4,14 +4,23 @@ export interface MergePreview {
   fast_forward: boolean;
 }
 
-/** Parse the human-readable conflict section emitted by `git merge-tree`. */
-export function parseMergeTreePreview(output: string, fastForward = false): MergePreview {
+/** Parse the human-readable conflict section emitted by `git merge-tree`.
+ * A non-zero merge-tree status is also a conflict signal, even when Git does
+ * not include a path in the diagnostic output.
+ */
+export function parseMergeTreePreview(
+  output: string,
+  fastForward = false,
+  commandFailed = false,
+): MergePreview {
   const conflicted_files: string[] = [];
+  let conflictOutput = commandFailed;
   for (const line of output.split(/\r?\n/)) {
+    if (/^\s*CONFLICT\b/.test(line) || line.includes("Merge conflict in ")) conflictOutput = true;
     const match = line.match(/Merge conflict in (.+?)\s*$/);
     if (match && !conflicted_files.includes(match[1])) conflicted_files.push(match[1]);
   }
-  return { clean: conflicted_files.length === 0, conflicted_files, fast_forward: fastForward };
+  return { clean: !conflictOutput, conflicted_files, fast_forward: fastForward };
 }
 
 export function isMergePreviewEnabled(versionOutput: string): boolean {

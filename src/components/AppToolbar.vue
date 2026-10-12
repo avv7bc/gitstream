@@ -275,7 +275,7 @@ function closeBranchMenu() {
         </button>
 
         <div v-if="showBranchMenu" class="dropdown-menu" @click.stop>
-          <button class="dropdown-item" disabled @click="runCommand('branch.merge'); closeBranchMenu()">
+          <button class="dropdown-item" @click="runCommand('branch.merge'); closeBranchMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="4" cy="4" r="1.5"/>
               <circle cx="12" cy="4" r="1.5"/>
@@ -285,7 +285,7 @@ function closeBranchMenu() {
             {{ i18n.toolbar.merge }}
             <span class="dropdown-shortcut">Ctrl+M</span>
           </button>
-          <button class="dropdown-item" disabled @click="runCommand('branch.rebase'); closeBranchMenu()">
+          <button class="dropdown-item" @click="runCommand('branch.rebase'); closeBranchMenu()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="4" cy="3" r="1.5" fill="currentColor" stroke="none"/>
               <circle cx="4" cy="8" r="1.5" fill="currentColor" stroke="none"/>

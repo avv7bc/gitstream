@@ -18,6 +18,7 @@ import { useI18n } from "@/composables/useI18n";
 import { useRepo } from "@/composables/useRepo";
 import { getCommand } from "@/commands/registry";
 import type { CommandContext } from "@/commands/types";
+import { toast } from "@/composables/useToast";
 const { i18n } = useI18n();
 
 // Текст подсказки для ветки: имя + автор tip-коммита (ближайшее, что Git даёт
@@ -233,6 +234,7 @@ async function confirmMerge(branchName?: string) {
   if (!b) return;
   try {
     await mergeBranch(branchName || b.name);
+    toast({ kind: "success", title: `Merged ${branchName || b.name}` });
   } catch (e) {
     logError(`Merge failed (resolve conflicts below if any): ${e}`);
   } finally {
@@ -247,6 +249,7 @@ async function confirmRebase(branchName?: string) {
   if (!b) return;
   try {
     await rebaseOnto(branchName || b.name);
+    toast({ kind: "success", title: `Rebased onto ${branchName || b.name}` });
   } catch (e) {
     logError(`Rebase failed (resolve conflicts below if any): ${e}`);
   } finally {

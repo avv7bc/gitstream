@@ -144,3 +144,21 @@ test result: ok. 95 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 ```text
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.30s
 ```
+
+## Reviewer fixes (follow-up)
+
+- Wired toolbar Merge and Rebase commands to the BranchPanel dialogs, and Push to the configured PushDialog remote/force options.
+- Added success toasts after local merge and rebase operations.
+- Marked rebase preview unavailable until a true per-commit simulation is implemented.
+- Preserved the exact selected-line payload through discard confirmation instead of rebuilding it after confirmation.
+- Treated merge-tree conflict diagnostics and any non-zero merge-tree status as conflicts, with regression tests in Rust and TypeScript.
+
+## Follow-up verification
+
+`npm test` — 7 test files, 57 tests passed.
+
+`npx vue-tsc --noEmit` — passed.
+
+`cargo test --all-targets` — 97 tests passed.
+
+`cargo clippy --all-targets -- -D warnings` — passed.

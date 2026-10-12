@@ -319,6 +319,14 @@ function handleCloneRepository() {
   repositoriesPanelRef.value?.triggerCloneRepository();
 }
 
+function handleToolbarMerge() {
+  branchPanelRef.value?.triggerMerge();
+}
+
+function handleToolbarRebase() {
+  branchPanelRef.value?.triggerRebase();
+}
+
 // --- Modal registry + open-order stack: Esc closes the topmost (last opened) ---
 const modalRegistry: { key: string; isOpen: () => boolean; close: () => void }[] = [
   { key: "commit", isOpen: () => showCommitDialog.value, close: () => { showCommitDialog.value = false; refreshAll(); } },
@@ -537,7 +545,7 @@ function onMouseUp() {
     <!-- Toolbar -->
     <AppToolbar
       @commit="showCommitDialog = true"
-      @push="handlePushRequest('origin', false)"
+      @push="showPushDialog = true"
       @pull="showPullDialog = true"
       @fetch="handleToolbarFetch"
       @fetch-all="handleFetchAllRequest"
@@ -548,6 +556,8 @@ function onMouseUp() {
       @clone-repository="handleCloneRepository"
       @add-group="handleAddGroup"
       @discard="showDiscardDialog = true"
+      @merge="handleToolbarMerge"
+      @rebase="handleToolbarRebase"
       @stash="showStashSaveDialog = true"
     />
 

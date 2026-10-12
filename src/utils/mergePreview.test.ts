@@ -22,6 +22,11 @@ describe("merge preview", () => {
     });
   });
 
+  it("treats conflict output and non-zero status as conflicts without paths", () => {
+    expect(parseMergeTreePreview("CONFLICT (content)")).toMatchObject({ clean: false });
+    expect(parseMergeTreePreview("merge-tree failed", false, true)).toMatchObject({ clean: false });
+  });
+
   it("only enables previews on Git 2.38 or newer", () => {
     expect(isMergePreviewEnabled("git version 2.37.9")).toBe(false);
     expect(isMergePreviewEnabled("git version 2.38.0")).toBe(true);

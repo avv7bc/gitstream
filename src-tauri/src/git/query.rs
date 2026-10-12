@@ -83,18 +83,35 @@ pub fn preview_merge(repo_path: &Path, branch: &str) -> Result<Option<MergePrevi
         })?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    if !output.status.success() && stdout.trim().is_empty() {
-        return Err(classify_git_error(&stderr));
-    }
-    Ok(Some(parse_merge_tree_output(
-        &format!("{stdout}\n{stderr}"),
-        fast_forward,
-    )))
+    let output_text = format!("{stdout}\n{stderr}");
+    let preview = if output.status.success() {
+        parse_merge_tree_output(&output_text, fast_forward)
+    } else {
+        parse_merge_tree_output_with_status(&output_text, fast_forward, true)
+    };
+    Ok(Some(preview))
 }
 
+/// Parse merge-tree output when the caller only has its text. This keeps the
+/// helper useful for tests and callers that do not spawn the command.
 pub fn parse_merge_tree_output(output: &str, fast_forward: bool) -> MergePreview {
+    parse_merge_tree_output_with_status(output, fast_forward, false)
+}
+
+/// Parse merge-tree output together with its process status. Git may emit a
+/// conflict without a path, so a non-zero status must force `clean = false`.
+pub fn parse_merge_tree_output_with_status(
+    output: &str,
+    fast_forward: bool,
+    command_failed: bool,
+) -> MergePreview {
     let mut conflicted_files = Vec::new();
+    let mut conflict_output = command_failed;
     for line in output.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("CONFLICT") || trimmed.contains("Merge conflict in ") {
+            conflict_output = true;
+        }
         if let Some(path) = line.split_once("Merge conflict in ").map(|(_, path)| path.trim()) {
             if !path.is_empty() && !conflicted_files.iter().any(|item| item == path) {
                 conflicted_files.push(path.to_string());
@@ -102,7 +119,7 @@ pub fn parse_merge_tree_output(output: &str, fast_forward: bool) -> MergePreview
         }
     }
     MergePreview {
-        clean: conflicted_files.is_empty(),
+        clean: !conflict_output,
         conflicted_files,
         fast_forward,
     }
@@ -110,7 +127,7 @@ pub fn parse_merge_tree_output(output: &str, fast_forward: bool) -> MergePreview
 
 #[cfg(test)]
 mod merge_preview_tests {
-    use super::{parse_merge_tree_output, supports_merge_preview};
+    use super::{parse_merge_tree_output, parse_merge_tree_output_with_status, supports_merge_preview};
 
     #[test]
     fn merge_preview_requires_git_238() {
@@ -128,6 +145,19 @@ mod merge_preview_tests {
         );
         assert!(!result.clean);
         assert_eq!(result.conflicted_files, ["src/main.rs", "README.md"]);
+    }
+
+    #[test]
+    fn nonzero_merge_tree_status_is_a_conflict_even_without_paths() {
+        let result = parse_merge_tree_output_with_status("merge-tree failed", false, true);
+        assert!(!result.clean);
+        assert!(result.conflicted_files.is_empty());
+    }
+
+    #[test]
+    fn generic_conflict_output_is_not_clean() {
+        let result = parse_merge_tree_output("CONFLICT (content)", false);
+        assert!(!result.clean);
     }
 }
 
