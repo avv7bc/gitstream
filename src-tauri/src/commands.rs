@@ -8,7 +8,7 @@ use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
 
-use crate::git::{diagnose, mutation, oplog, query, reflog, types::*};
+use crate::git::{diagnose, history, mutation, oplog, query, reflog, types::*, worktree};
 use crate::update::{self, UpdateCheck};
 
 #[derive(serde::Serialize, Clone)]
@@ -481,6 +481,41 @@ pub fn apply_lines(
 #[tauri::command]
 pub fn do_commit(repo_path: String, message: String, amend: bool) -> Result<String, String> {
     mutation::commit(Path::new(&repo_path), &message, amend).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_rebase_plan(
+    repo_path: String,
+    base: Option<String>,
+    plan: Vec<history::TodoItem>,
+) -> Result<String, String> {
+    history::rebase_plan(Path::new(&repo_path), base.as_deref(), &plan).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_worktrees(repo_path: String) -> Result<Vec<worktree::WorktreeInfo>, String> {
+    worktree::list(Path::new(&repo_path)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_worktree_add(
+    repo_path: String,
+    path: String,
+    branch: String,
+    new_branch: Option<String>,
+) -> Result<(), String> {
+    worktree::add(Path::new(&repo_path), &path, &branch, new_branch.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_worktree_remove(repo_path: String, path: String, force: bool) -> Result<(), String> {
+    worktree::remove(Path::new(&repo_path), &path, force).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_worktree_prune(repo_path: String) -> Result<(), String> {
+    worktree::prune(Path::new(&repo_path)).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

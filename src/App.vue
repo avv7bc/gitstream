@@ -33,6 +33,8 @@ import StashSaveDialog from "./components/dialogs/StashSaveDialog.vue";
 import UpdateBanner from "./components/UpdateBanner.vue";
 import ToastStack from "./components/ToastStack.vue";
 import OplogPanel from "./components/OplogPanel.vue";
+import WorktreePanel from "./components/WorktreePanel.vue";
+import InteractiveRebaseDialog from "./components/dialogs/InteractiveRebaseDialog.vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useUpdate } from "@/composables/useUpdate";
 import type { CommitInfo } from "@/types";
@@ -59,6 +61,7 @@ const { target: compareTarget, close: closeFileCompare } = useFileCompare();
 const { refresh: refreshConflicts } = useConflicts();
 const { undo, redo } = useOplog();
 const showOplog = ref(false);
+const showInteractiveRebase = ref(false);
 const { updateInfo, nextMajorInfo, checkForUpdate, dismissNextMajor } = useUpdate();
 
 async function undoLast() {
@@ -419,6 +422,7 @@ function onKeydown(e: KeyboardEvent) {
       "oplog.undo": () => undoLast(),
       "oplog.redo": () => redoLast(),
       "oplog.open": () => { showOplog.value = !showOplog.value; },
+      "history.interactive": () => { showInteractiveRebase.value = true; },
       "remote.pull": () => { showPullDialog.value = true; },
       "remote.push": () => handlePushRequest("origin", false),
       "settings.open": () => { showSettingsDialog.value = !showSettingsDialog.value; },
@@ -578,6 +582,7 @@ function onMouseUp() {
       @undo="undoLast"
       @redo="redoLast"
       @oplog="showOplog = !showOplog"
+      @interactive-rebase="showInteractiveRebase = true"
     />
 
     <ConflictBar @changed="refreshAll()" />
@@ -594,6 +599,7 @@ function onMouseUp() {
           <RepositoriesPanel ref="repositoriesPanelRef" @repo-added="handleRepoAdded" />
         </div>
         <div class="resize-handle-h" @mousedown="onMouseDown($event, 'repos')" />
+        <WorktreePanel />
         <div class="branches-section">
           <BranchPanel
             ref="branchPanelRef"
@@ -700,6 +706,7 @@ function onMouseUp() {
       @confirm="doReword($event)"
       @close="rewordPayload = null"
     />
+    <InteractiveRebaseDialog v-if="showInteractiveRebase" :commits="commits" @close="showInteractiveRebase = false" @done="showInteractiveRebase = false; refreshAll()" />
     <FileCompareDialog v-if="compareTarget" />
     <FileHistoryDialog v-if="fileHistoryOpen" />
     <BlameDialog v-if="blameOpen" />

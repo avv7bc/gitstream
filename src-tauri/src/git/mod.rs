@@ -7,3 +7,6 @@ pub mod types;
 
 pub mod oplog;
 pub mod reflog;
+
+pub mod history;
+pub mod worktree;
