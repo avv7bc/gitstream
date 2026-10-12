@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+    .sc-placeholder{background:color-mix(in srgb,currentColor 8%,transparent);
+      border:1px solid color-mix(in srgb,currentColor 50%,transparent);
+      border-radius:2px;box-sizing:border-box;overflow:hidden}
+    @keyframes sc-shine{0%{background-position:100% 50%}100%{background-position:0% 50%}}
+    html.sc-dc-streaming .sc-placeholder,
+    html.sc-dc-streaming .sc-interp.sc-missing{position:relative;
+      background:color-mix(in srgb,currentColor 5%,transparent);
+      border-color:transparent}
+    html.sc-dc-streaming .sc-placeholder::before,
+    html.sc-dc-streaming .sc-interp.sc-missing::before{content:'';
+      position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(90deg,rgba(217,119,87,0) 25%,rgba(247,225,211,.95) 37%,rgba(217,119,87,0) 63%);
+      background-size:400% 100%;animation:sc-shine 1.4s ease infinite}
+    html.sc-dc-streaming .sc-placeholder:nth-child(n+9 of .sc-placeholder)::before,
+    html.sc-dc-streaming .sc-interp.sc-missing:nth-child(n+9 of .sc-interp.sc-missing)::before{animation:none;
+      background:color-mix(in srgb,currentColor 8%,transparent)}
+    .sc-placeholder-error{padding:4px 8px;font:11px/1.4 ui-monospace,monospace;
+      color:color-mix(in srgb,currentColor 70%,transparent);word-break:break-word}
+    .sc-interp.sc-missing{display:inline-block;width:2em;height:1em;overflow:hidden;
+      vertical-align:text-bottom;background:rgba(255,255,255,.3);border:1px solid rgba(0,0,0,.5);
+      border-radius:2px;box-sizing:border-box;color:transparent;
+      user-select:none}
+    .sc-interp.sc-unresolved{font-family:ui-monospace,monospace;font-size:.85em;
+      color:color-mix(in srgb,currentColor 50%,transparent);
+      background:color-mix(in srgb,currentColor 10%,transparent);border-radius:3px;
+      padding:0 3px}
+    .sc-host.sc-has-error{position:relative}
+    .sc-logic-error{position:absolute;top:8px;left:8px;z-index:2147483647;max-width:60ch;
+      padding:6px 10px;background:#b00020;color:#fff;font:12px/1.4 ui-monospace,monospace;
+      border-radius:4px;white-space:pre-wrap;pointer-events:none}
+    /* Mirrors PRINT_BASELINE_CSS in apps/web deck-stage-export.ts — keep both
+       in sync until dc-runtime regains a build step. */
+    @media print {
+      @page { margin: 0.5cm; }
+      figure, table { break-inside: avoid; }
+      #dc-root, #dc-root > .sc-host { height: auto; }
+      *, *::before, *::after {
+        print-color-adjust: exact; -webkit-print-color-adjust: exact;
+        backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+        animation-delay: -99s !important; animation-duration: .001s !important;
+        animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+        animation-play-state: running !important; transition-duration: 0s !important;
+      }
+    }
+  </style>
+<meta charset="utf-8">
+<title>Вариант B — Главное окно</title>
+<style>x-dc{display:none!important}</style>
+<link rel="stylesheet" href="../fonts/b.css"><style data-dc-tpl="3">
+body{margin:0}
+sc-for,sc-if{display:contents}
+.b{font-family:'Manrope',system-ui,sans-serif;color:#1D1F24;font-size:14px;line-height:1.4;-webkit-font-smoothing:antialiased}
+.b *{box-sizing:border-box}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.row{display:flex;align-items:center}
+.ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp{flex:1}
+.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.btn{font:600 13px/1 'Manrope',sans-serif;height:34px;padding:0 14px;border-radius:8px;border:1px solid #E2E0D9;background:#fff;color:#1D1F24;display:inline-flex;align-items:center;gap:7px;cursor:pointer;box-shadow:0 1px 2px rgba(20,20,30,.06);white-space:nowrap;flex:none}
+.btn.p{background:#3550E0;border-color:#3550E0;color:#fff;box-shadow:0 1px 2px rgba(53,80,224,.3)}
+.btn.g{background:transparent;border-color:transparent;box-shadow:none;color:#4A4F5A}
+.btn.do{color:#B8285A;border-color:#F1C4D4}
+.btn.sm{height:28px;padding:0 10px;font-size:12px;border-radius:7px;gap:6px}
+.btn.ib{width:34px;padding:0;justify-content:center}
+.btn.sm.ib{width:28px}
+.btn:disabled{background:#EFEEE9;border-color:#E2E0D9;color:#8A8E98;box-shadow:none;cursor:default}
+.inp{font:500 13px 'Manrope',sans-serif;height:34px;border:1px solid #E2E0D9;border-radius:8px;background:#fff;padding:0 12px;color:#1D1F24;display:flex;align-items:center;gap:8px}
+.inp input{border:0;outline:0;background:transparent;font:inherit;color:inherit;flex:1;min-width:0;padding:0}
+.inp input::placeholder,textarea::placeholder{color:#6E7380}
+.pill{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 8px;border-radius:999px;font:600 11.5px/1 'Manrope',sans-serif;white-space:nowrap;flex:none}
+.kbd{display:inline-block;font:600 10.5px/1 'IBM Plex Mono',monospace;padding:3px 5px 2px;border-radius:5px;background:#fff;border:1px solid #DCD9D1;border-bottom-width:2px;color:#4A4F5A}
+.kbd.dk{background:#2E3138;border-color:#4A4E57;color:#E4E7EC}
+.bdg{display:inline-block;width:18px;height:18px;border-radius:5px;font:700 10.5px/18px 'IBM Plex Mono',monospace;text-align:center;flex:none}
+.card{background:#fff;border:1px solid #E2E0D9;border-radius:12px;box-shadow:0 1px 2px rgba(20,20,30,.06),0 8px 24px rgba(20,20,30,.08)}
+.lbl{font:700 11px/1 'Manrope',sans-serif;letter-spacing:.09em;text-transform:uppercase;color:#4A4F5A;margin:0 0 12px}
+.sublbl{font:600 12.5px/1.3 'Manrope',sans-serif;color:#4A4F5A;margin:0 0 10px}
+.seg{display:inline-flex;background:#EFEEE9;border-radius:9px;padding:3px;gap:2px;flex:none}
+.seg button{border:0;background:transparent;font:600 12.5px 'Manrope',sans-serif;color:#4A4F5A;height:26px;padding:0 10px;border-radius:7px;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.seg button.on{background:#fff;color:#1D1F24;box-shadow:0 1px 2px rgba(20,20,30,.12)}
+.ab{font:600 11px/1 'IBM Plex Mono',monospace;padding:3px 5px;border-radius:6px;flex:none}
+.ab.u{background:#E6EAFB;color:#2A41B8}.ab.n{background:#E2F3F5;color:#0A6575}
+.av{width:20px;height:20px;border-radius:50%;font:700 10.5px/20px 'Manrope',sans-serif;text-align:center;flex:none}
+.chip{height:26px;display:inline-flex;align-items:center;gap:5px;padding:0 8px 0 4px;border-radius:7px;border:1px solid #E2E0D9;background:#fff;font:600 12px 'Manrope',sans-serif;color:#4A4F5A;cursor:pointer;flex:none}
+.chip.on{background:#E6EAFB;border-color:#C9D2F7;color:#2A41B8}
+.spin{animation:spn 1s linear infinite}
+@keyframes spn{to{transform:rotate(360deg)}}
+.win{min-width:1360px;background:#F4F3EF;border:1px solid #D6D3CA;border-radius:14px;box-shadow:0 2px 6px rgba(20,20,30,.06),0 24px 64px rgba(20,20,30,.16);overflow:hidden;display:flex;flex-direction:column;position:relative}
+.tab{height:36px;display:inline-flex;align-items:center;gap:7px;padding:0 12px;border:0;border-radius:10px 10px 0 0;background:transparent;font:600 13px 'Manrope',sans-serif;color:#4A4F5A;cursor:pointer;flex:none}
+.tab.on{background:#fff;color:#1D1F24;box-shadow:0 -1px 3px rgba(20,20,30,.06)}
+.tab .i{width:14px;height:14px}
+.tb{font:500 11.5px 'IBM Plex Mono',monospace;color:#4A4F5A}
+.tc{display:inline-block;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#3550E0;color:#fff;font:700 10.5px/18px 'Manrope',sans-serif;text-align:center;flex:none}
+.grp{display:inline-flex;border-radius:9px;box-shadow:0 1px 2px rgba(20,20,30,.06)}
+.grp .btn{border-radius:0;box-shadow:none}
+.grp .btn:first-child{border-radius:8px 0 0 8px}
+.grp .btn:last-child{border-radius:0 8px 8px 0}
+.grp .btn+.btn{margin-left:-1px}
+.vsep{width:1px;height:22px;background:#E2E0D9;flex:none;margin:0 4px}
+.nv{display:flex;align-items:center;gap:10px;height:32px;padding:0 10px;border-radius:9px;font:600 13.5px 'Manrope',sans-serif;color:#4A4F5A;border:0;background:transparent;width:100%;cursor:pointer;text-align:left;flex:none}
+.nv.on{background:#fff;color:#1D1F24;box-shadow:0 1px 2px rgba(20,20,30,.08)}
+.nv.on .i{color:#3550E0}
+.sh{display:flex;align-items:center;gap:8px;height:28px;padding:0 0 0 8px;font:700 13px 'Manrope',sans-serif;margin-top:6px;flex:none}
+.sh .i{color:#4A4F5A}
+.ct{font:600 11px/1 'Manrope',sans-serif;color:#4A4F5A;background:#E4E2DB;border-radius:999px;padding:3px 7px}
+.sub{font:600 11.5px/1 'Manrope',sans-serif;color:#4A4F5A;padding:6px 10px 5px 26px;flex:none}
+.sr{display:flex;align-items:center;gap:8px;height:28px;padding:0 6px 0 22px;border-radius:8px;font:500 13px 'Manrope',sans-serif;color:#1D1F24;flex:none}
+.sr .i{width:15px;height:15px}
+.cr{height:28px;padding:0 14px 0 66px;display:flex;align-items:center;font-size:13px}
+.dl{display:flex;height:22px;font:400 13px/22px 'IBM Plex Mono',monospace}
+.dn{width:44px;flex:none;text-align:right;padding-right:8px;color:#5D6270;font-size:12px}
+.dt{flex:1;min-width:0;overflow:hidden;white-space:pre;color:#1D1F24}
+.dv{width:1px;background:#E2E0D9;flex:none}
+.sg{display:inline-block;width:18px;text-align:center}
+.hh{height:30px;padding:0 12px;gap:10px;background:#F5F6FD;border-bottom:1px solid #E6EAFB;border-top:1px solid #E6EAFB;font-size:12px;flex:none}
+.lnk{border:0;background:none;padding:0;color:#3550E0;font:500 12.5px 'IBM Plex Mono',monospace;text-decoration:underline;text-decoration-color:#C9D2F7;text-underline-offset:3px;cursor:pointer}
+.ck{width:16px;height:16px;border-radius:5px;border:1.5px solid;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.tg{appearance:none;-webkit-appearance:none;width:32px;height:18px;border-radius:999px;background:#D3D0C8;position:relative;margin:0;cursor:pointer;flex:none}
+.tg::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.tg:checked{background:#3550E0}.tg:checked::after{left:16px}
+.mi{display:flex;align-items:center;gap:10px;width:100%;height:32px;padding:0 10px;border:0;background:transparent;border-radius:8px;font:500 13px 'Manrope',sans-serif;color:#1D1F24;cursor:pointer;text-align:left}
+.mi .i{color:#4A4F5A}
+</style></head>
+<body>
+<div id="dc-root"><div class="sc-host" data-sc-name="B-Main"><div data-dc-tpl="4" class="b" style="width: 100%; box-sizing: border-box; min-height: 940px; background: rgb(232, 230, 224); padding: 28px 40px 56px;"><header data-dc-tpl="5" style="margin-bottom: 26px;">
+  <div data-dc-tpl="6" class="row" style="gap: 10px;"><span data-dc-tpl="7" style="font: 800 12px / 1 Manrope, sans-serif; letter-spacing: 0.16em; text-transform: uppercase; color: rgb(42, 65, 184);">B · Студия</span><span data-dc-tpl="8" style="width: 4px; height: 4px; border-radius: 50%; background: rgb(138, 142, 152);"></span><span data-dc-tpl="9" style="font: 700 12px / 1 Manrope, sans-serif; letter-spacing: 0.16em; text-transform: uppercase; color: rgb(29, 31, 36);">Главное окно</span></div>
+  <p data-dc-tpl="10" style="margin: 8px 0px 0px; font-size: 14px; color: rgb(74, 79, 90); max-width: 1000px;">Светлый воздушный интерфейс в духе Fork/Tower: вкладки репозиториев сверху, сайдбар разделов с иконками, режим «История» с инспектором коммита и режим «Изменения» со встроенной формой коммита вместо модального диалога.</p></header><div data-dc-tpl="11" class="lbl">Режим «История» — вкладки, тулбар, сайдбар разделов, граф, инспектор, diff, строка состояния</div><div data-dc-tpl="12" style="overflow-x: auto; padding: 2px 2px 30px;"><div data-dc-tpl="13" class="win" style="height: 920px;">
+
+  
+  <div data-dc-tpl="14" class="row" style="height: 44px; background: rgb(233, 231, 225); padding: 0px 8px 0px 12px; gap: 4px; flex: 0 0 auto; align-items: flex-end;">
+    <span data-dc-tpl="15" class="row" style="align-self: center; gap: 4px; margin-right: 6px;">
+      <span data-dc-tpl="16" style="width: 24px; height: 24px; border-radius: 7px; background: rgb(53, 80, 224); display: flex; align-items: center; justify-content: center;"><svg data-dc-tpl="17" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(255, 255, 255); width: 15px; height: 15px; stroke-width: 2.2;"><circle data-dc-tpl="18" cx="6" cy="6" r="2.5"></circle><circle data-dc-tpl="19" cx="6" cy="18" r="2.5"></circle><circle data-dc-tpl="20" cx="18" cy="8" r="2.5"></circle><path data-dc-tpl="21" d="M6 8.5v7M18 10.5c0 4-5 4.5-10 6.5"></path></svg></span>
+      <button data-dc-tpl="22" class="btn g sm" aria-label="Все репозитории" style="padding: 0px 6px; gap: 3px;"><svg data-dc-tpl="23" class="i" viewBox="0 0 24 24" aria-hidden="true"><rect data-dc-tpl="24" x="4" y="4" width="6" height="6" rx="1.5"></rect><rect data-dc-tpl="25" x="14" y="4" width="6" height="6" rx="1.5"></rect><rect data-dc-tpl="26" x="4" y="14" width="6" height="6" rx="1.5"></rect><rect data-dc-tpl="27" x="14" y="14" width="6" height="6" rx="1.5"></rect></svg><svg data-dc-tpl="28" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="29" d="M6 9l6 6 6-6"></path></svg></button>
+    </span>
+    <button data-dc-tpl="30" class="tab on"><svg data-dc-tpl="31" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(53, 80, 224);"><path data-dc-tpl="32" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="33" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg>gitstream<span data-dc-tpl="34" class="tb">main</span><span data-dc-tpl="35" class="tc" title="8 изменений">8</span><span data-dc-tpl="36" class="row" aria-hidden="true" style="color: rgb(74, 79, 90); margin-left: 2px;"><svg data-dc-tpl="37" class="i" viewBox="0 0 24 24" style="width: 13px; height: 13px;"><path data-dc-tpl="38" d="M6 6l12 12M18 6L6 18"></path></svg></span></button>
+    <button data-dc-tpl="39" class="tab"><svg data-dc-tpl="40" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="41" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="42" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg>tauri-plugin-askpass<span data-dc-tpl="43" class="tb">main</span><span data-dc-tpl="44" class="row" style="gap: 2px; color: rgb(10, 101, 117);"><svg data-dc-tpl="45" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px; stroke-width: 2.2;"><path data-dc-tpl="46" d="M12 4v15M6 13l6 6 6-6"></path></svg><svg data-dc-tpl="47" class="i spin" viewBox="0 0 24 24" aria-label="Pull выполняется" style="width: 14px; height: 14px; stroke-width: 2.4;"><circle data-dc-tpl="48" cx="12" cy="12" r="8" opacity=".25"></circle><path data-dc-tpl="49" d="M20 12a8 8 0 0 0-8-8"></path></svg></span></button>
+    <button data-dc-tpl="50" class="tab"><svg data-dc-tpl="51" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="52" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="53" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg>docs-site<span data-dc-tpl="54" class="tb">develop</span><span data-dc-tpl="55" class="tc" style="background: rgb(163, 95, 0);">3</span></button>
+    <button data-dc-tpl="56" class="tab"><svg data-dc-tpl="57" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="58" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="59" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg>dotfiles<span data-dc-tpl="60" class="tb">master</span></button>
+    <button data-dc-tpl="61" class="tab"><svg data-dc-tpl="62" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="63" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="64" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg>notes<span data-dc-tpl="65" class="tb">main</span></button>
+    <button data-dc-tpl="66" class="btn g sm ib" aria-label="Открыть репозиторий в новой вкладке" style="align-self: center; margin-left: 2px;"><svg data-dc-tpl="67" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="68" d="M12 5v14M5 12h14"></path></svg></button>
+    <span data-dc-tpl="69" class="sp"></span>
+    <span data-dc-tpl="70" class="row" style="align-self: center; gap: 2px;">
+      <button data-dc-tpl="71" class="btn g sm ib" aria-label="Свернуть"><svg data-dc-tpl="72" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="73" d="M6 12h12"></path></svg></button>
+      <button data-dc-tpl="74" class="btn g sm ib" aria-label="Развернуть"><svg data-dc-tpl="75" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 13px; height: 13px;"><rect data-dc-tpl="76" x="5" y="5" width="14" height="14" rx="2.5"></rect></svg></button>
+      <button data-dc-tpl="77" class="btn g sm ib" aria-label="Закрыть окно"><svg data-dc-tpl="78" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="79" d="M6 6l12 12M18 6L6 18"></path></svg></button>
+    </span>
+  </div>
+
+  
+  <div data-dc-tpl="80" class="row" style="height: 56px; background: rgb(255, 255, 255); border-bottom: 1px solid rgb(226, 224, 217); padding: 0px 14px; gap: 8px; flex: 0 0 auto; position: relative; z-index: 3;">
+    <button data-dc-tpl="81" class="btn g">Репозиторий<svg data-dc-tpl="82" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 13px; height: 13px;"><path data-dc-tpl="83" d="M6 9l6 6 6-6"></path></svg></button>
+    <button data-dc-tpl="84" class="btn" style="gap: 8px;"><svg data-dc-tpl="85" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(53, 80, 224);"><circle data-dc-tpl="86" cx="6" cy="6" r="2.5"></circle><circle data-dc-tpl="87" cx="6" cy="18" r="2.5"></circle><circle data-dc-tpl="88" cx="18" cy="8" r="2.5"></circle><path data-dc-tpl="89" d="M6 8.5v7M18 10.5c0 4-5 4.5-10 6.5"></path></svg><span data-dc-tpl="90" class="mono" style="font-weight: 600;">main</span><svg data-dc-tpl="91" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 13px; height: 13px; color: rgb(74, 79, 90);"><path data-dc-tpl="92" d="M6 9l6 6 6-6"></path></svg></button>
+    <span data-dc-tpl="93" class="vsep"></span>
+    <div data-dc-tpl="94" class="grp">
+      <button data-dc-tpl="95" class="btn"><svg data-dc-tpl="96" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="97" d="M12 4v10M8 10l4 4 4-4M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"></path></svg>Fetch</button>
+      <button data-dc-tpl="98" class="btn"><svg data-dc-tpl="99" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="100" d="M12 4v15M6 13l6 6 6-6"></path></svg>Pull<span data-dc-tpl="101" class="ab n">↓1</span></button>
+      <button data-dc-tpl="102" class="btn"><svg data-dc-tpl="103" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="104" d="M12 20V5M6 11l6-6 6 6"></path></svg>Push<span data-dc-tpl="105" class="ab u">↑2</span></button>
+    </div>
+    <button data-dc-tpl="106" class="btn p" style="margin-left: 4px;"><svg data-dc-tpl="107" class="i" viewBox="0 0 24 24" aria-hidden="true"><circle data-dc-tpl="108" cx="12" cy="12" r="3.5"></circle><path data-dc-tpl="109" d="M3 12h5.5M15.5 12H21"></path></svg>Коммит<span data-dc-tpl="110" style="background: rgba(255, 255, 255, 0.22); border-radius: 999px; padding: 3px 7px; font-size: 11px;">4</span></button>
+    <div data-dc-tpl="111" style="position: relative;">
+      <button data-dc-tpl="112" class="btn g" style="background: rgb(239, 238, 233); color: rgb(29, 31, 36);"><svg data-dc-tpl="113" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="114" d="M9 14L4 9l5-5"></path><path data-dc-tpl="115" d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path></svg>Отменить</button>
+      <div data-dc-tpl="116" role="tooltip" style="position: absolute; top: 46px; left: -6px; width: 300px; background: rgb(29, 31, 36); color: rgb(255, 255, 255); border-radius: 10px; padding: 10px 12px; box-shadow: rgba(20, 20, 30, 0.28) 0px 10px 28px; font-size: 12.5px; line-height: 1.45;">
+        <span data-dc-tpl="117" style="position: absolute; top: -5px; left: 34px; width: 10px; height: 10px; background: rgb(29, 31, 36); transform: rotate(45deg);"></span>
+        <div data-dc-tpl="118" class="row" style="gap: 6px;"><b data-dc-tpl="119" style="font-weight: 700;">Отменить последнюю операцию</b><span data-dc-tpl="120" class="sp"></span><span data-dc-tpl="121" class="kbd dk">Ctrl</span><span data-dc-tpl="122" class="kbd dk">Z</span></div>
+        <div data-dc-tpl="123" style="margin-top: 4px; color: rgb(201, 204, 211);">Коммит <span data-dc-tpl="124" class="mono" style="color: rgb(255, 255, 255);">a91f3c2</span> «refactor(ui): единые токены темы» — изменения вернутся в индекс</div>
+      </div>
+    </div>
+    <span data-dc-tpl="125" class="sp"></span>
+    <button data-dc-tpl="126" class="inp" aria-label="Палитра команд" style="width: 310px; height: 34px; cursor: pointer; background: rgb(250, 249, 246); color: rgb(74, 79, 90); text-align: left;"><svg data-dc-tpl="127" class="i" viewBox="0 0 24 24" aria-hidden="true"><circle data-dc-tpl="128" cx="11" cy="11" r="7"></circle><path data-dc-tpl="129" d="M20 20l-4-4"></path></svg><span data-dc-tpl="130" class="sp">Команды, ветки, коммиты…</span><span data-dc-tpl="131" class="kbd">Ctrl</span><span data-dc-tpl="132" class="kbd">Shift</span><span data-dc-tpl="133" class="kbd">P</span></button>
+    <button data-dc-tpl="134" class="btn g ib" aria-label="Статистика"><svg data-dc-tpl="135" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="136" d="M5 20V11M12 20V5M19 20v-7"></path></svg></button>
+    <button data-dc-tpl="137" class="btn g ib" aria-label="Настройки"><svg data-dc-tpl="138" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="139" d="M4 7h9M17 7h3M4 17h3M11 17h9"></path><circle data-dc-tpl="140" cx="15" cy="7" r="2"></circle><circle data-dc-tpl="141" cx="9" cy="17" r="2"></circle></svg></button>
+  </div>
+
+  
+  <div data-dc-tpl="142" class="row" style="flex: 1 1 0%; min-height: 0px; padding: 10px 10px 10px 0px; gap: 10px; align-items: stretch;">
+
+    
+    <aside data-dc-tpl="143" style="width: 252px; flex: 0 0 auto; padding: 0px 2px 0px 12px; display: flex; flex-direction: column; overflow: hidden;">
+      <label data-dc-tpl="144" class="inp" style="height: 34px; margin-bottom: 8px; flex: 0 0 auto;"><svg data-dc-tpl="145" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(74, 79, 90);"><circle data-dc-tpl="146" cx="11" cy="11" r="7"></circle><path data-dc-tpl="147" d="M20 20l-4-4"></path></svg><input data-dc-tpl="148" placeholder="Фильтр веток, тегов…" aria-label="Фильтр веток и тегов"><span data-dc-tpl="149" class="kbd">/</span></label>
+      <button data-dc-tpl="150" class="nv"><svg data-dc-tpl="151" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="152" d="M14 3H6v18h12V7z"></path><path data-dc-tpl="153" d="M9 11h6M12 8v6M9 17h6"></path></svg>Изменения<span data-dc-tpl="154" class="sp"></span><span data-dc-tpl="155" class="tc">8</span></button>
+      <button data-dc-tpl="156" class="nv on"><svg data-dc-tpl="157" class="i" viewBox="0 0 24 24" aria-hidden="true"><circle data-dc-tpl="158" cx="12" cy="12" r="9"></circle><path data-dc-tpl="159" d="M12 7v5l3 2"></path></svg>История<span data-dc-tpl="160" class="sp"></span><span data-dc-tpl="161" style="font: 500 11.5px &quot;IBM Plex Mono&quot;, monospace; color: rgb(74, 79, 90);">13</span></button>
+      <div data-dc-tpl="162" style="height: 1px; background: rgb(222, 219, 211); margin: 8px 6px 2px; flex: 0 0 auto;"></div>
+
+      <div data-dc-tpl="163" class="sh"><svg data-dc-tpl="164" class="i" viewBox="0 0 24 24" aria-hidden="true"><circle data-dc-tpl="165" cx="6" cy="6" r="2.5"></circle><circle data-dc-tpl="166" cx="6" cy="18" r="2.5"></circle><circle data-dc-tpl="167" cx="18" cy="8" r="2.5"></circle><path data-dc-tpl="168" d="M6 8.5v7M18 10.5c0 4-5 4.5-10 6.5"></path></svg>Ветки<span data-dc-tpl="169" class="ct">7</span><span data-dc-tpl="170" class="sp"></span><button data-dc-tpl="171" class="btn g sm ib" aria-label="Создать ветку" style="width: 24px; height: 24px;"><svg data-dc-tpl="172" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><path data-dc-tpl="173" d="M12 5v14M5 12h14"></path></svg></button></div>
+      
+        <div data-dc-tpl="176" class="sub row" style="gap: 5px;"><span class="sc-interp">Локальные · 4</span></div>
+        
+      
+        
+        <div data-dc-tpl="178" class="sr" style="background: rgb(255, 255, 255); font-weight: 700; box-shadow: rgba(20, 20, 30, 0.08) 0px 1px 2px;">
+          <span data-dc-tpl="179" style="width: 6px; height: 6px; border-radius: 50%; background: rgb(53, 80, 224); margin-left: -14px; margin-right: 0px; flex: 0 0 auto;"></span>
+          <svg data-dc-tpl="180" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(53, 80, 224);"><circle data-dc-tpl="181" cx="6" cy="6" r="2.5"></circle><circle data-dc-tpl="182" cx="6" cy="18" r="2.5"></circle><circle data-dc-tpl="183" cx="18" cy="8" r="2.5"></circle><path data-dc-tpl="184" d="M6 8.5v7M18 10.5c0 4-5 4.5-10 6.5"></path></svg>
+          <span data-dc-tpl="185" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span class="sc-interp">main</span></span>
+          
+          
+          <span data-dc-tpl="192" class="ab u"><span class="sc-interp">↑2</span></span>
+          <span data-dc-tpl="194" class="ab n"><span class="sc-interp">↓1</span></span>
+        </div>
+      
+        
+        <div data-dc-tpl="178" class="sr" style="background: transparent; font-weight: 500; box-shadow: none;">
+          <span data-dc-tpl="179" style="width: 6px; height: 6px; border-radius: 50%; background: transparent; margin-left: -14px; margin-right: 0px; flex: 0 0 auto;"></span>
+          <svg data-dc-tpl="180" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(74, 79, 90);"><circle data-dc-tpl="181" cx="6" cy="6" r="2.5"></circle><circle data-dc-tpl="182" cx="6" cy="18" r="2.5"></circle><circle data-dc-tpl="183" cx="18" cy="8" r="2.5"></circle><path data-dc-tpl="184" d="M6 8.5v7M18 10.5c0 4-5 4.5-10 6.5"></path></svg>
+          <span data-dc-tpl="185" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span class="sc-interp">feature/command-palette</span></span>
+          <span data-dc-tpl="187" class="pill" style="background: rgb(240, 235, 253); color: rgb(91, 55, 201); height: 17px; padding: 0px 6px; font-size: 10px;">wt</span>
+          
+          
+          
+        </div>
+      
+        
+        <div data-dc-tpl="178" class="sr" style="background: transparent; font-weight: 500; box-shadow: none;">
+          <span data-dc-tpl="179" style="width: 6px; height: 6px; border-radius: 50%; background: transparent; margin-left: -14px; margin-right: 0px; flex: 0 0 auto;"></span>
+          <svg data-dc-tpl="180" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(74, 79, 90);"><circle data-dc-tpl="181" cx="6" cy="6" r="2.5"></circle><circle data-dc-tpl="182" cx="6" cy="18" r="2.5"></circle><circle data-dc-tpl="183" cx="18" cy="8" r="2.5"></circle><path data-dc-tpl="184" d="M6 8.5v7M18 10.5c0 4-5 4.5-10 6.5"></path></svg>
+          <span data-dc-tpl="185" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span class="sc-interp">feature/inline-commit</span></span>
+          
+          <svg data-dc-tpl="189" class="i" viewBox="0 0 24 24" aria-label="Нет upstream" style="width: 14px; height: 14px; color: rgb(110, 115, 128);"><path data-dc-tpl="190" d="M7 18h10M4 4l16 16M6.1 9.6A4.2 4.2 0 0 0 7 18M10 6.3A6 6 0 0 1 17.6 10a4 4 0 0 1 2.2 6.4"></path></svg>
+          
+          
+        </div>
+      
+        
+        <div data-dc-tpl="178" class="sr" style="background: transparent; font-weight: 500; box-shadow: none;">
+          <span data-dc-tpl="179" style="width: 6px; height: 6px; border-radius: 50%; background: transparent; margin-left: -14px; margin-right: 0px; flex: 0 0 auto;"></span>
+          <svg data-dc-tpl="180" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(74, 79, 90);"><circle data-dc-tpl="181" cx="6" cy="6" r="2.5"></circle><circle data-dc-tpl="182" cx="6" cy="18" r="2.5"></circle><circle data-dc-tpl="183" cx="18" cy="8" r="2.5"></circle><path data-dc-tpl="184" d="M6 8.5v7M18 10.5c0 4-5 4.5-10 6.5"></path></svg>
+          <span data-dc-tpl="185" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span class="sc-interp">fix/askpass-timeout</span></span>
+          
+          <svg data-dc-tpl="189" class="i" viewBox="0 0 24 24" aria-label="Нет upstream" style="width: 14px; height: 14px; color: rgb(110, 115, 128);"><path data-dc-tpl="190" d="M7 18h10M4 4l16 16M6.1 9.6A4.2 4.2 0 0 0 7 18M10 6.3A6 6 0 0 1 17.6 10a4 4 0 0 1 2.2 6.4"></path></svg>
+          
+          
+        </div>
+      
+        <div data-dc-tpl="176" class="sub row" style="gap: 5px;"><span class="sc-interp">origin · 3</span></div>
+        
+      
+        
+        <div data-dc-tpl="178" class="sr" style="background: transparent; font-weight: 500; box-shadow: none;">
+          <span data-dc-tpl="179" style="width: 6px; height: 6px; border-radius: 50%; background: transparent; margin-left: -14px; margin-right: 0px; flex: 0 0 auto;"></span>
+          <svg data-dc-tpl="180" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(12, 133, 153);"><circle data-dc-tpl="181" cx="6" cy="6" r="2.5"></circle><circle data-dc-tpl="182" cx="6" cy="18" r="2.5"></circle><circle data-dc-tpl="183" cx="18" cy="8" r="2.5"></circle><path data-dc-tpl="184" d="M6 8.5v7M18 10.5c0 4-5 4.5-10 6.5"></path></svg>
+          <span data-dc-tpl="185" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span class="sc-interp">origin/main</span></span>
+          
+          
+          
+          
+        </div>
+      
+        
+        <div data-dc-tpl="178" class="sr" style="background: transparent; font-weight: 500; box-shadow: none;">
+          <span data-dc-tpl="179" style="width: 6px; height: 6px; border-radius: 50%; background: transparent; margin-left: -14px; margin-right: 0px; flex: 0 0 auto;"></span>
+          <svg data-dc-tpl="180" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(12, 133, 153);"><circle data-dc-tpl="181" cx="6" cy="6" r="2.5"></circle><circle data-dc-tpl="182" cx="6" cy="18" r="2.5"></circle><circle data-dc-tpl="183" cx="18" cy="8" r="2.5"></circle><path data-dc-tpl="184" d="M6 8.5v7M18 10.5c0 4-5 4.5-10 6.5"></path></svg>
+          <span data-dc-tpl="185" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span class="sc-interp">origin/feature/command-palette</span></span>
+          
+          
+          
+          
+        </div>
+      
+        
+        <div data-dc-tpl="178" class="sr" style="background: transparent; font-weight: 500; box-shadow: none;">
+          <span data-dc-tpl="179" style="width: 6px; height: 6px; border-radius: 50%; background: transparent; margin-left: -14px; margin-right: 0px; flex: 0 0 auto;"></span>
+          <svg data-dc-tpl="180" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(12, 133, 153);"><circle data-dc-tpl="181" cx="6" cy="6" r="2.5"></circle><circle data-dc-tpl="182" cx="6" cy="18" r="2.5"></circle><circle data-dc-tpl="183" cx="18" cy="8" r="2.5"></circle><path data-dc-tpl="184" d="M6 8.5v7M18 10.5c0 4-5 4.5-10 6.5"></path></svg>
+          <span data-dc-tpl="185" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span class="sc-interp">origin/release/1.1</span></span>
+          
+          
+          
+          
+        </div>
+      
+
+      <div data-dc-tpl="195" class="sh"><svg data-dc-tpl="196" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="197" d="M3.5 12.5V4h8.5l8.5 8.5-8 8z"></path><circle data-dc-tpl="198" cx="8" cy="8.5" r="1.4"></circle></svg>Теги<span data-dc-tpl="199" class="ct">4</span><span data-dc-tpl="200" class="sp"></span><button data-dc-tpl="201" class="btn g sm ib" aria-label="Создать тег" style="width: 24px; height: 24px;"><svg data-dc-tpl="202" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><path data-dc-tpl="203" d="M12 5v14M5 12h14"></path></svg></button></div>
+      
+        <div data-dc-tpl="205" class="sr" style="height: 25px;"><svg data-dc-tpl="206" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(199, 119, 0);"><path data-dc-tpl="207" d="M3.5 12.5V4h8.5l8.5 8.5-8 8z"></path><circle data-dc-tpl="208" cx="8" cy="8.5" r="1.4"></circle></svg><span data-dc-tpl="209" class="mono" style="flex: 1 1 0%; font-size: 12.5px;"><span class="sc-interp">v1.1.33</span></span><span data-dc-tpl="210" style="font-size: 11.5px; color: rgb(74, 79, 90);"><span class="sc-interp">23 сен</span></span></div>
+      
+        <div data-dc-tpl="205" class="sr" style="height: 25px;"><svg data-dc-tpl="206" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(199, 119, 0);"><path data-dc-tpl="207" d="M3.5 12.5V4h8.5l8.5 8.5-8 8z"></path><circle data-dc-tpl="208" cx="8" cy="8.5" r="1.4"></circle></svg><span data-dc-tpl="209" class="mono" style="flex: 1 1 0%; font-size: 12.5px;"><span class="sc-interp">v1.1.32</span></span><span data-dc-tpl="210" style="font-size: 11.5px; color: rgb(74, 79, 90);"><span class="sc-interp">22 сен</span></span></div>
+      
+        <div data-dc-tpl="205" class="sr" style="height: 25px;"><svg data-dc-tpl="206" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(199, 119, 0);"><path data-dc-tpl="207" d="M3.5 12.5V4h8.5l8.5 8.5-8 8z"></path><circle data-dc-tpl="208" cx="8" cy="8.5" r="1.4"></circle></svg><span data-dc-tpl="209" class="mono" style="flex: 1 1 0%; font-size: 12.5px;"><span class="sc-interp">v1.1.31</span></span><span data-dc-tpl="210" style="font-size: 11.5px; color: rgb(74, 79, 90);"><span class="sc-interp">9 сен</span></span></div>
+      
+        <div data-dc-tpl="205" class="sr" style="height: 25px;"><svg data-dc-tpl="206" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(199, 119, 0);"><path data-dc-tpl="207" d="M3.5 12.5V4h8.5l8.5 8.5-8 8z"></path><circle data-dc-tpl="208" cx="8" cy="8.5" r="1.4"></circle></svg><span data-dc-tpl="209" class="mono" style="flex: 1 1 0%; font-size: 12.5px;"><span class="sc-interp">v1.1.30</span></span><span data-dc-tpl="210" style="font-size: 11.5px; color: rgb(74, 79, 90);"><span class="sc-interp">22 июл</span></span></div>
+      
+
+      <div data-dc-tpl="211" class="sh"><svg data-dc-tpl="212" class="i" viewBox="0 0 24 24" aria-hidden="true"><rect data-dc-tpl="213" x="3" y="4" width="18" height="5" rx="1.5"></rect><path data-dc-tpl="214" d="M5 9v10h14V9M10 13h4"></path></svg>Stash<span data-dc-tpl="215" class="ct">2</span></div>
+      <div data-dc-tpl="216" class="sr"><svg data-dc-tpl="217" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(112, 72, 232);"><rect data-dc-tpl="218" x="3" y="4" width="18" height="5" rx="1.5"></rect><path data-dc-tpl="219" d="M5 9v10h14V9M10 13h4"></path></svg><span data-dc-tpl="220" class="ell" style="flex: 1 1 0%; min-width: 0px;">WIP: тулбар — порядок кнопок</span><span data-dc-tpl="221" style="font-size: 11.5px; color: rgb(74, 79, 90);">2 дн.</span></div>
+      <div data-dc-tpl="222" class="sr"><svg data-dc-tpl="223" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(112, 72, 232);"><rect data-dc-tpl="224" x="3" y="4" width="18" height="5" rx="1.5"></rect><path data-dc-tpl="225" d="M5 9v10h14V9M10 13h4"></path></svg><span data-dc-tpl="226" class="ell" style="flex: 1 1 0%; min-width: 0px;">эксперимент с lane-цветами</span><span data-dc-tpl="227" style="font-size: 11.5px; color: rgb(74, 79, 90);">5 дн.</span></div>
+
+      <div data-dc-tpl="228" class="sh"><svg data-dc-tpl="229" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="230" d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 9.6 4.2 4.2 0 0 0 7 18z"></path></svg>Remotes<span data-dc-tpl="231" class="ct">1</span></div>
+      <div data-dc-tpl="232" class="sr"><svg data-dc-tpl="233" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(12, 133, 153);"><path data-dc-tpl="234" d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 9.6 4.2 4.2 0 0 0 7 18z"></path></svg><span data-dc-tpl="235" style="flex: 1 1 0%; font-weight: 600;">origin</span><span data-dc-tpl="236" class="mono" style="font-size: 11.5px; color: rgb(74, 79, 90);">github.com</span></div>
+
+      <div data-dc-tpl="237" class="sh"><svg data-dc-tpl="238" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="239" d="M3 6h6l2 2h10v11H3z"></path><path data-dc-tpl="240" d="M13 13h5M13 16h3"></path></svg>Worktrees<span data-dc-tpl="241" class="ct">1</span><span data-dc-tpl="242" class="pill" style="background: rgb(227, 244, 231); color: rgb(35, 112, 50); height: 18px; padding: 0px 7px; font-size: 10.5px;">новое</span></div>
+      <div data-dc-tpl="243" class="sr" style="height: 40px;"><svg data-dc-tpl="244" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(112, 72, 232);"><path data-dc-tpl="245" d="M3 6h6l2 2h10v11H3z"></path><path data-dc-tpl="246" d="M13 13h5M13 16h3"></path></svg><div data-dc-tpl="247" style="min-width: 0px; flex: 1 1 0%; line-height: 1.25;"><div data-dc-tpl="248" class="mono ell" style="font-size: 12.5px;">../gitstream-palette</div><div data-dc-tpl="249" class="ell" style="font-size: 11.5px; color: rgb(74, 79, 90);">feature/command-palette</div></div></div>
+    </aside>
+
+    
+    <div data-dc-tpl="250" style="flex: 1 1 0%; min-width: 0px; display: flex; flex-direction: column; gap: 10px;">
+      <section data-dc-tpl="251" class="card" aria-label="История коммитов" style="height: 444px; flex: 0 0 auto; display: flex; flex-direction: column; overflow: hidden;">
+        <div data-dc-tpl="252" class="row" style="height: 48px; padding: 0px 10px 0px 16px; gap: 10px; border-bottom: 1px solid rgb(239, 238, 233); flex: 0 0 auto;">
+          <span data-dc-tpl="253" style="font-weight: 700; font-size: 15px;">История</span>
+          <button data-dc-tpl="254" class="btn sm">Все ветки<svg data-dc-tpl="255" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="256" d="M6 9l6 6 6-6"></path></svg></button>
+          <span data-dc-tpl="257" class="row" style="gap: 12px; font-size: 12px; color: rgb(74, 79, 90); margin-left: 4px;">
+            <span data-dc-tpl="258" class="row" style="gap: 5px;"><svg data-dc-tpl="259" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle data-dc-tpl="260" cx="6" cy="6" r="4.2" fill="#fff" stroke="#3550E0" stroke-width="1.8"></circle></svg>не отправлен</span>
+            <span data-dc-tpl="261" class="row" style="gap: 5px;"><svg data-dc-tpl="262" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle data-dc-tpl="263" cx="6" cy="6" r="4.2" fill="#fff" stroke="#0C8599" stroke-width="1.5" stroke-dasharray="2 1.6"></circle></svg>входящий</span>
+          </span>
+          <span data-dc-tpl="264" class="sp"></span>
+          <label data-dc-tpl="265" class="inp" style="width: 250px; height: 30px; background: rgb(250, 249, 246);"><svg data-dc-tpl="266" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px; color: rgb(74, 79, 90);"><circle data-dc-tpl="267" cx="11" cy="11" r="7"></circle><path data-dc-tpl="268" d="M20 20l-4-4"></path></svg><input data-dc-tpl="269" placeholder="Сообщение, автор, SHA, дата…" aria-label="Фильтр коммитов"></label>
+          <button data-dc-tpl="270" class="btn g sm ib" aria-label="Параметры отображения"><svg data-dc-tpl="271" class="i" viewBox="0 0 24 24" aria-hidden="true"><circle data-dc-tpl="272" cx="5" cy="12" r="1.2"></circle><circle data-dc-tpl="273" cx="12" cy="12" r="1.2"></circle><circle data-dc-tpl="274" cx="19" cy="12" r="1.2"></circle></svg></button>
+        </div>
+        <div data-dc-tpl="275" class="row" style="height: 28px; padding: 0px 14px 0px 16px; font: 600 11.5px Manrope, sans-serif; color: rgb(74, 79, 90); background: rgb(250, 249, 246); border-bottom: 1px solid rgb(239, 238, 233); flex: 0 0 auto;">
+          <span data-dc-tpl="276" style="width: 50px;">Граф</span><span data-dc-tpl="277" style="flex: 1 1 0%;">Описание</span><span data-dc-tpl="278" style="width: 132px;">Автор</span><span data-dc-tpl="279" style="width: 112px;">Дата</span><span data-dc-tpl="280" style="width: 76px;">SHA</span>
+        </div>
+        <div data-dc-tpl="281" style="position: relative; flex: 1 1 0%; overflow: hidden;">
+          <div data-dc-tpl="282" class="cr" style="gap: 8px;">
+            <span data-dc-tpl="283" style="font-weight: 700; color: rgb(29, 31, 36);">Рабочая копия — 8 изменений</span>
+            <span data-dc-tpl="284" class="pill" style="background: rgb(227, 244, 231); color: rgb(35, 112, 50);">4 в индексе</span>
+            <span data-dc-tpl="285" class="pill" style="background: rgb(239, 238, 233); color: rgb(74, 79, 90);">1 неотслеживаемый</span>
+            <span data-dc-tpl="286" class="sp"></span>
+            <button data-dc-tpl="287" class="btn sm g" style="color: rgb(53, 80, 224);">Открыть изменения</button>
+          </div>
+          
+            <div data-dc-tpl="289" class="cr" style="background: rgb(230, 234, 251); opacity: 1;">
+              <div data-dc-tpl="290" class="row" style="flex: 1 1 0%; min-width: 0px; overflow: hidden;">
+                <span data-dc-tpl="292" class="pill" style="background: rgb(29, 31, 36); color: rgb(255, 255, 255); box-shadow: rgb(29, 31, 36) 0px 0px 0px 1px inset; margin-right: 6px;"><span class="sc-interp">HEAD</span></span><span data-dc-tpl="292" class="pill" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184); box-shadow: rgb(201, 210, 247) 0px 0px 0px 1px inset; margin-right: 6px;"><span class="sc-interp">main</span></span>
+                <span data-dc-tpl="299" class="ell" style="min-width: 0px; font-weight: 700; color: rgb(29, 31, 36);"><span class="sc-interp">refactor(ui): единые токены темы</span></span>
+              </div>
+              <div data-dc-tpl="300" class="row" style="width: 132px; gap: 8px; flex: 0 0 auto;"><span data-dc-tpl="301" class="av" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184);"><span class="sc-interp">A</span></span><span data-dc-tpl="302" class="ell" style="color: rgb(74, 79, 90);"><span class="sc-interp">avv</span></span></div>
+              <span data-dc-tpl="303" style="width: 112px; flex: 0 0 auto; font-size: 12.5px; color: rgb(74, 79, 90);"><span class="sc-interp">26 сен, 18:20</span></span>
+              <span data-dc-tpl="304" class="mono row" style="width: 76px; flex: 0 0 auto; font-size: 12px; gap: 3px; color: rgb(42, 65, 184);"><span class="sc-interp">a91f3c2</span><svg data-dc-tpl="306" class="i" viewBox="0 0 24 24" aria-label="Не отправлен" style="width: 12px; height: 12px; stroke-width: 2.4;"><path data-dc-tpl="307" d="M12 20V5M6 11l6-6 6 6"></path></svg></span>
+            </div>
+          
+            <div data-dc-tpl="289" class="cr" style="background: transparent; opacity: 1;">
+              <div data-dc-tpl="290" class="row" style="flex: 1 1 0%; min-width: 0px; overflow: hidden;">
+                
+                <span data-dc-tpl="299" class="ell" style="min-width: 0px; font-weight: 500; color: rgb(29, 31, 36);"><span class="sc-interp">feat(commit): встроенная форма коммита</span></span>
+              </div>
+              <div data-dc-tpl="300" class="row" style="width: 132px; gap: 8px; flex: 0 0 auto;"><span data-dc-tpl="301" class="av" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184);"><span class="sc-interp">A</span></span><span data-dc-tpl="302" class="ell" style="color: rgb(74, 79, 90);"><span class="sc-interp">avv</span></span></div>
+              <span data-dc-tpl="303" style="width: 112px; flex: 0 0 auto; font-size: 12.5px; color: rgb(74, 79, 90);"><span class="sc-interp">25 сен, 11:42</span></span>
+              <span data-dc-tpl="304" class="mono row" style="width: 76px; flex: 0 0 auto; font-size: 12px; gap: 3px; color: rgb(42, 65, 184);"><span class="sc-interp">5d02e7b</span><svg data-dc-tpl="306" class="i" viewBox="0 0 24 24" aria-label="Не отправлен" style="width: 12px; height: 12px; stroke-width: 2.4;"><path data-dc-tpl="307" d="M12 20V5M6 11l6-6 6 6"></path></svg></span>
+            </div>
+          
+            <div data-dc-tpl="289" class="cr" style="background: transparent; opacity: 0.62;">
+              <div data-dc-tpl="290" class="row" style="flex: 1 1 0%; min-width: 0px; overflow: hidden;">
+                <span data-dc-tpl="292" class="pill" style="background: rgb(226, 243, 245); color: rgb(10, 101, 117); box-shadow: rgb(191, 227, 232) 0px 0px 0px 1px inset; margin-right: 6px;"><svg data-dc-tpl="297" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px; stroke-width: 2.2;"><path data-dc-tpl="298" d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 9.6 4.2 4.2 0 0 0 7 18z"></path></svg><span class="sc-interp">origin/main</span></span>
+                <span data-dc-tpl="299" class="ell" style="min-width: 0px; font-weight: 500; color: rgb(29, 31, 36);"><span class="sc-interp">docs: README — скриншоты</span></span>
+              </div>
+              <div data-dc-tpl="300" class="row" style="width: 132px; gap: 8px; flex: 0 0 auto;"><span data-dc-tpl="301" class="av" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184);"><span class="sc-interp">A</span></span><span data-dc-tpl="302" class="ell" style="color: rgb(74, 79, 90);"><span class="sc-interp">avv</span></span></div>
+              <span data-dc-tpl="303" style="width: 112px; flex: 0 0 auto; font-size: 12.5px; color: rgb(74, 79, 90);"><span class="sc-interp">24 сен, 09:05</span></span>
+              <span data-dc-tpl="304" class="mono row" style="width: 76px; flex: 0 0 auto; font-size: 12px; gap: 3px; color: rgb(10, 101, 117);"><span class="sc-interp">c47e19a</span><svg data-dc-tpl="309" class="i" viewBox="0 0 24 24" aria-label="Входящий" style="width: 12px; height: 12px; stroke-width: 2.4;"><path data-dc-tpl="310" d="M12 4v15M6 13l6 6 6-6"></path></svg></span>
+            </div>
+          
+            <div data-dc-tpl="289" class="cr" style="background: transparent; opacity: 1;">
+              <div data-dc-tpl="290" class="row" style="flex: 1 1 0%; min-width: 0px; overflow: hidden;">
+                <span data-dc-tpl="292" class="pill" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0); box-shadow: rgb(240, 217, 168) 0px 0px 0px 1px inset; margin-right: 6px;"><svg data-dc-tpl="294" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px; stroke-width: 2.2;"><path data-dc-tpl="295" d="M3.5 12.5V4h8.5l8.5 8.5-8 8z"></path></svg><span class="sc-interp">v1.1.33</span></span>
+                <span data-dc-tpl="299" class="ell" style="min-width: 0px; font-weight: 500; color: rgb(29, 31, 36);"><span class="sc-interp">fix(repos): ярлык ветки обновляется при переключении между репозиториями</span></span>
+              </div>
+              <div data-dc-tpl="300" class="row" style="width: 132px; gap: 8px; flex: 0 0 auto;"><span data-dc-tpl="301" class="av" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184);"><span class="sc-interp">A</span></span><span data-dc-tpl="302" class="ell" style="color: rgb(74, 79, 90);"><span class="sc-interp">avv</span></span></div>
+              <span data-dc-tpl="303" style="width: 112px; flex: 0 0 auto; font-size: 12.5px; color: rgb(74, 79, 90);"><span class="sc-interp">23 сен, 10:23</span></span>
+              <span data-dc-tpl="304" class="mono row" style="width: 76px; flex: 0 0 auto; font-size: 12px; gap: 3px; color: rgb(74, 79, 90);"><span class="sc-interp">bd94802</span></span>
+            </div>
+          
+            <div data-dc-tpl="289" class="cr" style="background: transparent; opacity: 1;">
+              <div data-dc-tpl="290" class="row" style="flex: 1 1 0%; min-width: 0px; overflow: hidden;">
+                
+                <span data-dc-tpl="299" class="ell" style="min-width: 0px; font-weight: 500; color: rgb(74, 79, 90);"><span class="sc-interp">Merge branch 'feature/command-palette'</span></span>
+              </div>
+              <div data-dc-tpl="300" class="row" style="width: 132px; gap: 8px; flex: 0 0 auto;"><span data-dc-tpl="301" class="av" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184);"><span class="sc-interp">A</span></span><span data-dc-tpl="302" class="ell" style="color: rgb(74, 79, 90);"><span class="sc-interp">avv</span></span></div>
+              <span data-dc-tpl="303" style="width: 112px; flex: 0 0 auto; font-size: 12.5px; color: rgb(74, 79, 90);"><span class="sc-interp">23 сен, 09:58</span></span>
+              <span data-dc-tpl="304" class="mono row" style="width: 76px; flex: 0 0 auto; font-size: 12px; gap: 3px; color: rgb(74, 79, 90);"><span class="sc-interp">8be0d41</span></span>
+            </div>
+          
+            <div data-dc-tpl="289" class="cr" style="background: transparent; opacity: 1;">
+              <div data-dc-tpl="290" class="row" style="flex: 1 1 0%; min-width: 0px; overflow: hidden;">
+                <span data-dc-tpl="292" class="pill" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184); box-shadow: rgb(201, 210, 247) 0px 0px 0px 1px inset; margin-right: 6px;"><span class="sc-interp">feature/command-palette</span></span><span data-dc-tpl="292" class="pill" style="background: rgb(226, 243, 245); color: rgb(10, 101, 117); box-shadow: rgb(191, 227, 232) 0px 0px 0px 1px inset; margin-right: 6px;"><svg data-dc-tpl="297" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px; stroke-width: 2.2;"><path data-dc-tpl="298" d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 9.6 4.2 4.2 0 0 0 7 18z"></path></svg><span class="sc-interp">origin</span></span>
+                <span data-dc-tpl="299" class="ell" style="min-width: 0px; font-weight: 500; color: rgb(29, 31, 36);"><span class="sc-interp">feat(palette): поиск по веткам и коммитам</span></span>
+              </div>
+              <div data-dc-tpl="300" class="row" style="width: 132px; gap: 8px; flex: 0 0 auto;"><span data-dc-tpl="301" class="av" style="background: rgb(240, 235, 253); color: rgb(91, 55, 201);"><span class="sc-interp">М</span></span><span data-dc-tpl="302" class="ell" style="color: rgb(74, 79, 90);"><span class="sc-interp">m.ivanova</span></span></div>
+              <span data-dc-tpl="303" style="width: 112px; flex: 0 0 auto; font-size: 12.5px; color: rgb(74, 79, 90);"><span class="sc-interp">19 сен, 17:30</span></span>
+              <span data-dc-tpl="304" class="mono row" style="width: 76px; flex: 0 0 auto; font-size: 12px; gap: 3px; color: rgb(74, 79, 90);"><span class="sc-interp">3f6a9d2</span></span>
+            </div>
+          
+            <div data-dc-tpl="289" class="cr" style="background: transparent; opacity: 1;">
+              <div data-dc-tpl="290" class="row" style="flex: 1 1 0%; min-width: 0px; overflow: hidden;">
+                
+                <span data-dc-tpl="299" class="ell" style="min-width: 0px; font-weight: 500; color: rgb(29, 31, 36);"><span class="sc-interp">feat(palette): каркас палитры команд</span></span>
+              </div>
+              <div data-dc-tpl="300" class="row" style="width: 132px; gap: 8px; flex: 0 0 auto;"><span data-dc-tpl="301" class="av" style="background: rgb(240, 235, 253); color: rgb(91, 55, 201);"><span class="sc-interp">М</span></span><span data-dc-tpl="302" class="ell" style="color: rgb(74, 79, 90);"><span class="sc-interp">m.ivanova</span></span></div>
+              <span data-dc-tpl="303" style="width: 112px; flex: 0 0 auto; font-size: 12.5px; color: rgb(74, 79, 90);"><span class="sc-interp">15 сен, 14:12</span></span>
+              <span data-dc-tpl="304" class="mono row" style="width: 76px; flex: 0 0 auto; font-size: 12px; gap: 3px; color: rgb(74, 79, 90);"><span class="sc-interp">e1b7c50</span></span>
+            </div>
+          
+            <div data-dc-tpl="289" class="cr" style="background: transparent; opacity: 1;">
+              <div data-dc-tpl="290" class="row" style="flex: 1 1 0%; min-width: 0px; overflow: hidden;">
+                <span data-dc-tpl="292" class="pill" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0); box-shadow: rgb(240, 217, 168) 0px 0px 0px 1px inset; margin-right: 6px;"><svg data-dc-tpl="294" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px; stroke-width: 2.2;"><path data-dc-tpl="295" d="M3.5 12.5V4h8.5l8.5 8.5-8 8z"></path></svg><span class="sc-interp">v1.1.32</span></span>
+                <span data-dc-tpl="299" class="ell" style="min-width: 0px; font-weight: 500; color: rgb(29, 31, 36);"><span class="sc-interp">fix: stabilize repository lifecycle and detached HEAD operations</span></span>
+              </div>
+              <div data-dc-tpl="300" class="row" style="width: 132px; gap: 8px; flex: 0 0 auto;"><span data-dc-tpl="301" class="av" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184);"><span class="sc-interp">A</span></span><span data-dc-tpl="302" class="ell" style="color: rgb(74, 79, 90);"><span class="sc-interp">avv</span></span></div>
+              <span data-dc-tpl="303" style="width: 112px; flex: 0 0 auto; font-size: 12.5px; color: rgb(74, 79, 90);"><span class="sc-interp">22 сен, 16:08</span></span>
+              <span data-dc-tpl="304" class="mono row" style="width: 76px; flex: 0 0 auto; font-size: 12px; gap: 3px; color: rgb(74, 79, 90);"><span class="sc-interp">2c9f2b6</span></span>
+            </div>
+          
+            <div data-dc-tpl="289" class="cr" style="background: transparent; opacity: 1;">
+              <div data-dc-tpl="290" class="row" style="flex: 1 1 0%; min-width: 0px; overflow: hidden;">
+                <span data-dc-tpl="292" class="pill" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0); box-shadow: rgb(240, 217, 168) 0px 0px 0px 1px inset; margin-right: 6px;"><svg data-dc-tpl="294" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px; stroke-width: 2.2;"><path data-dc-tpl="295" d="M3.5 12.5V4h8.5l8.5 8.5-8 8z"></path></svg><span class="sc-interp">v1.1.31</span></span>
+                <span data-dc-tpl="299" class="ell" style="min-width: 0px; font-weight: 500; color: rgb(29, 31, 36);"><span class="sc-interp">fix(pull): Pull обновляет все remote-ветки — fetch --tags + локальный merge/rebase</span></span>
+              </div>
+              <div data-dc-tpl="300" class="row" style="width: 132px; gap: 8px; flex: 0 0 auto;"><span data-dc-tpl="301" class="av" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184);"><span class="sc-interp">A</span></span><span data-dc-tpl="302" class="ell" style="color: rgb(74, 79, 90);"><span class="sc-interp">avv</span></span></div>
+              <span data-dc-tpl="303" style="width: 112px; flex: 0 0 auto; font-size: 12.5px; color: rgb(74, 79, 90);"><span class="sc-interp">9 сен, 12:30</span></span>
+              <span data-dc-tpl="304" class="mono row" style="width: 76px; flex: 0 0 auto; font-size: 12px; gap: 3px; color: rgb(74, 79, 90);"><span class="sc-interp">0e56ef2</span></span>
+            </div>
+          
+            <div data-dc-tpl="289" class="cr" style="background: transparent; opacity: 1;">
+              <div data-dc-tpl="290" class="row" style="flex: 1 1 0%; min-width: 0px; overflow: hidden;">
+                <span data-dc-tpl="292" class="pill" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0); box-shadow: rgb(240, 217, 168) 0px 0px 0px 1px inset; margin-right: 6px;"><svg data-dc-tpl="294" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px; stroke-width: 2.2;"><path data-dc-tpl="295" d="M3.5 12.5V4h8.5l8.5 8.5-8 8z"></path></svg><span class="sc-interp">v1.1.30</span></span>
+                <span data-dc-tpl="299" class="ell" style="min-width: 0px; font-weight: 500; color: rgb(29, 31, 36);"><span class="sc-interp">fix(log): читаемый вывод в Git output — переводы строк сохраняются</span></span>
+              </div>
+              <div data-dc-tpl="300" class="row" style="width: 132px; gap: 8px; flex: 0 0 auto;"><span data-dc-tpl="301" class="av" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184);"><span class="sc-interp">A</span></span><span data-dc-tpl="302" class="ell" style="color: rgb(74, 79, 90);"><span class="sc-interp">avv</span></span></div>
+              <span data-dc-tpl="303" style="width: 112px; flex: 0 0 auto; font-size: 12.5px; color: rgb(74, 79, 90);"><span class="sc-interp">22 июл, 21:43</span></span>
+              <span data-dc-tpl="304" class="mono row" style="width: 76px; flex: 0 0 auto; font-size: 12px; gap: 3px; color: rgb(74, 79, 90);"><span class="sc-interp">f3827ff</span></span>
+            </div>
+          
+            <div data-dc-tpl="289" class="cr" style="background: transparent; opacity: 1;">
+              <div data-dc-tpl="290" class="row" style="flex: 1 1 0%; min-width: 0px; overflow: hidden;">
+                
+                <span data-dc-tpl="299" class="ell" style="min-width: 0px; font-weight: 500; color: rgb(29, 31, 36);"><span class="sc-interp">fix(log): кириллические пути в выводе pull/push/fetch/clone</span></span>
+              </div>
+              <div data-dc-tpl="300" class="row" style="width: 132px; gap: 8px; flex: 0 0 auto;"><span data-dc-tpl="301" class="av" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184);"><span class="sc-interp">A</span></span><span data-dc-tpl="302" class="ell" style="color: rgb(74, 79, 90);"><span class="sc-interp">avv</span></span></div>
+              <span data-dc-tpl="303" style="width: 112px; flex: 0 0 auto; font-size: 12.5px; color: rgb(74, 79, 90);"><span class="sc-interp">17 июл, 15:15</span></span>
+              <span data-dc-tpl="304" class="mono row" style="width: 76px; flex: 0 0 auto; font-size: 12px; gap: 3px; color: rgb(74, 79, 90);"><span class="sc-interp">746a441</span></span>
+            </div>
+          
+            <div data-dc-tpl="289" class="cr" style="background: transparent; opacity: 1;">
+              <div data-dc-tpl="290" class="row" style="flex: 1 1 0%; min-width: 0px; overflow: hidden;">
+                
+                <span data-dc-tpl="299" class="ell" style="min-width: 0px; font-weight: 500; color: rgb(29, 31, 36);"><span class="sc-interp">fix(ci): замечания clippy в app_log.rs</span></span>
+              </div>
+              <div data-dc-tpl="300" class="row" style="width: 132px; gap: 8px; flex: 0 0 auto;"><span data-dc-tpl="301" class="av" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184);"><span class="sc-interp">A</span></span><span data-dc-tpl="302" class="ell" style="color: rgb(74, 79, 90);"><span class="sc-interp">avv</span></span></div>
+              <span data-dc-tpl="303" style="width: 112px; flex: 0 0 auto; font-size: 12.5px; color: rgb(74, 79, 90);"><span class="sc-interp">13 июл, 18:05</span></span>
+              <span data-dc-tpl="304" class="mono row" style="width: 76px; flex: 0 0 auto; font-size: 12px; gap: 3px; color: rgb(74, 79, 90);"><span class="sc-interp">31b79b4</span></span>
+            </div>
+          
+          <svg data-dc-tpl="311" width="56" height="380" viewBox="0 0 56 380" aria-hidden="true" style="position: absolute; left: 10px; top: 0px; pointer-events: none;">
+            <path data-dc-tpl="312" d="M16 14V42" stroke="#8A8E98" stroke-width="2" stroke-dasharray="3 3" fill="none"></path>
+            <path data-dc-tpl="313" d="M16 42V380" stroke="#3550E0" stroke-width="2" fill="none"></path>
+            <path data-dc-tpl="314" d="M34 98C34 114 16 110 16 126" stroke="#0C8599" stroke-width="2" stroke-dasharray="4 3" fill="none" opacity=".75"></path>
+            <path data-dc-tpl="315" d="M16 154C16 170 34 166 34 182V238C34 254 16 250 16 266" stroke="#7048E8" stroke-width="2" fill="none"></path>
+            <circle data-dc-tpl="316" cx="16" cy="14" r="5" fill="#fff" stroke="#6E7380" stroke-width="1.6" stroke-dasharray="2.5 2"></circle>
+            <circle data-dc-tpl="317" cx="16" cy="42" r="6.5" fill="#fff" stroke="#3550E0" stroke-width="2.2"></circle><circle data-dc-tpl="318" cx="16" cy="42" r="2.6" fill="#3550E0"></circle>
+            <circle data-dc-tpl="319" cx="16" cy="70" r="5" fill="#fff" stroke="#3550E0" stroke-width="2.2"></circle>
+            <circle data-dc-tpl="320" cx="34" cy="98" r="5" fill="#fff" stroke="#0C8599" stroke-width="1.8" stroke-dasharray="2.5 2" opacity=".8"></circle>
+            <circle data-dc-tpl="321" cx="16" cy="126" r="5" fill="#3550E0" stroke="#fff" stroke-width="2"></circle>
+            <circle data-dc-tpl="322" cx="16" cy="154" r="6" fill="#3550E0" stroke="#fff" stroke-width="2"></circle><circle data-dc-tpl="323" cx="16" cy="154" r="2" fill="#fff"></circle>
+            <circle data-dc-tpl="324" cx="34" cy="182" r="5" fill="#7048E8" stroke="#fff" stroke-width="2"></circle>
+            <circle data-dc-tpl="325" cx="34" cy="210" r="5" fill="#7048E8" stroke="#fff" stroke-width="2"></circle>
+            <circle data-dc-tpl="326" cx="16" cy="238" r="5" fill="#3550E0" stroke="#fff" stroke-width="2"></circle>
+            <circle data-dc-tpl="327" cx="16" cy="266" r="5" fill="#3550E0" stroke="#fff" stroke-width="2"></circle>
+            <circle data-dc-tpl="328" cx="16" cy="294" r="5" fill="#3550E0" stroke="#fff" stroke-width="2"></circle>
+            <circle data-dc-tpl="329" cx="16" cy="322" r="5" fill="#3550E0" stroke="#fff" stroke-width="2"></circle>
+            <circle data-dc-tpl="330" cx="16" cy="350" r="5" fill="#3550E0" stroke="#fff" stroke-width="2"></circle>
+          </svg>
+        </div>
+      </section>
+
+      <section data-dc-tpl="331" class="card" aria-label="Diff" style="flex: 1 1 0%; min-height: 0px; display: flex; flex-direction: column; overflow: hidden;">
+        <div data-dc-tpl="332" class="row" style="height: 44px; padding: 0px 10px 0px 12px; gap: 10px; border-bottom: 1px solid rgb(239, 238, 233); flex: 0 0 auto;">
+          <div data-dc-tpl="333" class="seg" role="tablist"><button data-dc-tpl="334" class="on" role="tab" aria-selected="true">Изменения</button><button data-dc-tpl="335" role="tab" aria-selected="false"><svg data-dc-tpl="336" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><rect data-dc-tpl="337" x="3" y="4" width="18" height="16" rx="3"></rect><path data-dc-tpl="338" d="M7 9l3 3-3 3M12 15h5"></path></svg>Git output</button></div>
+          <nav data-dc-tpl="339" class="row mono" aria-label="Путь к файлу" style="gap: 3px; font-size: 12.5px; color: rgb(74, 79, 90); min-width: 0px;">src<svg data-dc-tpl="340" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="341" d="M9 6l6 6-6 6"></path></svg>styles<svg data-dc-tpl="342" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="343" d="M9 6l6 6-6 6"></path></svg><b data-dc-tpl="344" style="color: rgb(29, 31, 36); font-weight: 600;">main.css</b></nav>
+          <span data-dc-tpl="345" class="bdg" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);">M</span>
+          <span data-dc-tpl="346" class="sp"></span>
+          <span data-dc-tpl="347" style="font-size: 12px; color: rgb(74, 79, 90);">Хунк 1 из 1</span>
+          <span data-dc-tpl="348" class="row" style="gap: 2px;"><button data-dc-tpl="349" class="btn g sm ib" aria-label="Предыдущий хунк"><svg data-dc-tpl="350" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="351" d="M6 15l6-6 6 6"></path></svg></button><button data-dc-tpl="352" class="btn g sm ib" aria-label="Следующий хунк"><svg data-dc-tpl="353" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="354" d="M6 9l6 6 6-6"></path></svg></button></span>
+          <div data-dc-tpl="355" class="seg"><button data-dc-tpl="356" aria-label="Unified"><svg data-dc-tpl="357" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><rect data-dc-tpl="358" x="3" y="4" width="18" height="16" rx="2"></rect><path data-dc-tpl="359" d="M3 12h18"></path></svg></button><button data-dc-tpl="360" class="on" aria-label="Side-by-side"><svg data-dc-tpl="361" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><rect data-dc-tpl="362" x="3" y="4" width="18" height="16" rx="2"></rect><path data-dc-tpl="363" d="M12 4v16"></path></svg></button></div>
+        </div>
+        <div data-dc-tpl="364" class="row hh" style="border-top: 0px;">
+          <span data-dc-tpl="365" class="mono" style="color: rgb(42, 65, 184); font-weight: 500;">@@ -1,9 +1,6 @@</span><span data-dc-tpl="366" class="mono" style="color: rgb(74, 79, 90);">a91f3c2 · только просмотр</span>
+          <span data-dc-tpl="367" class="sp"></span>
+          <span data-dc-tpl="368" class="mono" style="color: rgb(35, 112, 50); font-weight: 600;">+4</span><span data-dc-tpl="369" class="mono" style="color: rgb(184, 40, 90); font-weight: 600;">−7</span>
+        </div>
+        
+          <div data-dc-tpl="371" class="dl"><span data-dc-tpl="372" class="dn" style="background: rgb(249, 222, 232);"><span class="sc-interp">1</span></span><span data-dc-tpl="373" class="dt" style="background: rgb(253, 240, 244);"><span data-dc-tpl="374" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp">−</span></span><span class="sc-interp">:root {</span><span data-dc-tpl="375" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="376" class="dv"></span><span data-dc-tpl="377" class="dn" style="background: rgb(220, 240, 225); color: rgb(93, 98, 112);"><span class="sc-interp">1</span></span><span data-dc-tpl="378" class="dt" style="background: rgb(238, 248, 240);"><span data-dc-tpl="379" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp">+</span></span><span class="sc-interp">@import './tokens.css';</span><span data-dc-tpl="380" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+        
+          <div data-dc-tpl="371" class="dl"><span data-dc-tpl="372" class="dn" style="background: rgb(249, 222, 232);"><span class="sc-interp">2</span></span><span data-dc-tpl="373" class="dt" style="background: rgb(253, 240, 244);"><span data-dc-tpl="374" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp">−</span></span><span class="sc-interp">  --bg: #1e1e2e;</span><span data-dc-tpl="375" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="376" class="dv"></span><span data-dc-tpl="377" class="dn" style="background: rgb(244, 243, 239); color: rgb(93, 98, 112);"><span class="sc-interp"></span></span><span data-dc-tpl="378" class="dt" style="background: repeating-linear-gradient(135deg, rgb(250, 249, 246) 0px, rgb(250, 249, 246) 6px, rgb(239, 237, 231) 6px, rgb(239, 237, 231) 7px);"><span data-dc-tpl="379" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp"></span></span><span class="sc-interp"></span><span data-dc-tpl="380" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+        
+          <div data-dc-tpl="371" class="dl"><span data-dc-tpl="372" class="dn" style="background: rgb(249, 222, 232);"><span class="sc-interp">3</span></span><span data-dc-tpl="373" class="dt" style="background: rgb(253, 240, 244);"><span data-dc-tpl="374" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp">−</span></span><span class="sc-interp">  --panel: #181825;</span><span data-dc-tpl="375" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="376" class="dv"></span><span data-dc-tpl="377" class="dn" style="background: rgb(244, 243, 239); color: rgb(93, 98, 112);"><span class="sc-interp"></span></span><span data-dc-tpl="378" class="dt" style="background: repeating-linear-gradient(135deg, rgb(250, 249, 246) 0px, rgb(250, 249, 246) 6px, rgb(239, 237, 231) 6px, rgb(239, 237, 231) 7px);"><span data-dc-tpl="379" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp"></span></span><span class="sc-interp"></span><span data-dc-tpl="380" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+        
+          <div data-dc-tpl="371" class="dl"><span data-dc-tpl="372" class="dn" style="background: rgb(249, 222, 232);"><span class="sc-interp">4</span></span><span data-dc-tpl="373" class="dt" style="background: rgb(253, 240, 244);"><span data-dc-tpl="374" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp">−</span></span><span class="sc-interp">  --accent: #89b4fa;</span><span data-dc-tpl="375" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="376" class="dv"></span><span data-dc-tpl="377" class="dn" style="background: rgb(244, 243, 239); color: rgb(93, 98, 112);"><span class="sc-interp"></span></span><span data-dc-tpl="378" class="dt" style="background: repeating-linear-gradient(135deg, rgb(250, 249, 246) 0px, rgb(250, 249, 246) 6px, rgb(239, 237, 231) 6px, rgb(239, 237, 231) 7px);"><span data-dc-tpl="379" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp"></span></span><span class="sc-interp"></span><span data-dc-tpl="380" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+        
+          <div data-dc-tpl="371" class="dl"><span data-dc-tpl="372" class="dn" style="background: rgb(249, 222, 232);"><span class="sc-interp">5</span></span><span data-dc-tpl="373" class="dt" style="background: rgb(253, 240, 244);"><span data-dc-tpl="374" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp">−</span></span><span class="sc-interp">}</span><span data-dc-tpl="375" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="376" class="dv"></span><span data-dc-tpl="377" class="dn" style="background: rgb(244, 243, 239); color: rgb(93, 98, 112);"><span class="sc-interp"></span></span><span data-dc-tpl="378" class="dt" style="background: repeating-linear-gradient(135deg, rgb(250, 249, 246) 0px, rgb(250, 249, 246) 6px, rgb(239, 237, 231) 6px, rgb(239, 237, 231) 7px);"><span data-dc-tpl="379" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp"></span></span><span class="sc-interp"></span><span data-dc-tpl="380" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+        
+          <div data-dc-tpl="371" class="dl"><span data-dc-tpl="372" class="dn" style="background: rgb(250, 249, 246);"><span class="sc-interp">6</span></span><span data-dc-tpl="373" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="374" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"> </span></span><span class="sc-interp"></span><span data-dc-tpl="375" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="376" class="dv"></span><span data-dc-tpl="377" class="dn" style="background: rgb(250, 249, 246); color: rgb(93, 98, 112);"><span class="sc-interp">2</span></span><span data-dc-tpl="378" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="379" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp"> </span></span><span class="sc-interp"></span><span data-dc-tpl="380" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+        
+          <div data-dc-tpl="371" class="dl"><span data-dc-tpl="372" class="dn" style="background: rgb(250, 249, 246);"><span class="sc-interp">7</span></span><span data-dc-tpl="373" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="374" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"> </span></span><span class="sc-interp">.toolbar {</span><span data-dc-tpl="375" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="376" class="dv"></span><span data-dc-tpl="377" class="dn" style="background: rgb(250, 249, 246); color: rgb(93, 98, 112);"><span class="sc-interp">3</span></span><span data-dc-tpl="378" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="379" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp"> </span></span><span class="sc-interp">.toolbar {</span><span data-dc-tpl="380" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+        
+          <div data-dc-tpl="371" class="dl"><span data-dc-tpl="372" class="dn" style="background: rgb(249, 222, 232);"><span class="sc-interp">8</span></span><span data-dc-tpl="373" class="dt" style="background: rgb(253, 240, 244);"><span data-dc-tpl="374" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp">−</span></span><span class="sc-interp">  height: </span><span data-dc-tpl="375" style="background: rgb(245, 192, 211); border-radius: 3px;"><span class="sc-interp">40px</span></span><span class="sc-interp">;</span></span><span data-dc-tpl="376" class="dv"></span><span data-dc-tpl="377" class="dn" style="background: rgb(220, 240, 225); color: rgb(93, 98, 112);"><span class="sc-interp">4</span></span><span data-dc-tpl="378" class="dt" style="background: rgb(238, 248, 240);"><span data-dc-tpl="379" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp">+</span></span><span class="sc-interp">  height: </span><span data-dc-tpl="380" style="background: rgb(173, 221, 185); border-radius: 3px;"><span class="sc-interp">var(--toolbar-h)</span></span><span class="sc-interp">;</span></span></div>
+        
+          <div data-dc-tpl="371" class="dl"><span data-dc-tpl="372" class="dn" style="background: rgb(249, 222, 232);"><span class="sc-interp">9</span></span><span data-dc-tpl="373" class="dt" style="background: rgb(253, 240, 244);"><span data-dc-tpl="374" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp">−</span></span><span class="sc-interp">  background: var(--</span><span data-dc-tpl="375" style="background: rgb(245, 192, 211); border-radius: 3px;"><span class="sc-interp">panel</span></span><span class="sc-interp">);</span></span><span data-dc-tpl="376" class="dv"></span><span data-dc-tpl="377" class="dn" style="background: rgb(220, 240, 225); color: rgb(93, 98, 112);"><span class="sc-interp">5</span></span><span data-dc-tpl="378" class="dt" style="background: rgb(238, 248, 240);"><span data-dc-tpl="379" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp">+</span></span><span class="sc-interp">  background: var(--</span><span data-dc-tpl="380" style="background: rgb(173, 221, 185); border-radius: 3px;"><span class="sc-interp">surface</span></span><span class="sc-interp">);</span></span></div>
+        
+          <div data-dc-tpl="371" class="dl"><span data-dc-tpl="372" class="dn" style="background: rgb(244, 243, 239);"><span class="sc-interp"></span></span><span data-dc-tpl="373" class="dt" style="background: repeating-linear-gradient(135deg, rgb(250, 249, 246) 0px, rgb(250, 249, 246) 6px, rgb(239, 237, 231) 6px, rgb(239, 237, 231) 7px);"><span data-dc-tpl="374" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"></span></span><span class="sc-interp"></span><span data-dc-tpl="375" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="376" class="dv"></span><span data-dc-tpl="377" class="dn" style="background: rgb(220, 240, 225); color: rgb(93, 98, 112);"><span class="sc-interp">6</span></span><span data-dc-tpl="378" class="dt" style="background: rgb(238, 248, 240);"><span data-dc-tpl="379" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp">+</span></span><span class="sc-interp">  border-bottom: 1px solid var(--border);</span><span data-dc-tpl="380" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+        
+      </section>
+    </div>
+
+    
+    <section data-dc-tpl="381" class="card" aria-label="Детали коммита" style="width: 340px; flex: 0 0 auto; display: flex; flex-direction: column; overflow: hidden;">
+      <div data-dc-tpl="382" style="padding: 14px 18px 16px; border-bottom: 1px solid rgb(239, 238, 233);">
+        <div data-dc-tpl="383" class="row" style="gap: 8px;">
+          <span data-dc-tpl="384" style="font: 700 11px / 1 Manrope, sans-serif; letter-spacing: 0.09em; text-transform: uppercase; color: rgb(74, 79, 90);">Коммит</span>
+          <span data-dc-tpl="385" class="pill mono" style="background: rgb(239, 238, 233); color: rgb(29, 31, 36); font-family: &quot;IBM Plex Mono&quot;, monospace; font-weight: 500;">a91f3c2</span>
+          <button data-dc-tpl="386" class="btn g sm ib" aria-label="Копировать SHA"><svg data-dc-tpl="387" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><rect data-dc-tpl="388" x="8" y="8" width="12" height="12" rx="2"></rect><path data-dc-tpl="389" d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button>
+          <span data-dc-tpl="390" class="sp"></span>
+          <button data-dc-tpl="391" class="btn g sm ib" aria-label="Действия с коммитом"><svg data-dc-tpl="392" class="i" viewBox="0 0 24 24" aria-hidden="true"><circle data-dc-tpl="393" cx="5" cy="12" r="1.2"></circle><circle data-dc-tpl="394" cx="12" cy="12" r="1.2"></circle><circle data-dc-tpl="395" cx="19" cy="12" r="1.2"></circle></svg></button>
+        </div>
+        <h3 data-dc-tpl="396" style="margin: 10px 0px 9px; font: 700 17px / 1.3 Manrope, sans-serif;">refactor(ui): единые токены темы</h3>
+        <div data-dc-tpl="397" class="row" style="gap: 6px; flex-wrap: wrap;">
+          <span data-dc-tpl="398" class="pill" style="background: rgb(29, 31, 36); color: rgb(255, 255, 255);">HEAD</span>
+          <span data-dc-tpl="399" class="pill" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184); box-shadow: rgb(201, 210, 247) 0px 0px 0px 1px inset;">main</span>
+          <span data-dc-tpl="400" class="pill" style="background: rgb(255, 255, 255); color: rgb(42, 65, 184); box-shadow: rgb(201, 210, 247) 0px 0px 0px 1px inset;"><svg data-dc-tpl="401" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px; stroke-width: 2.4;"><path data-dc-tpl="402" d="M12 20V5M6 11l6-6 6 6"></path></svg>не отправлен</span>
+        </div>
+        <p data-dc-tpl="403" style="margin: 12px 0px 0px; font-size: 13px; line-height: 1.55; color: rgb(74, 79, 90);">Цвета, радиусы и тени вынесены в tokens.css — компоненты используют CSS-переменные вместо литералов. Подготовка к светлой теме.</p>
+        <div data-dc-tpl="404" style="display: grid; grid-template-columns: 72px 1fr; gap: 9px 10px; margin-top: 14px; font-size: 13px; align-items: center;">
+          <span data-dc-tpl="405" style="color: rgb(74, 79, 90);">Автор</span><span data-dc-tpl="406" class="row" style="gap: 7px;"><span data-dc-tpl="407" class="av" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184);">A</span><b data-dc-tpl="408" style="font-weight: 600;">avv</b></span>
+          <span data-dc-tpl="409" style="color: rgb(74, 79, 90);">Дата</span><span data-dc-tpl="410">26 сентября 2026, 18:20</span>
+          <span data-dc-tpl="411" style="color: rgb(74, 79, 90);">Родитель</span><span data-dc-tpl="412" class="row" style="gap: 7px; min-width: 0px;"><button data-dc-tpl="413" class="lnk">5d02e7b</button><span data-dc-tpl="414" class="ell" style="color: rgb(74, 79, 90); font-size: 12.5px;">feat(commit): встроенная форма…</span></span>
+          <span data-dc-tpl="415" style="color: rgb(74, 79, 90);">SHA</span><span data-dc-tpl="416" class="row" style="gap: 6px; min-width: 0px;"><span data-dc-tpl="417" class="mono ell" style="font-size: 12px; color: rgb(29, 31, 36);">a91f3c2e7b41d09c5f2a8e6b13d7c90f4e21a5b8</span></span>
+        </div>
+      </div>
+      <div data-dc-tpl="418" class="row" style="padding: 12px 14px 8px 18px; gap: 8px; flex: 0 0 auto;">
+        <span data-dc-tpl="419" style="font-weight: 700; font-size: 14px;">Файлы</span><span data-dc-tpl="420" class="ct">5</span>
+        <span data-dc-tpl="421" class="mono" style="font-size: 12px; color: rgb(35, 112, 50); font-weight: 600;">+38</span><span data-dc-tpl="422" class="mono" style="font-size: 12px; color: rgb(184, 40, 90); font-weight: 600;">−20</span>
+        <span data-dc-tpl="423" class="sp"></span>
+        <div data-dc-tpl="424" class="seg"><button data-dc-tpl="425" class="on" aria-label="Дерево" style="padding: 0px 7px;"><svg data-dc-tpl="426" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><path data-dc-tpl="427" d="M5 4v13a2 2 0 0 0 2 2h4M5 9h6"></path><rect data-dc-tpl="428" x="13" y="6" width="7" height="6" rx="1.5"></rect><rect data-dc-tpl="429" x="13" y="16" width="7" height="6" rx="1.5"></rect></svg></button><button data-dc-tpl="430" aria-label="Плоский список" style="padding: 0px 7px;"><svg data-dc-tpl="431" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><path data-dc-tpl="432" d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"></path></svg></button></div>
+      </div>
+      <div data-dc-tpl="433" class="row" style="padding: 0px 18px 10px; gap: 6px; flex: 0 0 auto;">
+        <button data-dc-tpl="434" class="chip on"><span data-dc-tpl="435" class="bdg" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);">M</span>4</button>
+        <button data-dc-tpl="436" class="chip on"><span data-dc-tpl="437" class="bdg" style="background: rgb(227, 244, 231); color: rgb(35, 112, 50);">A</span>1</button>
+        <button data-dc-tpl="438" class="chip"><span data-dc-tpl="439" class="bdg" style="background: rgb(252, 228, 236); color: rgb(184, 40, 90);">D</span>0</button>
+        <button data-dc-tpl="440" class="chip"><span data-dc-tpl="441" class="bdg" style="background: rgb(240, 235, 253); color: rgb(91, 55, 201);">R</span>0</button>
+      </div>
+      <div data-dc-tpl="442" style="padding: 0px 8px 8px;">
+        
+          <div data-dc-tpl="445" class="row" style="height: 28px; padding-left: 12px; gap: 6px; font-size: 12.5px; color: rgb(74, 79, 90);"><svg data-dc-tpl="446" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="447" d="M6 9l6 6 6-6"></path></svg><svg data-dc-tpl="448" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px; color: rgb(199, 119, 0);"><path data-dc-tpl="449" d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg><span data-dc-tpl="450" class="mono" style="font-weight: 500;"><span class="sc-interp">src/styles</span></span></div>
+          
+        
+          
+          <div data-dc-tpl="452" class="row" style="height: 28px; padding: 0px 10px 0px 36px; gap: 8px; border-radius: 8px; background: rgb(230, 234, 251);"><span data-dc-tpl="453" class="bdg" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);"><span class="sc-interp">M</span></span><span data-dc-tpl="454" class="ell" style="flex: 1 1 0%; min-width: 0px; font-size: 13px; font-weight: 700;"><span class="sc-interp">main.css</span></span><span data-dc-tpl="455" class="mono" style="font-size: 11.5px; color: rgb(74, 79, 90);"><span class="sc-interp">+4 −7</span></span></div>
+        
+          
+          <div data-dc-tpl="452" class="row" style="height: 28px; padding: 0px 10px 0px 36px; gap: 8px; border-radius: 8px; background: transparent;"><span data-dc-tpl="453" class="bdg" style="background: rgb(227, 244, 231); color: rgb(35, 112, 50);"><span class="sc-interp">A</span></span><span data-dc-tpl="454" class="ell" style="flex: 1 1 0%; min-width: 0px; font-size: 13px; font-weight: 500;"><span class="sc-interp">tokens.css</span></span><span data-dc-tpl="455" class="mono" style="font-size: 11.5px; color: rgb(74, 79, 90);"><span class="sc-interp">+26</span></span></div>
+        
+          <div data-dc-tpl="445" class="row" style="height: 28px; padding-left: 12px; gap: 6px; font-size: 12.5px; color: rgb(74, 79, 90);"><svg data-dc-tpl="446" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="447" d="M6 9l6 6 6-6"></path></svg><svg data-dc-tpl="448" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px; color: rgb(199, 119, 0);"><path data-dc-tpl="449" d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg><span data-dc-tpl="450" class="mono" style="font-weight: 500;"><span class="sc-interp">src/components</span></span></div>
+          
+        
+          
+          <div data-dc-tpl="452" class="row" style="height: 28px; padding: 0px 10px 0px 36px; gap: 8px; border-radius: 8px; background: transparent;"><span data-dc-tpl="453" class="bdg" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);"><span class="sc-interp">M</span></span><span data-dc-tpl="454" class="ell" style="flex: 1 1 0%; min-width: 0px; font-size: 13px; font-weight: 500;"><span class="sc-interp">AppToolbar.vue</span></span><span data-dc-tpl="455" class="mono" style="font-size: 11.5px; color: rgb(74, 79, 90);"><span class="sc-interp">+3 −5</span></span></div>
+        
+          
+          <div data-dc-tpl="452" class="row" style="height: 28px; padding: 0px 10px 0px 36px; gap: 8px; border-radius: 8px; background: transparent;"><span data-dc-tpl="453" class="bdg" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);"><span class="sc-interp">M</span></span><span data-dc-tpl="454" class="ell" style="flex: 1 1 0%; min-width: 0px; font-size: 13px; font-weight: 500;"><span class="sc-interp">BranchPanel.vue</span></span><span data-dc-tpl="455" class="mono" style="font-size: 11.5px; color: rgb(74, 79, 90);"><span class="sc-interp">+2 −4</span></span></div>
+        
+          
+          <div data-dc-tpl="452" class="row" style="height: 28px; padding: 0px 10px 0px 36px; gap: 8px; border-radius: 8px; background: transparent;"><span data-dc-tpl="453" class="bdg" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);"><span class="sc-interp">M</span></span><span data-dc-tpl="454" class="ell" style="flex: 1 1 0%; min-width: 0px; font-size: 13px; font-weight: 500;"><span class="sc-interp">StatusBar.vue</span></span><span data-dc-tpl="455" class="mono" style="font-size: 11.5px; color: rgb(74, 79, 90);"><span class="sc-interp">+3 −4</span></span></div>
+        
+      </div>
+      <span data-dc-tpl="456" class="sp"></span>
+      <div data-dc-tpl="457" class="row" style="padding: 10px 14px; gap: 8px; border-top: 1px solid rgb(239, 238, 233); background: rgb(250, 249, 246);">
+        <button data-dc-tpl="458" class="btn sm" style="flex: 1 1 0%; justify-content: center;"><svg data-dc-tpl="459" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><circle data-dc-tpl="460" cx="12" cy="12" r="9"></circle><path data-dc-tpl="461" d="M12 7v5l3 2"></path></svg>История файла</button>
+        <button data-dc-tpl="462" class="btn sm" style="flex: 1 1 0%; justify-content: center;"><svg data-dc-tpl="463" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><rect data-dc-tpl="464" x="3" y="4" width="18" height="16" rx="2"></rect><path data-dc-tpl="465" d="M12 4v16"></path></svg>Сравнить…</button>
+      </div>
+    </section>
+  </div>
+
+  
+  <footer data-dc-tpl="466" class="row" style="height: 30px; flex: 0 0 auto; background: rgb(250, 249, 246); border-top: 1px solid rgb(226, 224, 217); padding: 0px 8px 0px 14px; gap: 14px; font-size: 12px; color: rgb(74, 79, 90);">
+    <span data-dc-tpl="467" class="row" style="gap: 6px; color: rgb(29, 31, 36); font-weight: 600;"><svg data-dc-tpl="468" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px; color: rgb(53, 80, 224);"><path data-dc-tpl="469" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="470" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg>gitstream</span>
+    <span data-dc-tpl="471" class="row" style="gap: 6px;"><svg data-dc-tpl="472" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><circle data-dc-tpl="473" cx="6" cy="6" r="2.5"></circle><circle data-dc-tpl="474" cx="6" cy="18" r="2.5"></circle><circle data-dc-tpl="475" cx="18" cy="8" r="2.5"></circle><path data-dc-tpl="476" d="M6 8.5v7M18 10.5c0 4-5 4.5-10 6.5"></path></svg><span data-dc-tpl="477" class="mono" style="color: rgb(29, 31, 36);">main</span><span data-dc-tpl="478" class="ab u">↑2</span><span data-dc-tpl="479" class="ab n">↓1</span></span>
+    <span data-dc-tpl="480">8 изменений · 4 в индексе</span>
+    <span data-dc-tpl="481" class="sp"></span>
+    <span data-dc-tpl="482" class="row" style="gap: 6px; color: rgb(10, 101, 117); font-weight: 600;"><svg data-dc-tpl="483" class="i spin" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px; stroke-width: 2.4;"><circle data-dc-tpl="484" cx="12" cy="12" r="8" opacity=".25"></circle><path data-dc-tpl="485" d="M20 12a8 8 0 0 0-8-8"></path></svg>Pull · tauri-plugin-askpass</span><span data-dc-tpl="486">осталось 18 с</span>
+    <span data-dc-tpl="487" class="vsep" style="height: 16px;"></span>
+    <button data-dc-tpl="488" class="btn g sm" style="height: 24px; color: rgb(29, 31, 36);"><svg data-dc-tpl="489" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><rect data-dc-tpl="490" x="3" y="4" width="18" height="16" rx="3"></rect><path data-dc-tpl="491" d="M7 9l3 3-3 3M12 15h5"></path></svg>Git output<span data-dc-tpl="492" class="kbd">Alt O</span></button>
+  </footer></div></div><div data-dc-tpl="493" class="lbl" style="margin-top: 6px;">Режим «Изменения» — индекс и рабочая копия слева, встроенная форма коммита, частичный stage в side-by-side diff</div><div data-dc-tpl="494" style="overflow-x: auto; padding: 2px 2px 30px;"><div data-dc-tpl="495" class="win" style="height: 770px;">
+  <div data-dc-tpl="496" class="row" style="flex: 1 1 0%; min-height: 0px; padding: 12px; gap: 12px; align-items: stretch;">
+    <div data-dc-tpl="497" style="width: 340px; flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; min-height: 0px;">
+      <div data-dc-tpl="498" class="seg" role="tablist" style="display: flex; padding: 4px;"><button data-dc-tpl="499" class="on" role="tab" aria-selected="true" style="flex: 1 1 0%; justify-content: center; height: 30px;"><svg data-dc-tpl="500" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px; color: rgb(53, 80, 224);"><path data-dc-tpl="501" d="M14 3H6v18h12V7z"></path><path data-dc-tpl="502" d="M9 11h6M12 8v6M9 17h6"></path></svg>Изменения<span data-dc-tpl="503" class="tc">8</span></button><button data-dc-tpl="504" role="tab" aria-selected="false" style="flex: 1 1 0%; justify-content: center; height: 30px;"><svg data-dc-tpl="505" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><circle data-dc-tpl="506" cx="12" cy="12" r="9"></circle><path data-dc-tpl="507" d="M12 7v5l3 2"></path></svg>История</button></div>
+      <div data-dc-tpl="508" class="row" style="gap: 6px; flex: 0 0 auto;">
+        <label data-dc-tpl="509" class="inp" style="flex: 1 1 0%;"><svg data-dc-tpl="510" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(74, 79, 90);"><circle data-dc-tpl="511" cx="11" cy="11" r="7"></circle><path data-dc-tpl="512" d="M20 20l-4-4"></path></svg><input data-dc-tpl="513" placeholder="Фильтр файлов" aria-label="Фильтр файлов"></label>
+        <div data-dc-tpl="514" class="seg"><button data-dc-tpl="515" aria-label="Дерево" style="padding: 0px 8px;"><svg data-dc-tpl="516" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path data-dc-tpl="517" d="M5 4v13a2 2 0 0 0 2 2h4M5 9h6"></path><rect data-dc-tpl="518" x="13" y="6" width="7" height="6" rx="1.5"></rect><rect data-dc-tpl="519" x="13" y="16" width="7" height="6" rx="1.5"></rect></svg></button><button data-dc-tpl="520" class="on" aria-label="Плоский список" style="padding: 0px 8px;"><svg data-dc-tpl="521" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path data-dc-tpl="522" d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"></path></svg></button></div>
+      </div>
+      <div data-dc-tpl="523" class="row" role="group" aria-label="Фильтр по состоянию" style="gap: 5px; flex: 0 0 auto;">
+        <button data-dc-tpl="524" class="chip on" style="padding: 0px 9px;">Все 8</button>
+        <button data-dc-tpl="525" class="chip"><span data-dc-tpl="526" class="bdg" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);">M</span>4</button>
+        <button data-dc-tpl="527" class="chip"><span data-dc-tpl="528" class="bdg" style="background: rgb(227, 244, 231); color: rgb(35, 112, 50);">A</span>1</button>
+        <button data-dc-tpl="529" class="chip"><span data-dc-tpl="530" class="bdg" style="background: rgb(252, 228, 236); color: rgb(184, 40, 90);">D</span>1</button>
+        <button data-dc-tpl="531" class="chip"><span data-dc-tpl="532" class="bdg" style="background: rgb(240, 235, 253); color: rgb(91, 55, 201);">R</span>1</button>
+        <button data-dc-tpl="533" class="chip"><span data-dc-tpl="534" class="bdg" style="background: rgb(239, 238, 233); color: rgb(74, 79, 90);">?</span>1</button>
+      </div>
+      <div data-dc-tpl="535" class="card" style="flex: 1 1 0%; min-height: 0px; overflow: hidden; padding: 4px 0px; box-shadow: rgba(20, 20, 30, 0.06) 0px 1px 2px;">
+        
+          <div data-dc-tpl="537" class="row" style="height: 34px; padding: 0px 8px 0px 14px; gap: 8px;">
+            <span data-dc-tpl="538" style="font: 700 12.5px Manrope, sans-serif;"><span class="sc-interp">В индексе</span></span><span data-dc-tpl="539" class="ct"><span class="sc-interp">4</span></span><span data-dc-tpl="540" class="sp"></span><button data-dc-tpl="541" class="btn g sm" style="color: rgb(53, 80, 224);"><span class="sc-interp">Убрать все</span></button>
+          </div>
+          
+            <div data-dc-tpl="543" class="row" style="height: 28px; padding: 0px 10px 0px 14px; gap: 9px; background: transparent; font-size: 13px;">
+              <span data-dc-tpl="544" class="ck" role="checkbox" aria-checked="true" aria-label="AppToolbar.vue в индексе" style="background: rgb(53, 80, 224); border-color: rgb(53, 80, 224);"><svg data-dc-tpl="546" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px; color: rgb(255, 255, 255); stroke-width: 3.2;"><path data-dc-tpl="547" d="M5 12.5l4.5 4.5L19 7"></path></svg></span>
+              <span data-dc-tpl="551" class="bdg" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);"><span class="sc-interp">M</span></span>
+              <span data-dc-tpl="552" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span data-dc-tpl="553" style="font-weight: 600;"><span class="sc-interp">AppToolbar.vue</span></span><span data-dc-tpl="554" style="color: rgb(74, 79, 90); font-size: 12px; margin-left: 6px;"><span class="sc-interp">src/components</span></span></span>
+              
+            </div>
+          
+            <div data-dc-tpl="543" class="row" style="height: 28px; padding: 0px 10px 0px 14px; gap: 9px; background: transparent; font-size: 13px;">
+              <span data-dc-tpl="544" class="ck" role="checkbox" aria-checked="true" aria-label="CommandPalette.vue в индексе" style="background: rgb(53, 80, 224); border-color: rgb(53, 80, 224);"><svg data-dc-tpl="546" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px; color: rgb(255, 255, 255); stroke-width: 3.2;"><path data-dc-tpl="547" d="M5 12.5l4.5 4.5L19 7"></path></svg></span>
+              <span data-dc-tpl="551" class="bdg" style="background: rgb(227, 244, 231); color: rgb(35, 112, 50);"><span class="sc-interp">A</span></span>
+              <span data-dc-tpl="552" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span data-dc-tpl="553" style="font-weight: 600;"><span class="sc-interp">CommandPalette.vue</span></span><span data-dc-tpl="554" style="color: rgb(74, 79, 90); font-size: 12px; margin-left: 6px;"><span class="sc-interp">src/components</span></span></span>
+              
+            </div>
+          
+            <div data-dc-tpl="543" class="row" style="height: 28px; padding: 0px 10px 0px 14px; gap: 9px; background: transparent; font-size: 13px;">
+              <span data-dc-tpl="544" class="ck" role="checkbox" aria-checked="true" aria-label="LinePair.vue в индексе" style="background: rgb(53, 80, 224); border-color: rgb(53, 80, 224);"><svg data-dc-tpl="546" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px; color: rgb(255, 255, 255); stroke-width: 3.2;"><path data-dc-tpl="547" d="M5 12.5l4.5 4.5L19 7"></path></svg></span>
+              <span data-dc-tpl="551" class="bdg" style="background: rgb(240, 235, 253); color: rgb(91, 55, 201);"><span class="sc-interp">R</span></span>
+              <span data-dc-tpl="552" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span data-dc-tpl="553" style="font-weight: 600;"><span class="sc-interp">LinePair.vue</span></span><span data-dc-tpl="554" style="color: rgb(74, 79, 90); font-size: 12px; margin-left: 6px;"><span class="sc-interp">src/components/diff ← DiffLinesPair.vue</span></span></span>
+              
+            </div>
+          
+            <div data-dc-tpl="543" class="row" style="height: 28px; padding: 0px 10px 0px 14px; gap: 9px; background: transparent; font-size: 13px;">
+              <span data-dc-tpl="544" class="ck" role="checkbox" aria-checked="mixed" aria-label="FileList.vue в индексе" style="background: rgb(53, 80, 224); border-color: rgb(53, 80, 224);"><svg data-dc-tpl="549" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px; color: rgb(255, 255, 255); stroke-width: 3.2;"><path data-dc-tpl="550" d="M6 12h12"></path></svg></span>
+              <span data-dc-tpl="551" class="bdg" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);"><span class="sc-interp">M</span></span>
+              <span data-dc-tpl="552" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span data-dc-tpl="553" style="font-weight: 600;"><span class="sc-interp">FileList.vue</span></span><span data-dc-tpl="554" style="color: rgb(74, 79, 90); font-size: 12px; margin-left: 6px;"><span class="sc-interp">src/components</span></span></span>
+              <span data-dc-tpl="556" class="pill" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0); height: 18px; padding: 0px 6px; font-size: 10.5px;">частично</span>
+            </div>
+          
+        
+          <div data-dc-tpl="537" class="row" style="height: 34px; padding: 0px 8px 0px 14px; gap: 8px;">
+            <span data-dc-tpl="538" style="font: 700 12.5px Manrope, sans-serif;"><span class="sc-interp">Не в индексе</span></span><span data-dc-tpl="539" class="ct"><span class="sc-interp">5</span></span><span data-dc-tpl="540" class="sp"></span><button data-dc-tpl="541" class="btn g sm" style="color: rgb(53, 80, 224);"><span class="sc-interp">Добавить все</span></button>
+          </div>
+          
+            <div data-dc-tpl="543" class="row" style="height: 28px; padding: 0px 10px 0px 14px; gap: 9px; background: rgb(230, 234, 251); font-size: 13px;">
+              <span data-dc-tpl="544" class="ck" role="checkbox" aria-checked="mixed" aria-label="FileList.vue в индексе" style="background: rgb(53, 80, 224); border-color: rgb(53, 80, 224);"><svg data-dc-tpl="549" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px; color: rgb(255, 255, 255); stroke-width: 3.2;"><path data-dc-tpl="550" d="M6 12h12"></path></svg></span>
+              <span data-dc-tpl="551" class="bdg" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);"><span class="sc-interp">M</span></span>
+              <span data-dc-tpl="552" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span data-dc-tpl="553" style="font-weight: 600;"><span class="sc-interp">FileList.vue</span></span><span data-dc-tpl="554" style="color: rgb(74, 79, 90); font-size: 12px; margin-left: 6px;"><span class="sc-interp">src/components</span></span></span>
+              <span data-dc-tpl="556" class="pill" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0); height: 18px; padding: 0px 6px; font-size: 10.5px;">частично</span>
+            </div>
+          
+            <div data-dc-tpl="543" class="row" style="height: 28px; padding: 0px 10px 0px 14px; gap: 9px; background: transparent; font-size: 13px;">
+              <span data-dc-tpl="544" class="ck" role="checkbox" aria-checked="false" aria-label="main.css в индексе" style="background: rgb(255, 255, 255); border-color: rgb(194, 191, 182);"></span>
+              <span data-dc-tpl="551" class="bdg" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);"><span class="sc-interp">M</span></span>
+              <span data-dc-tpl="552" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span data-dc-tpl="553" style="font-weight: 600;"><span class="sc-interp">main.css</span></span><span data-dc-tpl="554" style="color: rgb(74, 79, 90); font-size: 12px; margin-left: 6px;"><span class="sc-interp">src/styles</span></span></span>
+              
+            </div>
+          
+            <div data-dc-tpl="543" class="row" style="height: 28px; padding: 0px 10px 0px 14px; gap: 9px; background: transparent; font-size: 13px;">
+              <span data-dc-tpl="544" class="ck" role="checkbox" aria-checked="false" aria-label="DiffPanel.vue в индексе" style="background: rgb(255, 255, 255); border-color: rgb(194, 191, 182);"></span>
+              <span data-dc-tpl="551" class="bdg" style="background: rgb(252, 228, 236); color: rgb(184, 40, 90);"><span class="sc-interp">D</span></span>
+              <span data-dc-tpl="552" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span data-dc-tpl="553" style="font-weight: 600;"><span class="sc-interp">DiffPanel.vue</span></span><span data-dc-tpl="554" style="color: rgb(74, 79, 90); font-size: 12px; margin-left: 6px;"><span class="sc-interp">src/components</span></span></span>
+              
+            </div>
+          
+            <div data-dc-tpl="543" class="row" style="height: 28px; padding: 0px 10px 0px 14px; gap: 9px; background: transparent; font-size: 13px;">
+              <span data-dc-tpl="544" class="ck" role="checkbox" aria-checked="false" aria-label="mutation.rs в индексе" style="background: rgb(255, 255, 255); border-color: rgb(194, 191, 182);"></span>
+              <span data-dc-tpl="551" class="bdg" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);"><span class="sc-interp">M</span></span>
+              <span data-dc-tpl="552" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span data-dc-tpl="553" style="font-weight: 600;"><span class="sc-interp">mutation.rs</span></span><span data-dc-tpl="554" style="color: rgb(74, 79, 90); font-size: 12px; margin-left: 6px;"><span class="sc-interp">src-tauri/src/git</span></span></span>
+              
+            </div>
+          
+            <div data-dc-tpl="543" class="row" style="height: 28px; padding: 0px 10px 0px 14px; gap: 9px; background: transparent; font-size: 13px;">
+              <span data-dc-tpl="544" class="ck" role="checkbox" aria-checked="false" aria-label="useToast.ts в индексе" style="background: rgb(255, 255, 255); border-color: rgb(194, 191, 182);"></span>
+              <span data-dc-tpl="551" class="bdg" style="background: rgb(239, 238, 233); color: rgb(74, 79, 90);"><span class="sc-interp">?</span></span>
+              <span data-dc-tpl="552" class="ell" style="flex: 1 1 0%; min-width: 0px;"><span data-dc-tpl="553" style="font-weight: 600;"><span class="sc-interp">useToast.ts</span></span><span data-dc-tpl="554" style="color: rgb(74, 79, 90); font-size: 12px; margin-left: 6px;"><span class="sc-interp">src/composables</span></span></span>
+              
+            </div>
+          
+        
+      </div>
+      <div data-dc-tpl="557" class="card" aria-label="Форма коммита" style="padding: 14px; flex: 0 0 auto;">
+        <div data-dc-tpl="558" class="row" style="gap: 8px; margin-bottom: 10px;">
+          <span data-dc-tpl="559" class="av" style="background: rgb(230, 234, 251); color: rgb(42, 65, 184);">A</span><span data-dc-tpl="560" style="font-size: 13px; color: rgb(74, 79, 90);">Коммит в <b data-dc-tpl="561" class="mono" style="color: rgb(29, 31, 36); font-weight: 600;">main</b></span>
+          <span data-dc-tpl="562" class="sp"></span>
+          <label data-dc-tpl="563" class="row" style="gap: 8px; font: 600 12.5px Manrope, sans-serif; color: rgb(74, 79, 90); cursor: pointer;">Amend<input data-dc-tpl="564" type="checkbox" class="tg" aria-label="Amend — дополнить последний коммит"></label>
+        </div>
+        <div data-dc-tpl="565" class="inp" style="height: 38px; border-color: rgb(53, 80, 224); box-shadow: rgba(53, 80, 224, 0.16) 0px 0px 0px 3px;"><input data-dc-tpl="566" aria-label="Заголовок коммита" value="feat(files): тулбар списка файлов и композер" style="font-weight: 600; font-size: 13.5px;"><span data-dc-tpl="567" class="mono" style="font-size: 11.5px; color: rgb(74, 79, 90);">44/72</span></div>
+        <textarea data-dc-tpl="568" class="inp" aria-label="Описание коммита" style="width: 100%; height: 68px; margin-top: 8px; padding: 9px 12px; resize: none; font: 500 13px / 1.5 Manrope, sans-serif; display: block;">Заголовок списка заменён на FileListToolbar; CommitComposer показывается только для рабочей копии.</textarea>
+        <button data-dc-tpl="569" class="btn g sm" style="margin-top: 6px; color: rgb(91, 55, 201); padding: 0px 6px;"><svg data-dc-tpl="570" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path data-dc-tpl="571" d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"></path><path data-dc-tpl="572" d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"></path></svg>Сгенерировать сообщение<span data-dc-tpl="573" class="pill" style="background: rgb(240, 235, 253); color: rgb(91, 55, 201); height: 16px; padding: 0px 5px; font-size: 10px;">AI</span></button>
+        <div data-dc-tpl="574" class="row" style="gap: 8px; margin-top: 8px;">
+          <button data-dc-tpl="575" class="btn p" style="flex: 1 1 0%; justify-content: center; height: 36px;"><svg data-dc-tpl="576" class="i" viewBox="0 0 24 24" aria-hidden="true"><circle data-dc-tpl="577" cx="12" cy="12" r="3.5"></circle><path data-dc-tpl="578" d="M3 12h5.5M15.5 12H21"></path></svg>Коммит · 4 файла</button>
+          <button data-dc-tpl="579" class="btn" style="height: 36px;"><svg data-dc-tpl="580" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="581" d="M12 20V5M6 11l6-6 6 6"></path></svg>Коммит и Push</button>
+        </div>
+        <div data-dc-tpl="582" class="row" style="justify-content: center; gap: 4px; margin-top: 9px; font-size: 11.5px; color: rgb(74, 79, 90);"><span data-dc-tpl="583" class="kbd">Ctrl</span><span data-dc-tpl="584" class="kbd">Enter</span><span data-dc-tpl="585" style="margin-left: 3px;">коммит</span><span data-dc-tpl="586" style="margin: 0px 5px;">·</span><span data-dc-tpl="587" class="kbd">Ctrl</span><span data-dc-tpl="588" class="kbd">Shift</span><span data-dc-tpl="589" class="kbd">Enter</span><span data-dc-tpl="590" style="margin-left: 3px;">+ Push</span></div>
+      </div>
+    </div>
+
+    <section data-dc-tpl="591" class="card" aria-label="Diff рабочей копии" style="flex: 1 1 0%; min-width: 0px; display: flex; flex-direction: column; overflow: hidden;">
+      <div data-dc-tpl="592" class="row" style="height: 46px; padding: 0px 10px 0px 12px; gap: 10px; border-bottom: 1px solid rgb(239, 238, 233); flex: 0 0 auto;">
+        <div data-dc-tpl="593" class="seg" role="tablist"><button data-dc-tpl="594" class="on" role="tab" aria-selected="true">Изменения</button><button data-dc-tpl="595" role="tab" aria-selected="false"><svg data-dc-tpl="596" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><rect data-dc-tpl="597" x="3" y="4" width="18" height="16" rx="3"></rect><path data-dc-tpl="598" d="M7 9l3 3-3 3M12 15h5"></path></svg>Git output<span data-dc-tpl="599" class="pill" style="background: rgb(252, 228, 236); color: rgb(184, 40, 90); height: 16px; padding: 0px 5px; font-size: 10px;">1</span></button></div>
+        <nav data-dc-tpl="600" class="row mono" aria-label="Путь к файлу" style="gap: 3px; font-size: 12.5px; color: rgb(74, 79, 90);">src<svg data-dc-tpl="601" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="602" d="M9 6l6 6-6 6"></path></svg>components<svg data-dc-tpl="603" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="604" d="M9 6l6 6-6 6"></path></svg><b data-dc-tpl="605" style="color: rgb(29, 31, 36); font-weight: 600;">FileList.vue</b></nav>
+        <span data-dc-tpl="606" class="bdg" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);">M</span>
+        <span data-dc-tpl="607" class="pill" style="background: rgb(255, 243, 219); color: rgb(138, 83, 0);">частично в индексе</span>
+        <span data-dc-tpl="608" class="sp"></span>
+        <span data-dc-tpl="609" style="font-size: 12px; color: rgb(74, 79, 90);">Хунк 1 из 2</span>
+        <span data-dc-tpl="610" class="row" style="gap: 2px;"><button data-dc-tpl="611" class="btn g sm ib" aria-label="Предыдущий хунк" disabled="" style="background: transparent; border-color: transparent;"><svg data-dc-tpl="612" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="613" d="M6 15l6-6 6 6"></path></svg></button><button data-dc-tpl="614" class="btn g sm ib" aria-label="Следующий хунк"><svg data-dc-tpl="615" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="616" d="M6 9l6 6 6-6"></path></svg></button></span>
+        <div data-dc-tpl="617" class="seg"><button data-dc-tpl="618" aria-label="Unified"><svg data-dc-tpl="619" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><rect data-dc-tpl="620" x="3" y="4" width="18" height="16" rx="2"></rect><path data-dc-tpl="621" d="M3 12h18"></path></svg></button><button data-dc-tpl="622" class="on" aria-label="Side-by-side"><svg data-dc-tpl="623" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><rect data-dc-tpl="624" x="3" y="4" width="18" height="16" rx="2"></rect><path data-dc-tpl="625" d="M12 4v16"></path></svg></button></div>
+        <button data-dc-tpl="626" class="btn g sm ib" aria-label="Параметры diff"><svg data-dc-tpl="627" class="i" viewBox="0 0 24 24" aria-hidden="true"><circle data-dc-tpl="628" cx="5" cy="12" r="1.2"></circle><circle data-dc-tpl="629" cx="12" cy="12" r="1.2"></circle><circle data-dc-tpl="630" cx="19" cy="12" r="1.2"></circle></svg></button>
+      </div>
+      <div data-dc-tpl="631" class="row" style="height: 26px; font: 600 11.5px Manrope, sans-serif; color: rgb(74, 79, 90); background: rgb(250, 249, 246); flex: 0 0 auto;">
+        <span data-dc-tpl="632" style="flex: 1 1 0%; padding-left: 62px;">Индекс</span><span data-dc-tpl="633" class="dv" style="height: 100%;"></span><span data-dc-tpl="634" style="flex: 1 1 0%; padding-left: 62px;">Рабочая копия</span>
+      </div>
+      <div data-dc-tpl="635" class="row hh" style="height: 40px;">
+        <span data-dc-tpl="636" class="mono" style="color: rgb(42, 65, 184); font-weight: 500;">@@ -42,9 +42,14 @@</span><span data-dc-tpl="637" class="mono" style="color: rgb(74, 79, 90);">&lt;template&gt;</span>
+        <span data-dc-tpl="638" class="sp"></span>
+        <span data-dc-tpl="639" class="pill" style="background: rgb(53, 80, 224); color: rgb(255, 255, 255);">Выбрано 3 строки</span>
+        <button data-dc-tpl="640" class="btn sm p"><svg data-dc-tpl="641" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><path data-dc-tpl="642" d="M12 5v14M5 12h14"></path></svg>Stage строки</button>
+        <button data-dc-tpl="643" class="btn sm do">Discard строки</button>
+        <span data-dc-tpl="644" class="vsep" style="height: 18px;"></span>
+        <button data-dc-tpl="645" class="btn sm"><svg data-dc-tpl="646" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><path data-dc-tpl="647" d="M12 5v14M5 12h14"></path></svg>Stage хунк</button>
+        <button data-dc-tpl="648" class="btn sm do">Discard хунк</button>
+      </div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(250, 249, 246);"><span class="sc-interp">42</span></span><span data-dc-tpl="652" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"> </span></span><span class="sc-interp">&lt;div class="file-list"&gt;</span><span data-dc-tpl="654" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(250, 249, 246); color: rgb(93, 98, 112);"><span class="sc-interp">42</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="658" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp"> </span></span><span class="sc-interp">&lt;div class="file-list"&gt;</span><span data-dc-tpl="659" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(249, 222, 232);"><span class="sc-interp">43</span></span><span data-dc-tpl="652" class="dt" style="background: rgb(253, 240, 244);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp">−</span></span><span class="sc-interp">  &lt;div class="file-list-header"&gt;</span><span data-dc-tpl="654" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(220, 240, 225); color: rgb(93, 98, 112);"><span class="sc-interp">43</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(238, 248, 240);"><span data-dc-tpl="658" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp">+</span></span><span class="sc-interp">  &lt;FileListToolbar</span><span data-dc-tpl="659" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(249, 222, 232);"><span class="sc-interp">44</span></span><span data-dc-tpl="652" class="dt" style="background: rgb(253, 240, 244);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp">−</span></span><span class="sc-interp">    &lt;span class="title" v-text="t('files.title')" /&gt;</span><span data-dc-tpl="654" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(220, 240, 225); color: rgb(93, 98, 112);"><span class="sc-interp">44</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(238, 248, 240);"><span data-dc-tpl="658" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp">+</span></span><span class="sc-interp">    :title="t('files.title')"</span><span data-dc-tpl="659" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(249, 222, 232);"><span class="sc-interp">45</span></span><span data-dc-tpl="652" class="dt" style="background: rgb(253, 240, 244);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp">−</span></span><span class="sc-interp">    &lt;button class="btn-icon" @click="toggleTree" /&gt;</span><span data-dc-tpl="654" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(220, 240, 225); color: rgb(93, 98, 112);"><span class="sc-interp">45</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(238, 248, 240);"><span data-dc-tpl="658" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp">+</span></span><span class="sc-interp">    v-model:tree="treeMode"</span><span data-dc-tpl="659" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(249, 222, 232);"><span class="sc-interp">46</span></span><span data-dc-tpl="652" class="dt" style="background: rgb(253, 240, 244);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp">−</span></span><span class="sc-interp">  &lt;/div&gt;</span><span data-dc-tpl="654" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(220, 240, 225); color: rgb(93, 98, 112);"><span class="sc-interp">46</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(238, 248, 240);"><span data-dc-tpl="658" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp">+</span></span><span class="sc-interp">    v-model:filters="filters"</span><span data-dc-tpl="659" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(244, 243, 239);"><span class="sc-interp"></span></span><span data-dc-tpl="652" class="dt" style="background: repeating-linear-gradient(135deg, rgb(250, 249, 246) 0px, rgb(250, 249, 246) 6px, rgb(239, 237, 231) 6px, rgb(239, 237, 231) 7px);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"></span></span><span class="sc-interp"></span><span data-dc-tpl="654" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(220, 240, 225); color: rgb(93, 98, 112);"><span class="sc-interp">47</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(238, 248, 240);"><span data-dc-tpl="658" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp">+</span></span><span class="sc-interp">    :counts="statusCounts"</span><span data-dc-tpl="659" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(244, 243, 239);"><span class="sc-interp"></span></span><span data-dc-tpl="652" class="dt" style="background: repeating-linear-gradient(135deg, rgb(250, 249, 246) 0px, rgb(250, 249, 246) 6px, rgb(239, 237, 231) 6px, rgb(239, 237, 231) 7px);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"></span></span><span class="sc-interp"></span><span data-dc-tpl="654" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(220, 240, 225); color: rgb(93, 98, 112);"><span class="sc-interp">48</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(238, 248, 240);"><span data-dc-tpl="658" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp">+</span></span><span class="sc-interp">  /&gt;</span><span data-dc-tpl="659" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(250, 249, 246);"><span class="sc-interp">47</span></span><span data-dc-tpl="652" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"> </span></span><span class="sc-interp">  &lt;VirtualList :items="visibleFiles"&gt;</span><span data-dc-tpl="654" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(250, 249, 246); color: rgb(93, 98, 112);"><span class="sc-interp">49</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="658" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp"> </span></span><span class="sc-interp">  &lt;VirtualList :items="visibleFiles"&gt;</span><span data-dc-tpl="659" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(249, 222, 232);"><span class="sc-interp">48</span></span><span data-dc-tpl="652" class="dt" style="background: rgb(253, 240, 244);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp">−</span></span><span class="sc-interp">    &lt;FileRow :file="item" :</span><span data-dc-tpl="654" style="background: rgb(245, 192, 211); border-radius: 3px;"><span class="sc-interp">selected="sel"</span></span><span class="sc-interp"> /&gt;</span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(220, 240, 225); color: rgb(93, 98, 112);"><span class="sc-interp">50</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(238, 248, 240);"><span data-dc-tpl="658" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp">+</span></span><span class="sc-interp">    &lt;FileRow :file="item" :</span><span data-dc-tpl="659" style="background: rgb(173, 221, 185); border-radius: 3px;"><span class="sc-interp">staged="isStaged(item)"</span></span><span class="sc-interp"> /&gt;</span></span></div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(250, 249, 246);"><span class="sc-interp">49</span></span><span data-dc-tpl="652" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"> </span></span><span class="sc-interp">  &lt;/VirtualList&gt;</span><span data-dc-tpl="654" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(250, 249, 246); color: rgb(93, 98, 112);"><span class="sc-interp">51</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="658" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp"> </span></span><span class="sc-interp">  &lt;/VirtualList&gt;</span><span data-dc-tpl="659" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(244, 243, 239);"><span class="sc-interp"></span></span><span data-dc-tpl="652" class="dt" style="background: repeating-linear-gradient(135deg, rgb(250, 249, 246) 0px, rgb(250, 249, 246) 6px, rgb(239, 237, 231) 6px, rgb(239, 237, 231) 7px);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"></span></span><span class="sc-interp"></span><span data-dc-tpl="654" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(53, 80, 224); color: rgb(255, 255, 255);"><span class="sc-interp">52</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(227, 232, 253);"><span data-dc-tpl="658" class="sg" style="color: rgb(42, 65, 184);"><span class="sc-interp">+</span></span><span class="sc-interp">  &lt;CommitComposer</span><span data-dc-tpl="659" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(244, 243, 239);"><span class="sc-interp"></span></span><span data-dc-tpl="652" class="dt" style="background: repeating-linear-gradient(135deg, rgb(250, 249, 246) 0px, rgb(250, 249, 246) 6px, rgb(239, 237, 231) 6px, rgb(239, 237, 231) 7px);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"></span></span><span class="sc-interp"></span><span data-dc-tpl="654" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(53, 80, 224); color: rgb(255, 255, 255);"><span class="sc-interp">53</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(227, 232, 253);"><span data-dc-tpl="658" class="sg" style="color: rgb(42, 65, 184);"><span class="sc-interp">+</span></span><span class="sc-interp">    v-if="isWorkingTree"</span><span data-dc-tpl="659" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(244, 243, 239);"><span class="sc-interp"></span></span><span data-dc-tpl="652" class="dt" style="background: repeating-linear-gradient(135deg, rgb(250, 249, 246) 0px, rgb(250, 249, 246) 6px, rgb(239, 237, 231) 6px, rgb(239, 237, 231) 7px);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"></span></span><span class="sc-interp"></span><span data-dc-tpl="654" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(53, 80, 224); color: rgb(255, 255, 255);"><span class="sc-interp">54</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(227, 232, 253);"><span data-dc-tpl="658" class="sg" style="color: rgb(42, 65, 184);"><span class="sc-interp">+</span></span><span class="sc-interp">    @committed="refresh" /&gt;</span><span data-dc-tpl="659" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="650" class="dl"><span data-dc-tpl="651" class="dn" style="background: rgb(250, 249, 246);"><span class="sc-interp">50</span></span><span data-dc-tpl="652" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="653" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"> </span></span><span class="sc-interp">&lt;/div&gt;</span><span data-dc-tpl="654" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="655" class="dv"></span><span data-dc-tpl="656" class="dn" style="background: rgb(250, 249, 246); color: rgb(93, 98, 112);"><span class="sc-interp">55</span></span><span data-dc-tpl="657" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="658" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp"> </span></span><span class="sc-interp">&lt;/div&gt;</span><span data-dc-tpl="659" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+      <div data-dc-tpl="660" class="row" style="height: 28px; justify-content: center; gap: 8px; background: rgb(250, 249, 246); border-top: 1px dashed rgb(226, 224, 217); font-size: 12px; color: rgb(74, 79, 90); flex: 0 0 auto;"><svg data-dc-tpl="661" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><path data-dc-tpl="662" d="M8 9l4-4 4 4M8 15l4 4 4-4"></path></svg>20 строк без изменений — развернуть</div>
+      <div data-dc-tpl="663" class="row hh" style="height: 40px;">
+        <span data-dc-tpl="664" class="mono" style="color: rgb(42, 65, 184); font-weight: 500;">@@ -71,3 +76,5 @@</span><span data-dc-tpl="665" class="mono" style="color: rgb(74, 79, 90);">&lt;script setup&gt;</span>
+        <span data-dc-tpl="666" class="sp"></span>
+        <button data-dc-tpl="667" class="btn sm"><svg data-dc-tpl="668" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px;"><path data-dc-tpl="669" d="M12 5v14M5 12h14"></path></svg>Stage хунк</button>
+        <button data-dc-tpl="670" class="btn sm do">Discard хунк</button>
+      </div>
+      
+        <div data-dc-tpl="672" class="dl"><span data-dc-tpl="673" class="dn" style="background: rgb(250, 249, 246);"><span class="sc-interp">71</span></span><span data-dc-tpl="674" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="675" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"> </span></span><span class="sc-interp">import { computed } from 'vue'</span><span data-dc-tpl="676" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="677" class="dv"></span><span data-dc-tpl="678" class="dn" style="background: rgb(250, 249, 246); color: rgb(93, 98, 112);"><span class="sc-interp">76</span></span><span data-dc-tpl="679" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="680" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp"> </span></span><span class="sc-interp">import { computed } from 'vue'</span><span data-dc-tpl="681" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="672" class="dl"><span data-dc-tpl="673" class="dn" style="background: rgb(250, 249, 246);"><span class="sc-interp">72</span></span><span data-dc-tpl="674" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="675" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"> </span></span><span class="sc-interp">import VirtualList from './VirtualList.vue'</span><span data-dc-tpl="676" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="677" class="dv"></span><span data-dc-tpl="678" class="dn" style="background: rgb(250, 249, 246); color: rgb(93, 98, 112);"><span class="sc-interp">77</span></span><span data-dc-tpl="679" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="680" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp"> </span></span><span class="sc-interp">import VirtualList from './VirtualList.vue'</span><span data-dc-tpl="681" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="672" class="dl"><span data-dc-tpl="673" class="dn" style="background: rgb(244, 243, 239);"><span class="sc-interp"></span></span><span data-dc-tpl="674" class="dt" style="background: repeating-linear-gradient(135deg, rgb(250, 249, 246) 0px, rgb(250, 249, 246) 6px, rgb(239, 237, 231) 6px, rgb(239, 237, 231) 7px);"><span data-dc-tpl="675" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"></span></span><span class="sc-interp"></span><span data-dc-tpl="676" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="677" class="dv"></span><span data-dc-tpl="678" class="dn" style="background: rgb(220, 240, 225); color: rgb(93, 98, 112);"><span class="sc-interp">78</span></span><span data-dc-tpl="679" class="dt" style="background: rgb(238, 248, 240);"><span data-dc-tpl="680" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp">+</span></span><span class="sc-interp">import FileListToolbar from './FileListToolbar.vue'</span><span data-dc-tpl="681" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="672" class="dl"><span data-dc-tpl="673" class="dn" style="background: rgb(244, 243, 239);"><span class="sc-interp"></span></span><span data-dc-tpl="674" class="dt" style="background: repeating-linear-gradient(135deg, rgb(250, 249, 246) 0px, rgb(250, 249, 246) 6px, rgb(239, 237, 231) 6px, rgb(239, 237, 231) 7px);"><span data-dc-tpl="675" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"></span></span><span class="sc-interp"></span><span data-dc-tpl="676" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="677" class="dv"></span><span data-dc-tpl="678" class="dn" style="background: rgb(220, 240, 225); color: rgb(93, 98, 112);"><span class="sc-interp">79</span></span><span data-dc-tpl="679" class="dt" style="background: rgb(238, 248, 240);"><span data-dc-tpl="680" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp">+</span></span><span class="sc-interp">import CommitComposer from './CommitComposer.vue'</span><span data-dc-tpl="681" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+        <div data-dc-tpl="672" class="dl"><span data-dc-tpl="673" class="dn" style="background: rgb(250, 249, 246);"><span class="sc-interp">73</span></span><span data-dc-tpl="674" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="675" class="sg" style="color: rgb(184, 40, 90);"><span class="sc-interp"> </span></span><span class="sc-interp">import FileRow from './FileRow.vue'</span><span data-dc-tpl="676" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span><span data-dc-tpl="677" class="dv"></span><span data-dc-tpl="678" class="dn" style="background: rgb(250, 249, 246); color: rgb(93, 98, 112);"><span class="sc-interp">80</span></span><span data-dc-tpl="679" class="dt" style="background: rgb(255, 255, 255);"><span data-dc-tpl="680" class="sg" style="color: rgb(35, 112, 50);"><span class="sc-interp"> </span></span><span class="sc-interp">import FileRow from './FileRow.vue'</span><span data-dc-tpl="681" style="background: transparent; border-radius: 3px;"><span class="sc-interp"></span></span><span class="sc-interp"></span></span></div>
+      
+      <span data-dc-tpl="682" class="sp" style="background: rgb(250, 249, 246); border-top: 1px solid rgb(239, 238, 233);"></span>
+    </section>
+  </div></div></div><div data-dc-tpl="683" class="lbl" style="margin-top: 6px;">Детали навигации</div><div data-dc-tpl="684" style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+  <div data-dc-tpl="685" style="width: 340px;">
+    <div data-dc-tpl="686" class="sublbl">Переключатель репозиториев — кнопка слева от вкладок</div>
+    <div data-dc-tpl="687" class="card" style="padding: 8px;">
+      <label data-dc-tpl="688" class="inp" style="margin: 2px 2px 6px;"><svg data-dc-tpl="689" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(74, 79, 90);"><circle data-dc-tpl="690" cx="11" cy="11" r="7"></circle><path data-dc-tpl="691" d="M20 20l-4-4"></path></svg><input data-dc-tpl="692" placeholder="Найти репозиторий…" aria-label="Найти репозиторий"></label>
+      
+        <div data-dc-tpl="695" class="row" style="height: 30px; padding: 0px 10px 0px 8px; gap: 6px; font: 700 12px Manrope, sans-serif; color: rgb(74, 79, 90);"><svg data-dc-tpl="696" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="697" d="M6 9l6 6 6-6"></path></svg><svg data-dc-tpl="698" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path data-dc-tpl="699" d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg><span data-dc-tpl="700" class="sp"><span class="sc-interp">Работа</span></span><span data-dc-tpl="701" style="font-weight: 600;"><span class="sc-interp">3</span></span></div>
+        
+      
+        
+        <div data-dc-tpl="703" class="row" style="height: 34px; padding: 0px 10px 0px 30px; gap: 8px; border-radius: 8px; background: rgb(230, 234, 251); font-size: 13px;"><svg data-dc-tpl="704" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px; color: rgb(53, 80, 224);"><path data-dc-tpl="705" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="706" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg><span data-dc-tpl="707" style="font-weight: 700;"><span class="sc-interp">gitstream</span></span><span data-dc-tpl="708" class="tb"><span class="sc-interp">main</span></span><span data-dc-tpl="709" class="sp"></span><span data-dc-tpl="711" class="tc" style="background: rgb(53, 80, 224);"><span class="sc-interp">8</span></span></div>
+      
+        
+        <div data-dc-tpl="703" class="row" style="height: 34px; padding: 0px 10px 0px 30px; gap: 8px; border-radius: 8px; background: transparent; font-size: 13px;"><svg data-dc-tpl="704" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px; color: rgb(74, 79, 90);"><path data-dc-tpl="705" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="706" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg><span data-dc-tpl="707" style="font-weight: 500;"><span class="sc-interp">tauri-plugin-askpass</span></span><span data-dc-tpl="708" class="tb"><span class="sc-interp">main</span></span><span data-dc-tpl="709" class="sp"></span><span data-dc-tpl="713" class="row" style="gap: 2px; color: rgb(10, 101, 117);"><svg data-dc-tpl="714" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px; stroke-width: 2.2;"><path data-dc-tpl="715" d="M12 4v15M6 13l6 6 6-6"></path></svg><svg data-dc-tpl="716" class="i spin" viewBox="0 0 24 24" aria-label="Pull выполняется" style="width: 15px; height: 15px; stroke-width: 2.4;"><circle data-dc-tpl="717" cx="12" cy="12" r="8" opacity=".25"></circle><path data-dc-tpl="718" d="M20 12a8 8 0 0 0-8-8"></path></svg></span></div>
+      
+        
+        <div data-dc-tpl="703" class="row" style="height: 34px; padding: 0px 10px 0px 30px; gap: 8px; border-radius: 8px; background: transparent; font-size: 13px;"><svg data-dc-tpl="704" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px; color: rgb(74, 79, 90);"><path data-dc-tpl="705" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="706" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg><span data-dc-tpl="707" style="font-weight: 500;"><span class="sc-interp">docs-site</span></span><span data-dc-tpl="708" class="tb"><span class="sc-interp">develop</span></span><span data-dc-tpl="709" class="sp"></span><span data-dc-tpl="711" class="tc" style="background: rgb(163, 95, 0);"><span class="sc-interp">3</span></span></div>
+      
+        <div data-dc-tpl="695" class="row" style="height: 30px; padding: 0px 10px 0px 8px; gap: 6px; font: 700 12px Manrope, sans-serif; color: rgb(74, 79, 90);"><svg data-dc-tpl="696" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="697" d="M6 9l6 6 6-6"></path></svg><svg data-dc-tpl="698" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path data-dc-tpl="699" d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg><span data-dc-tpl="700" class="sp"><span class="sc-interp">Личное</span></span><span data-dc-tpl="701" style="font-weight: 600;"><span class="sc-interp">2</span></span></div>
+        
+      
+        
+        <div data-dc-tpl="703" class="row" style="height: 34px; padding: 0px 10px 0px 30px; gap: 8px; border-radius: 8px; background: transparent; font-size: 13px;"><svg data-dc-tpl="704" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px; color: rgb(74, 79, 90);"><path data-dc-tpl="705" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="706" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg><span data-dc-tpl="707" style="font-weight: 500;"><span class="sc-interp">dotfiles</span></span><span data-dc-tpl="708" class="tb"><span class="sc-interp">master</span></span><span data-dc-tpl="709" class="sp"></span></div>
+      
+        
+        <div data-dc-tpl="703" class="row" style="height: 34px; padding: 0px 10px 0px 30px; gap: 8px; border-radius: 8px; background: transparent; font-size: 13px;"><svg data-dc-tpl="704" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px; color: rgb(74, 79, 90);"><path data-dc-tpl="705" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="706" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg><span data-dc-tpl="707" style="font-weight: 500;"><span class="sc-interp">notes</span></span><span data-dc-tpl="708" class="tb"><span class="sc-interp">main</span></span><span data-dc-tpl="709" class="sp"></span></div>
+      
+      <div data-dc-tpl="719" style="height: 1px; background: rgb(239, 238, 233); margin: 6px 4px;"></div>
+      <button data-dc-tpl="720" class="mi"><svg data-dc-tpl="721" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="722" d="M12 5v14M5 12h14"></path></svg>Добавить репозиторий…</button>
+      <button data-dc-tpl="723" class="mi"><svg data-dc-tpl="724" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="725" d="M12 4v10M8 10l4 4 4-4M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"></path></svg>Клонировать…</button>
+      <button data-dc-tpl="726" class="mi"><svg data-dc-tpl="727" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="728" d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Новая группа</button>
+    </div>
+  </div>
+
+  <div data-dc-tpl="729" style="width: 620px;">
+    <div data-dc-tpl="730" class="sublbl">Вкладки репозиториев — состояния</div>
+    <div data-dc-tpl="731" class="card" style="overflow: visible;">
+      <div data-dc-tpl="732" class="row" style="height: 50px; background: rgb(233, 231, 225); border-radius: 12px 12px 0px 0px; padding: 0px 12px; align-items: flex-end; gap: 4px;">
+        <button data-dc-tpl="733" class="tab on"><svg data-dc-tpl="734" class="i" viewBox="0 0 24 24" aria-hidden="true" style="color: rgb(53, 80, 224);"><path data-dc-tpl="735" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="736" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg>gitstream<span data-dc-tpl="737" class="tc">8</span></button>
+        <button data-dc-tpl="738" class="tab" style="background: rgb(244, 243, 239); color: rgb(29, 31, 36);"><svg data-dc-tpl="739" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="740" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="741" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg>docs-site<span data-dc-tpl="742" class="tc" style="background: rgb(163, 95, 0);">3</span><span data-dc-tpl="743" class="row" aria-hidden="true" style="width: 18px; height: 18px; border-radius: 5px; background: rgb(228, 226, 219); justify-content: center;"><svg data-dc-tpl="744" class="i" viewBox="0 0 24 24" style="width: 12px; height: 12px;"><path data-dc-tpl="745" d="M6 6l12 12M18 6L6 18"></path></svg></span></button>
+        <span data-dc-tpl="746" style="position: relative;">
+          <button data-dc-tpl="747" class="tab"><svg data-dc-tpl="748" class="i" viewBox="0 0 24 24" aria-hidden="true"><path data-dc-tpl="749" d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"></path><path data-dc-tpl="750" d="M5 20a2 2 0 0 0 2 2h12v-4"></path></svg>tauri-plugin-askpass<span data-dc-tpl="751" class="row" style="gap: 2px; color: rgb(10, 101, 117);"><svg data-dc-tpl="752" class="i" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px; stroke-width: 2.2;"><path data-dc-tpl="753" d="M12 4v15M6 13l6 6 6-6"></path></svg><svg data-dc-tpl="754" class="i spin" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px; stroke-width: 2.4;"><circle data-dc-tpl="755" cx="12" cy="12" r="8" opacity=".25"></circle><path data-dc-tpl="756" d="M20 12a8 8 0 0 0-8-8"></path></svg></span></button>
+          <span data-dc-tpl="757" role="tooltip" style="position: absolute; top: 44px; right: -8px; z-index: 4; white-space: nowrap; background: rgb(29, 31, 36); color: rgb(255, 255, 255); border-radius: 8px; padding: 7px 10px; font-size: 12px; box-shadow: rgba(20, 20, 30, 0.25) 0px 8px 20px;"><span data-dc-tpl="758" style="position: absolute; top: -4px; right: 24px; width: 8px; height: 8px; background: rgb(29, 31, 36); transform: rotate(45deg);"></span>Pull <span data-dc-tpl="759" class="mono">origin/main</span> · осталось 18 с</span>
+        </span>
+              </div>
+      <div data-dc-tpl="760" style="padding: 52px 18px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 22px; font-size: 12.5px; color: rgb(74, 79, 90); line-height: 1.45;">
+        <div data-dc-tpl="761"><b data-dc-tpl="762" style="color: rgb(29, 31, 36);">Активная</b> — белая, сливается с тулбаром; ветка рядом с именем.</div>
+        <div data-dc-tpl="763"><b data-dc-tpl="764" style="color: rgb(29, 31, 36);">Наведение</b> — появляется ×; средний клик закрывает вкладку.</div>
+        <div data-dc-tpl="765"><b data-dc-tpl="766" style="color: rgb(29, 31, 36);">Число</b> — изменения в рабочей копии (синий — текущий, янтарный — фоновый репозиторий).</div>
+        <div data-dc-tpl="767"><b data-dc-tpl="768" style="color: rgb(29, 31, 36);">Крутилка</b> — сетевая операция: ↓ Pull/Fetch, ↑ Push; remote и отсчёт в тултипе.</div>
+      </div>
+    </div>
+  </div>
+
+  <div data-dc-tpl="769" style="width: 352px;">
+    <div data-dc-tpl="770" class="sublbl">Узлы графа</div>
+    <div data-dc-tpl="771" class="card" style="padding: 10px 16px;">
+      <div data-dc-tpl="772" class="row" style="height: 34px; gap: 12px; font-size: 13px;"><svg data-dc-tpl="773" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle data-dc-tpl="774" cx="10" cy="10" r="6.5" fill="#fff" stroke="#3550E0" stroke-width="2.2"></circle><circle data-dc-tpl="775" cx="10" cy="10" r="2.6" fill="#3550E0"></circle></svg><b data-dc-tpl="776" style="font-weight: 600;">HEAD</b><span data-dc-tpl="777" style="color: rgb(74, 79, 90);">текущий коммит</span></div>
+      <div data-dc-tpl="778" class="row" style="height: 34px; gap: 12px; font-size: 13px;"><svg data-dc-tpl="779" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle data-dc-tpl="780" cx="10" cy="10" r="5" fill="#fff" stroke="#3550E0" stroke-width="2.2"></circle></svg><b data-dc-tpl="781" style="font-weight: 600;">Не отправлен</b><span data-dc-tpl="782" style="color: rgb(74, 79, 90);">кольцо, ↑ у SHA</span></div>
+      <div data-dc-tpl="783" class="row" style="height: 34px; gap: 12px; font-size: 13px;"><svg data-dc-tpl="784" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle data-dc-tpl="785" cx="10" cy="10" r="5" fill="#fff" stroke="#0C8599" stroke-width="1.8" stroke-dasharray="2.5 2"></circle></svg><b data-dc-tpl="786" style="font-weight: 600;">Входящий</b><span data-dc-tpl="787" style="color: rgb(74, 79, 90);">пунктир, строка приглушена</span></div>
+      <div data-dc-tpl="788" class="row" style="height: 34px; gap: 12px; font-size: 13px;"><svg data-dc-tpl="789" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle data-dc-tpl="790" cx="10" cy="10" r="6" fill="#3550E0"></circle><circle data-dc-tpl="791" cx="10" cy="10" r="2" fill="#fff"></circle></svg><b data-dc-tpl="792" style="font-weight: 600;">Merge</b><span data-dc-tpl="793" style="color: rgb(74, 79, 90);">два родителя</span></div>
+      <div data-dc-tpl="794" class="row" style="height: 34px; gap: 12px; font-size: 13px;"><svg data-dc-tpl="795" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle data-dc-tpl="796" cx="10" cy="10" r="5" fill="#7048E8"></circle></svg><b data-dc-tpl="797" style="font-weight: 600;">Опубликован</b><span data-dc-tpl="798" style="color: rgb(74, 79, 90);">цвет — линия ветки</span></div>
+      <div data-dc-tpl="799" class="row" style="height: 34px; gap: 12px; font-size: 13px;"><svg data-dc-tpl="800" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle data-dc-tpl="801" cx="10" cy="10" r="5" fill="#fff" stroke="#6E7380" stroke-width="1.6" stroke-dasharray="2.5 2"></circle></svg><b data-dc-tpl="802" style="font-weight: 600;">Рабочая копия</b><span data-dc-tpl="803" style="color: rgb(74, 79, 90);">незакоммиченное</span></div>
+    </div>
+  </div></div></div></div></div>
+
+
+
+</body></html>

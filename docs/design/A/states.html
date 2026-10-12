@@ -1,0 +1,915 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+    .sc-placeholder{background:color-mix(in srgb,currentColor 8%,transparent);
+      border:1px solid color-mix(in srgb,currentColor 50%,transparent);
+      border-radius:2px;box-sizing:border-box;overflow:hidden}
+    @keyframes sc-shine{0%{background-position:100% 50%}100%{background-position:0% 50%}}
+    html.sc-dc-streaming .sc-placeholder,
+    html.sc-dc-streaming .sc-interp.sc-missing{position:relative;
+      background:color-mix(in srgb,currentColor 5%,transparent);
+      border-color:transparent}
+    html.sc-dc-streaming .sc-placeholder::before,
+    html.sc-dc-streaming .sc-interp.sc-missing::before{content:'';
+      position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(90deg,rgba(217,119,87,0) 25%,rgba(247,225,211,.95) 37%,rgba(217,119,87,0) 63%);
+      background-size:400% 100%;animation:sc-shine 1.4s ease infinite}
+    html.sc-dc-streaming .sc-placeholder:nth-child(n+9 of .sc-placeholder)::before,
+    html.sc-dc-streaming .sc-interp.sc-missing:nth-child(n+9 of .sc-interp.sc-missing)::before{animation:none;
+      background:color-mix(in srgb,currentColor 8%,transparent)}
+    .sc-placeholder-error{padding:4px 8px;font:11px/1.4 ui-monospace,monospace;
+      color:color-mix(in srgb,currentColor 70%,transparent);word-break:break-word}
+    .sc-interp.sc-missing{display:inline-block;width:2em;height:1em;overflow:hidden;
+      vertical-align:text-bottom;background:rgba(255,255,255,.3);border:1px solid rgba(0,0,0,.5);
+      border-radius:2px;box-sizing:border-box;color:transparent;
+      user-select:none}
+    .sc-interp.sc-unresolved{font-family:ui-monospace,monospace;font-size:.85em;
+      color:color-mix(in srgb,currentColor 50%,transparent);
+      background:color-mix(in srgb,currentColor 10%,transparent);border-radius:3px;
+      padding:0 3px}
+    .sc-host.sc-has-error{position:relative}
+    .sc-logic-error{position:absolute;top:8px;left:8px;z-index:2147483647;max-width:60ch;
+      padding:6px 10px;background:#b00020;color:#fff;font:12px/1.4 ui-monospace,monospace;
+      border-radius:4px;white-space:pre-wrap;pointer-events:none}
+    /* Mirrors PRINT_BASELINE_CSS in apps/web deck-stage-export.ts — keep both
+       in sync until dc-runtime regains a build step. */
+    @media print {
+      @page { margin: 0.5cm; }
+      figure, table { break-inside: avoid; }
+      #dc-root, #dc-root > .sc-host { height: auto; }
+      *, *::before, *::after {
+        print-color-adjust: exact; -webkit-print-color-adjust: exact;
+        backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+        animation-delay: -99s !important; animation-duration: .001s !important;
+        animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+        animation-play-state: running !important; transition-duration: 0s !important;
+      }
+    }
+  </style>
+<meta charset="utf-8">
+<title>Вариант A — Состояния</title>
+<style>x-dc{display:none!important}</style>
+<link rel="stylesheet" href="../fonts/a.css"><style data-dc-tpl="3">
+body{margin:0}
+.a{--bg:#14161B;--pn:#1A1D23;--rs:#20242C;--hv:#262B34;--sl:#233250;--bd:#2B303A;--b2:#22262E;--tx:#E4E7EC;--t2:#A9B0BC;--mu:#7D8594;--ac:#5B9BFF;--as:#3D7EF0;--gr:#4CC38A;--rd:#F2707A;--am:#E8B85A;--pu:#B392F0;--te:#4FC1C9;--or:#F0955A;font:13px/1.35 'IBM Plex Sans',system-ui,sans-serif;color:var(--tx);-webkit-font-smoothing:antialiased}
+.a *,.a *::before,.a *::after{box-sizing:border-box}
+.a button,.a input,.a textarea,.a select{font:inherit;color:inherit}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px}
+.i{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.btn{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:4px;border:1px solid var(--bd);background:var(--rs);color:var(--tx);font-weight:500;font-size:12.5px;white-space:nowrap;cursor:pointer}
+.btn.p{background:var(--as);border-color:var(--as);color:#fff}
+.btn.g{background:transparent;border-color:transparent;color:var(--t2)}
+.btn.d{background:#C23F4B;border-color:#C23F4B;color:#fff}
+.btn.do{background:transparent;border-color:rgba(242,112,122,.55);color:#F58C94}
+.btn.sm{height:22px;padding:0 8px;font-size:12px}
+.btn.ib{width:26px;padding:0;justify-content:center}
+.btn.ib.sm{width:22px}
+.btn:disabled{opacity:.45;cursor:default}
+.inp{height:26px;border-radius:4px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);padding:0 8px;outline:none;font-size:13px}
+.inp::placeholder{color:var(--mu)}
+.inp.fo{border-color:var(--ac);box-shadow:0 0 0 2px rgba(91,155,255,.25)}
+.inp.er{border-color:var(--rd);box-shadow:0 0 0 2px rgba(242,112,122,.18)}
+.pt{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t2)}
+.ph{height:30px;flex:none;display:flex;align-items:center;gap:6px;padding:0 6px 0 10px;border-bottom:1px solid var(--b2)}
+.chip{display:inline-flex;align-items:center;height:17px;padding:0 5px;border-radius:4px;border:1px solid transparent;font:500 11px/1 'JetBrains Mono',monospace;white-space:nowrap;flex:none}
+.chip .pre{opacity:.65}
+.head{background:var(--as);border-color:var(--as);color:#fff}
+.loc{background:rgba(91,155,255,.13);border-color:rgba(91,155,255,.38);color:#9CC3FF}
+.rem{background:rgba(76,195,138,.10);border-color:rgba(76,195,138,.34);color:#7AD7A9}
+.tag{background:rgba(232,184,90,.10);border-color:rgba(232,184,90,.34);color:#EDC97F}
+.stc{background:rgba(179,146,240,.12);border-color:rgba(179,146,240,.34);color:#CBB4F6}
+.kbd{display:inline-flex;align-items:center;height:17px;padding:0 5px;border-radius:3px;border:1px solid var(--bd);border-bottom-width:2px;background:var(--bg);color:var(--t2);font:500 10.5px/1 'JetBrains Mono',monospace;white-space:nowrap}
+.bdg{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;font:600 10.5px/1 'JetBrains Mono',monospace;flex:none}
+.bM{background:rgba(232,184,90,.16);color:#EDC97F}.bA{background:rgba(76,195,138,.16);color:#7AD7A9}.bD{background:rgba(242,112,122,.16);color:#F58C94}.bR{background:rgba(179,146,240,.16);color:#CBB4F6}.bU{background:rgba(79,193,201,.16);color:#7FD3D9}.bC{background:rgba(240,149,90,.18);color:#F4AD7E}
+.cn{display:inline-flex;align-items:center;height:16px;padding:0 6px;border-radius:8px;background:var(--rs);color:var(--t2);font:500 10.5px/1 'JetBrains Mono',monospace}
+.ab{display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:8px;font:500 10.5px/1 'JetBrains Mono',monospace}
+.up{background:rgba(91,155,255,.16);color:#9CC3FF}.dn{background:rgba(232,184,90,.15);color:#EDC97F}
+.sep{width:1px;height:20px;background:var(--bd);flex:none;margin:0 4px}
+.tr{height:24px;display:flex;align-items:center;gap:6px;padding:0 8px;font-size:12.5px;white-space:nowrap}
+.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.seg{display:inline-flex;height:26px;padding:2px;gap:2px;border-radius:5px;background:var(--bg);border:1px solid var(--b2)}
+.seg button{border:0;background:transparent;color:var(--t2);font-size:12.5px;padding:0 10px;border-radius:3px;cursor:pointer}
+.seg button.on{background:var(--hv);color:var(--tx)}
+.tab{height:30px;display:inline-flex;align-items:center;gap:6px;padding:0 10px;border:0;background:none;color:var(--t2);font-size:12.5px;font-weight:500;box-shadow:inset 0 -2px 0 transparent}
+.tab.on{color:var(--tx);box-shadow:inset 0 -2px 0 var(--ac)}
+.net{position:relative;width:16px;height:16px;flex:none;display:inline-block}
+.net .r{position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(91,155,255,.22);border-top-color:var(--ac);animation:sp .9s linear infinite}
+.net svg{position:absolute;left:3px;top:3px;width:10px;height:10px;color:var(--ac)}
+@keyframes sp{to{transform:rotate(360deg)}}
+.lbl{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);margin-bottom:8px}
+.lbl b{color:var(--ac);font-weight:600}
+.cap{font-size:11.5px;color:var(--mu)}
+.stg{background:var(--bg);border:1px solid var(--b2);border-radius:8px;position:relative;overflow:hidden}
+.pnl{background:var(--pn);border:1px solid var(--bd);border-radius:6px;overflow:hidden}
+.menu{width:100%;background:var(--rs);border:1px solid var(--bd);border-radius:6px;box-shadow:0 12px 32px rgba(0,0,0,.5);padding:4px}
+.mt{margin:-4px -4px 4px;padding:7px 10px;border-bottom:1px solid var(--bd);font:11.5px 'JetBrains Mono',monospace;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mi{height:26px;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:4px;font-size:12.5px;white-space:nowrap}
+.mi .s{margin-left:auto;font:11px 'JetBrains Mono',monospace;color:var(--mu)}
+.msep{height:1px;background:var(--bd);margin:4px 6px}
+.toast{display:flex;align-items:flex-start;gap:10px;padding:10px 8px 10px 12px;background:var(--rs);border:1px solid var(--bd);border-radius:6px;box-shadow:0 10px 28px rgba(0,0,0,.45);position:relative}
+.toast::before{content:"";position:absolute;left:-1px;top:-1px;bottom:-1px;width:3px;border-radius:6px 0 0 6px;background:var(--tc)}
+.tt{font-weight:600;font-size:13px}
+.tb{font-size:12.5px;color:var(--t2);margin-top:2px;line-height:1.4}
+.ic{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.sk{border-radius:3px;background:linear-gradient(90deg,#20242C 0,#2B313B 40%,#20242C 80%);background-size:320px 100%;animation:sh 1.4s linear infinite}
+@keyframes sh{from{background-position:-320px 0}to{background-position:320px 0}}
+.ck{appearance:none;-webkit-appearance:none;width:14px;height:14px;margin:0;border:1px solid #4A5160;border-radius:3px;background:var(--bg);display:inline-grid;place-content:center;flex:none}
+.ck:checked{background:var(--as);border-color:var(--as)}
+.ck:checked::after{content:"";width:7px;height:4px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:translateY(-1px) rotate(-45deg)}
+.rd{appearance:none;-webkit-appearance:none;width:14px;height:14px;margin:0;border:1px solid #4A5160;border-radius:50%;background:var(--bg);display:inline-grid;place-content:center;flex:none}
+.rd:checked{border-color:var(--as)}
+.rd:checked::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--ac)}
+.sw{appearance:none;-webkit-appearance:none;width:26px;height:14px;margin:0;border-radius:7px;background:var(--hv);border:1px solid var(--bd);position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:1px;left:1px;width:10px;height:10px;border-radius:50%;background:var(--t2)}
+.sw:checked{background:var(--as);border-color:var(--as)}
+.sw:checked::after{left:13px;background:#fff}
+.chk{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx)}
+.kg{display:flex;flex-direction:column;gap:10px}
+.kh{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t2)}
+.sb{height:26px;display:flex;align-items:center;gap:12px;padding:0 6px 0 10px;background:var(--pn);border:1px solid var(--bd);border-radius:4px;font-size:12px;color:var(--t2);white-space:nowrap;overflow:hidden}
+.pr{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:4px;font-size:13px}
+.rc{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--bd);border-radius:6px;background:var(--rs)}
+</style></head>
+<body>
+<div id="dc-root"><div class="sc-host" data-sc-name="A-States"><div data-dc-tpl="4" class="a" style="width: 100%; box-sizing: border-box; min-height: 2900px; background: rgb(15, 17, 20); padding: 18px 32px 40px;">
+
+  <div data-dc-tpl="5" style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 20px;">
+    <div data-dc-tpl="6" style="font-size: 11.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ac);">A · Графит — Состояния и обратная связь</div>
+    <div data-dc-tpl="7" style="font-size: 12.5px; color: var(--t2);">Стартовый экран, пустые состояния, загрузка, уведомления, панели операций, меню, палитра команд, подсказки, статус-бар и базовый набор контролов.</div>
+  </div>
+
+  <div data-dc-tpl="8" style="display: flex; flex-direction: column; gap: 32px;">
+
+  
+  <div data-dc-tpl="9" style="display: flex; flex-wrap: wrap; gap: 24px;">
+    <div data-dc-tpl="10" style="flex: 1 1 820px; min-width: 0px;">
+      <div data-dc-tpl="11" class="lbl"><b data-dc-tpl="12">01</b>Стартовый экран — нет репозитория</div>
+      <div data-dc-tpl="13" style="overflow-x: auto;">
+      <div data-dc-tpl="14" class="stg" style="min-width: 780px; height: 470px; display: flex; flex-direction: column;">
+        <div data-dc-tpl="15" style="height: 44px; flex: 0 0 auto; display: flex; align-items: center; gap: 4px; padding: 0px 8px; background: var(--pn); border-bottom: 1px solid var(--bd);">
+          <button data-dc-tpl="16" class="btn" style="height: 32px; padding: 0px 8px 0px 5px; gap: 8px; background: var(--bg);">
+            <span data-dc-tpl="17" style="width: 22px; height: 22px; border-radius: 5px; background: var(--hv); display: inline-flex; align-items: center; justify-content: center; color: var(--t2);"><svg data-dc-tpl="18" class="i" viewBox="0 0 16 16" aria-hidden="true"><path data-dc-tpl="19" d="M5 3v10M5 9c4 0 6-1.5 6-5"></path><circle data-dc-tpl="20" cx="11" cy="3.5" r="1.3"></circle></svg></span>
+            <span data-dc-tpl="21" style="color: var(--t2); font-weight: 500;">Нет репозитория</span>
+            <svg data-dc-tpl="22" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 12px; height: 12px; color: var(--mu);"><path data-dc-tpl="23" d="M4 6l4 4 4-4"></path></svg>
+          </button>
+          <button data-dc-tpl="24" class="btn g">Репозиторий</button>
+          <span data-dc-tpl="25" class="sep"></span>
+          <button data-dc-tpl="26" class="btn" disabled="">Fetch</button><button data-dc-tpl="27" class="btn" disabled="">Pull</button><button data-dc-tpl="28" class="btn" disabled="">Push</button>
+          <span data-dc-tpl="29" class="sep"></span>
+          <button data-dc-tpl="30" class="btn p" disabled="">Коммит</button>
+          <span data-dc-tpl="31" style="flex: 1 1 0%;"></span>
+          <button data-dc-tpl="32" class="btn" style="width: 230px; justify-content: flex-start; background: var(--bg); color: var(--mu); font-weight: 400;"><svg data-dc-tpl="33" class="i" viewBox="0 0 16 16" aria-hidden="true"><circle data-dc-tpl="34" cx="7" cy="7" r="4.5"></circle><path data-dc-tpl="35" d="M10.5 10.5 14 14"></path></svg>Команды…<span data-dc-tpl="36" style="margin-left: auto; display: flex; gap: 3px;"><span data-dc-tpl="37" class="kbd">Ctrl</span><span data-dc-tpl="38" class="kbd">Shift</span><span data-dc-tpl="39" class="kbd">P</span></span></button>
+          <button data-dc-tpl="40" class="btn g ib" aria-label="Настройки"><svg data-dc-tpl="41" class="i" viewBox="0 0 16 16" aria-hidden="true"><path data-dc-tpl="42" d="M2.5 4.5h6.5M12.5 4.5h1M2.5 11.5h1M7 11.5h6.5"></path><circle data-dc-tpl="43" cx="10.8" cy="4.5" r="1.7"></circle><circle data-dc-tpl="44" cx="5.2" cy="11.5" r="1.7"></circle></svg></button>
+        </div>
+        <div data-dc-tpl="45" style="flex: 1 1 0%; display: flex; gap: 40px; padding: 30px 40px 24px; min-height: 0px;">
+          <div data-dc-tpl="46" style="width: 300px; flex: 0 0 auto; display: flex; flex-direction: column;">
+            <span data-dc-tpl="47" style="width: 44px; height: 44px; border-radius: 10px; background: var(--as); display: inline-flex; align-items: center; justify-content: center; color: rgb(255, 255, 255);"><svg data-dc-tpl="48" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 24px; height: 24px; stroke-width: 1.6;"><path data-dc-tpl="49" d="M5 3v10M5 9c4 0 6-1.5 6-5"></path><circle data-dc-tpl="50" cx="11" cy="3.5" r="1.3"></circle><circle data-dc-tpl="51" cx="5" cy="13" r="1"></circle></svg></span>
+            <div data-dc-tpl="52" style="font-size: 21px; font-weight: 600; margin-top: 12px;">Добро пожаловать в GitStream</div>
+            <div data-dc-tpl="53" style="font-size: 12.5px; color: var(--t2); margin-top: 4px; line-height: 1.45;">Откройте репозиторий, склонируйте его по URL или создайте новый.</div>
+            <div data-dc-tpl="54" style="display: flex; flex-direction: column; gap: 8px; margin-top: 18px;">
+              <button data-dc-tpl="55" class="btn" style="height: 54px; justify-content: flex-start; gap: 12px; padding: 0px 12px; border-color: rgba(91, 155, 255, 0.55); background: rgba(91, 155, 255, 0.08);"><span data-dc-tpl="56" class="ic" style="width: 30px; height: 30px; border-radius: 6px; background: var(--as); color: rgb(255, 255, 255);"><svg data-dc-tpl="57" class="i" viewBox="0 0 16 16" aria-hidden="true"><path data-dc-tpl="58" d="M2 4h4.2l1.5 1.5H14v7H2z"></path></svg></span><span data-dc-tpl="59" style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px;"><span data-dc-tpl="60">Открыть репозиторий…</span><span data-dc-tpl="61" style="font-size: 11.5px; font-weight: 400; color: var(--t2);">Добавить папку с .git в список</span></span></button>
+              <button data-dc-tpl="62" class="btn" style="height: 54px; justify-content: flex-start; gap: 12px; padding: 0px 12px;"><span data-dc-tpl="63" class="ic" style="width: 30px; height: 30px; border-radius: 6px; background: var(--hv); color: var(--ac);"><svg data-dc-tpl="64" class="i" viewBox="0 0 16 16" aria-hidden="true"><path data-dc-tpl="65" d="M8 2.5v7.5M4.8 7 8 10.2 11.2 7M3 13.5h10"></path></svg></span><span data-dc-tpl="66" style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px;"><span data-dc-tpl="67">Клонировать…</span><span data-dc-tpl="68" style="font-size: 11.5px; font-weight: 400; color: var(--t2);">По URL — HTTPS или SSH</span></span></button>
+              <button data-dc-tpl="69" class="btn" style="height: 54px; justify-content: flex-start; gap: 12px; padding: 0px 12px;"><span data-dc-tpl="70" class="ic" style="width: 30px; height: 30px; border-radius: 6px; background: var(--hv); color: var(--gr);"><svg data-dc-tpl="71" class="i" viewBox="0 0 16 16" aria-hidden="true"><path data-dc-tpl="72" d="M8 3v10M3 8h10"></path></svg></span><span data-dc-tpl="73" style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px;"><span data-dc-tpl="74">Создать репозиторий (git init)…</span><span data-dc-tpl="75" style="font-size: 11.5px; font-weight: 400; color: var(--t2);">В пустой или существующей папке</span></span></button>
+            </div>
+          </div>
+          <div data-dc-tpl="76" style="flex: 1 1 0%; min-width: 0px; display: flex; flex-direction: column;">
+            <div data-dc-tpl="77" style="display: flex; align-items: center; height: 24px;"><span data-dc-tpl="78" class="pt">Недавние</span><button data-dc-tpl="79" class="btn g sm" style="margin-left: auto;">Очистить список</button></div>
+            <div data-dc-tpl="80" class="pnl" style="margin-top: 6px;">
+              
+                <div data-dc-tpl="82" style="height: 40px; display: flex; align-items: center; gap: 10px; padding: 0px 12px; border-bottom: 1px solid var(--b2); background: rgba(91, 155, 255, 0.07);">
+                  <svg data-dc-tpl="83" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: rgb(91, 155, 255);"><path data-dc-tpl="84" d="M3.5 2.5H12v11H4.6a1.1 1.1 0 0 1-1.1-1.1z"></path><path data-dc-tpl="85" d="M3.5 12.4a1.1 1.1 0 0 1 1.1-1.1H12"></path></svg>
+                  <div data-dc-tpl="86" style="display: flex; flex-direction: column; min-width: 0px; line-height: 1.25;">
+                    <span data-dc-tpl="87" style="font-weight: 500;"><span class="sc-interp">gitstream</span></span>
+                    <span data-dc-tpl="88" class="mono trunc" style="font-size: 11px; color: var(--mu);"><span class="sc-interp">~/projects/gitstream</span></span>
+                  </div>
+                  <span data-dc-tpl="89" class="chip loc" style="margin-left: auto;"><span class="sc-interp">main</span></span>
+                  <span data-dc-tpl="90" style="width: 96px; text-align: right; font-size: 11.5px; color: var(--mu);"><span class="sc-interp">2 мин назад</span></span>
+                </div>
+              
+                <div data-dc-tpl="82" style="height: 40px; display: flex; align-items: center; gap: 10px; padding: 0px 12px; border-bottom: 1px solid var(--b2); background: transparent;">
+                  <svg data-dc-tpl="83" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: rgb(125, 133, 148);"><path data-dc-tpl="84" d="M3.5 2.5H12v11H4.6a1.1 1.1 0 0 1-1.1-1.1z"></path><path data-dc-tpl="85" d="M3.5 12.4a1.1 1.1 0 0 1 1.1-1.1H12"></path></svg>
+                  <div data-dc-tpl="86" style="display: flex; flex-direction: column; min-width: 0px; line-height: 1.25;">
+                    <span data-dc-tpl="87" style="font-weight: 500;"><span class="sc-interp">tauri-plugin-askpass</span></span>
+                    <span data-dc-tpl="88" class="mono trunc" style="font-size: 11px; color: var(--mu);"><span class="sc-interp">~/projects/tauri-plugin-askpass</span></span>
+                  </div>
+                  <span data-dc-tpl="89" class="chip loc" style="margin-left: auto;"><span class="sc-interp">main</span></span>
+                  <span data-dc-tpl="90" style="width: 96px; text-align: right; font-size: 11.5px; color: var(--mu);"><span class="sc-interp">вчера</span></span>
+                </div>
+              
+                <div data-dc-tpl="82" style="height: 40px; display: flex; align-items: center; gap: 10px; padding: 0px 12px; border-bottom: 1px solid var(--b2); background: transparent;">
+                  <svg data-dc-tpl="83" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: rgb(125, 133, 148);"><path data-dc-tpl="84" d="M3.5 2.5H12v11H4.6a1.1 1.1 0 0 1-1.1-1.1z"></path><path data-dc-tpl="85" d="M3.5 12.4a1.1 1.1 0 0 1 1.1-1.1H12"></path></svg>
+                  <div data-dc-tpl="86" style="display: flex; flex-direction: column; min-width: 0px; line-height: 1.25;">
+                    <span data-dc-tpl="87" style="font-weight: 500;"><span class="sc-interp">docs-site</span></span>
+                    <span data-dc-tpl="88" class="mono trunc" style="font-size: 11px; color: var(--mu);"><span class="sc-interp">~/work/docs-site</span></span>
+                  </div>
+                  <span data-dc-tpl="89" class="chip loc" style="margin-left: auto;"><span class="sc-interp">develop</span></span>
+                  <span data-dc-tpl="90" style="width: 96px; text-align: right; font-size: 11.5px; color: var(--mu);"><span class="sc-interp">3 дня назад</span></span>
+                </div>
+              
+                <div data-dc-tpl="82" style="height: 40px; display: flex; align-items: center; gap: 10px; padding: 0px 12px; border-bottom: 1px solid var(--b2); background: transparent;">
+                  <svg data-dc-tpl="83" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: rgb(125, 133, 148);"><path data-dc-tpl="84" d="M3.5 2.5H12v11H4.6a1.1 1.1 0 0 1-1.1-1.1z"></path><path data-dc-tpl="85" d="M3.5 12.4a1.1 1.1 0 0 1 1.1-1.1H12"></path></svg>
+                  <div data-dc-tpl="86" style="display: flex; flex-direction: column; min-width: 0px; line-height: 1.25;">
+                    <span data-dc-tpl="87" style="font-weight: 500;"><span class="sc-interp">dotfiles</span></span>
+                    <span data-dc-tpl="88" class="mono trunc" style="font-size: 11px; color: var(--mu);"><span class="sc-interp">~/dotfiles</span></span>
+                  </div>
+                  <span data-dc-tpl="89" class="chip loc" style="margin-left: auto;"><span class="sc-interp">master</span></span>
+                  <span data-dc-tpl="90" style="width: 96px; text-align: right; font-size: 11.5px; color: var(--mu);"><span class="sc-interp">неделю назад</span></span>
+                </div>
+              
+                <div data-dc-tpl="82" style="height: 40px; display: flex; align-items: center; gap: 10px; padding: 0px 12px; border-bottom: 1px solid var(--b2); background: transparent;">
+                  <svg data-dc-tpl="83" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: rgb(125, 133, 148);"><path data-dc-tpl="84" d="M3.5 2.5H12v11H4.6a1.1 1.1 0 0 1-1.1-1.1z"></path><path data-dc-tpl="85" d="M3.5 12.4a1.1 1.1 0 0 1 1.1-1.1H12"></path></svg>
+                  <div data-dc-tpl="86" style="display: flex; flex-direction: column; min-width: 0px; line-height: 1.25;">
+                    <span data-dc-tpl="87" style="font-weight: 500;"><span class="sc-interp">notes</span></span>
+                    <span data-dc-tpl="88" class="mono trunc" style="font-size: 11px; color: var(--mu);"><span class="sc-interp">~/notes</span></span>
+                  </div>
+                  <span data-dc-tpl="89" class="chip loc" style="margin-left: auto;"><span class="sc-interp">main</span></span>
+                  <span data-dc-tpl="90" style="width: 96px; text-align: right; font-size: 11.5px; color: var(--mu);"><span class="sc-interp">2 недели назад</span></span>
+                </div>
+              
+            </div>
+            <div data-dc-tpl="91" style="margin-top: 14px; flex: 1 1 0%; border: 1.5px dashed rgba(91, 155, 255, 0.45); border-radius: 6px; background: rgba(91, 155, 255, 0.05); display: flex; align-items: center; gap: 14px; padding: 12px 16px;">
+              <svg data-dc-tpl="92" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 26px; height: 26px; color: var(--ac); stroke-width: 1.3;"><path data-dc-tpl="93" d="M2 4h4.2l1.5 1.5H14v7H2z"></path><path data-dc-tpl="94" d="M8 7.2v3.6M6.4 9.3 8 10.9l1.6-1.6"></path></svg>
+              <div data-dc-tpl="95"><div data-dc-tpl="96" style="font-weight: 500;">Перетащите папку сюда</div><div data-dc-tpl="97" style="font-size: 12px; color: var(--t2); margin-top: 2px;">Репозиторий будет добавлен; для папки без .git предложим git init</div></div>
+            </div>
+          </div>
+        </div>
+        <div data-dc-tpl="98" style="height: 26px; flex: 0 0 auto; display: flex; align-items: center; padding: 0px 10px; background: var(--pn); border-top: 1px solid var(--bd); font-size: 12px; color: var(--mu);"><span data-dc-tpl="99">Нет открытого репозитория</span><span data-dc-tpl="100" class="mono" style="margin-left: auto;">GitStream v1.1.33</span></div>
+      </div>
+      </div>
+    </div>
+
+    <div data-dc-tpl="101" style="flex: 1 1 532px; min-width: 0px;">
+      <div data-dc-tpl="102" class="lbl"><b data-dc-tpl="103">02</b>Пустые состояния</div>
+      <div data-dc-tpl="104" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+        
+        <div data-dc-tpl="105" class="pnl" style="height: 227px; display: flex; flex-direction: column;">
+          <div data-dc-tpl="106" class="ph"><span data-dc-tpl="107" class="pt">Файлы</span><span data-dc-tpl="108" class="cn">0</span><span data-dc-tpl="109" class="cap" style="margin-left: auto; padding-right: 4px;">чистая рабочая копия</span></div>
+          <div data-dc-tpl="110" style="flex: 1 1 0%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px; text-align: center;">
+            <span data-dc-tpl="111" class="ic" style="width: 40px; height: 40px; background: rgba(76, 195, 138, 0.12); color: var(--gr);"><svg data-dc-tpl="112" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 20px; height: 20px;"><path data-dc-tpl="113" d="M3 8.5l3 3 7-7" stroke-width="1.8"></path></svg></span>
+            <div data-dc-tpl="114" style="font-weight: 600; margin-top: 4px;">Нет изменений</div>
+            <div data-dc-tpl="115" style="font-size: 12px; color: var(--t2);">Рабочая копия совпадает с HEAD <span data-dc-tpl="116" class="mono" style="font-size: 11.5px; color: rgb(156, 195, 255);">9f41c2a</span></div>
+            <button data-dc-tpl="117" class="btn sm" style="margin-top: 6px;">Показать все файлы</button>
+          </div>
+        </div>
+        
+        <div data-dc-tpl="118" class="pnl" style="height: 227px; display: flex; flex-direction: column;">
+          <div data-dc-tpl="119" style="height: 30px; flex: 0 0 auto; display: flex; align-items: center; padding: 0px 4px; border-bottom: 1px solid var(--b2);"><button data-dc-tpl="120" class="tab on">Изменения</button><button data-dc-tpl="121" class="tab">Git output</button></div>
+          <div data-dc-tpl="122" style="flex: 1 1 0%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px; text-align: center;">
+            <span data-dc-tpl="123" class="ic" style="width: 40px; height: 40px; border-radius: 8px; background: var(--rs); color: var(--t2);"><svg data-dc-tpl="124" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 20px; height: 20px;"><path data-dc-tpl="125" d="M2 2.5h5v11H2zM9 2.5h5v11H9z"></path><path data-dc-tpl="126" d="M3.5 5.5h2M3.5 8h2M10.5 5.5h2M10.5 10.5h2"></path></svg></span>
+            <div data-dc-tpl="127" style="font-weight: 600; margin-top: 4px;">Файл не выбран</div>
+            <div data-dc-tpl="128" style="font-size: 12px; color: var(--t2);">Выберите файл в панели «Файлы», чтобы увидеть diff</div>
+            <div data-dc-tpl="129" style="display: flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 11.5px; color: var(--mu);"><span data-dc-tpl="130" class="kbd">↑</span><span data-dc-tpl="131" class="kbd">↓</span>выбор<span data-dc-tpl="132" class="kbd" style="margin-left: 8px;">Enter</span>открыть</div>
+          </div>
+        </div>
+        
+        <div data-dc-tpl="133" class="pnl" style="height: 227px; display: flex; flex-direction: column;">
+          <div data-dc-tpl="134" class="ph"><span data-dc-tpl="135" class="pt">Ветки</span></div>
+          <div data-dc-tpl="136" class="tr" style="height: 22px; font-weight: 600; font-size: 12px; color: var(--t2);"><svg data-dc-tpl="137" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 11px; height: 11px;"><path data-dc-tpl="138" d="M6 4l4 4-4 4"></path></svg>Локальные<span data-dc-tpl="139" class="cn">4</span></div>
+          <div data-dc-tpl="140" class="tr" style="height: 22px; font-weight: 600; font-size: 12px; color: var(--t2);"><svg data-dc-tpl="141" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 11px; height: 11px;"><path data-dc-tpl="142" d="M4 6l4 4 4-4"></path></svg>Теги<span data-dc-tpl="143" class="cn">0</span></div>
+          <div data-dc-tpl="144" style="margin: 2px 10px 0px 26px; padding: 12px; border: 1px dashed var(--bd); border-radius: 6px; display: flex; flex-direction: column; gap: 6px;">
+            <div data-dc-tpl="145" style="display: flex; align-items: center; gap: 8px;"><svg data-dc-tpl="146" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--am);"><path data-dc-tpl="147" d="M2.5 2.5h5l6 6-5 5-6-6z"></path><circle data-dc-tpl="148" cx="5.5" cy="5.5" r=".8"></circle></svg><span data-dc-tpl="149" style="font-weight: 500;">Тегов пока нет</span></div>
+            <div data-dc-tpl="150" style="font-size: 12px; color: var(--t2);">Отметьте релиз, например <span data-dc-tpl="151" class="mono" style="font-size: 11.5px;">v1.2.0</span></div>
+            <div data-dc-tpl="152" style="display: flex; align-items: center; gap: 8px; margin-top: 2px;"><button data-dc-tpl="153" class="btn sm">Создать тег…</button><span data-dc-tpl="154" class="kbd">Shift+F7</span></div>
+          </div>
+          <div data-dc-tpl="155" class="tr" style="height: 22px; font-weight: 600; font-size: 12px; color: var(--t2); margin-top: 6px;"><svg data-dc-tpl="156" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 11px; height: 11px;"><path data-dc-tpl="157" d="M6 4l4 4-4 4"></path></svg>Stashes<span data-dc-tpl="158" class="cn">2</span></div>
+        </div>
+        
+        <div data-dc-tpl="159" class="pnl" style="height: 227px; display: flex; flex-direction: column;">
+          <div data-dc-tpl="160" class="ph"><span data-dc-tpl="161" class="pt">Журнал</span>
+            <div data-dc-tpl="162" style="flex: 1 1 0%; position: relative; margin-left: 6px;">
+              <input data-dc-tpl="163" class="inp fo" aria-label="Фильтр коммитов" value="palete" style="width: 100%; height: 22px; font-size: 12px; padding-right: 24px;">
+              <button data-dc-tpl="164" class="btn g ib sm" aria-label="Очистить фильтр" style="position: absolute; right: 0px; top: 0px; height: 22px;"><svg data-dc-tpl="165" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 11px; height: 11px;"><path data-dc-tpl="166" d="M4 4l8 8M12 4l-8 8"></path></svg></button>
+            </div>
+          </div>
+          <div data-dc-tpl="167" style="flex: 1 1 0%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px; text-align: center;">
+            <span data-dc-tpl="168" class="ic" style="width: 40px; height: 40px; background: var(--rs); color: var(--t2);"><svg data-dc-tpl="169" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 20px; height: 20px;"><circle data-dc-tpl="170" cx="7" cy="7" r="4.5"></circle><path data-dc-tpl="171" d="M10.5 10.5 14 14M5.3 7h3.4"></path></svg></span>
+            <div data-dc-tpl="172" style="font-weight: 600; margin-top: 4px;">Ничего не найдено по «palete»</div>
+            <div data-dc-tpl="173" style="font-size: 12px; color: var(--t2);">Поиск по 500 загруженным коммитам. Возможно: <button data-dc-tpl="174" class="btn g" style="height: auto; padding: 0px; color: var(--ac); font-size: 12px; text-decoration: underline;">palette</button></div>
+            <button data-dc-tpl="175" class="btn sm" style="margin-top: 6px;">Сбросить фильтр</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  
+  <div data-dc-tpl="176" style="display: flex; flex-wrap: wrap; gap: 24px;">
+    <div data-dc-tpl="177" style="flex: 1 1 430px; min-width: 0px;">
+      <div data-dc-tpl="178" class="lbl"><b data-dc-tpl="179">04</b>Уведомления — стек (правый нижний угол)</div>
+      <div data-dc-tpl="180" class="stg" style="min-height: 480px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+        <div data-dc-tpl="181" class="toast" style="--tc: var(--gr);">
+          <span data-dc-tpl="182" class="ic" style="background: rgba(76, 195, 138, 0.15); color: var(--gr);"><svg data-dc-tpl="183" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="184" d="M3 8.5l3 3 7-7" stroke-width="2"></path></svg></span>
+          <div data-dc-tpl="185" style="flex: 1 1 0%; min-width: 0px;"><div data-dc-tpl="186" class="tt">Push в origin/main — 2 коммита</div><div data-dc-tpl="187" class="tb mono" style="font-size: 11.5px;">bd94802..9f41c2a  main → origin/main</div></div>
+          <span data-dc-tpl="188" class="cap">сейчас</span>
+          <button data-dc-tpl="189" class="btn g ib sm" aria-label="Закрыть"><svg data-dc-tpl="190" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 11px; height: 11px;"><path data-dc-tpl="191" d="M4 4l8 8M12 4l-8 8"></path></svg></button>
+        </div>
+        <div data-dc-tpl="192" class="toast" style="--tc: var(--ac);">
+          <span data-dc-tpl="193" class="ic" style="background: rgba(91, 155, 255, 0.15); color: var(--ac);"><svg data-dc-tpl="194" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="195" d="M8 7v4.5M8 4.6h.01" stroke-width="2"></path></svg></span>
+          <div data-dc-tpl="196" style="flex: 1 1 0%; min-width: 0px;"><div data-dc-tpl="197" class="tt">Fetch: 1 новый коммит в origin/main</div><div data-dc-tpl="198" class="tb"><span data-dc-tpl="199" class="mono" style="font-size: 11.5px;">c08a5f3</span> docs: README — скриншоты</div>
+            <div data-dc-tpl="200" style="display: flex; gap: 6px; margin-top: 8px;"><button data-dc-tpl="201" class="btn sm">Pull</button><button data-dc-tpl="202" class="btn g sm">Показать в журнале</button></div></div>
+          <button data-dc-tpl="203" class="btn g ib sm" aria-label="Закрыть"><svg data-dc-tpl="204" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 11px; height: 11px;"><path data-dc-tpl="205" d="M4 4l8 8M12 4l-8 8"></path></svg></button>
+        </div>
+        <div data-dc-tpl="206" class="toast" style="--tc: var(--am);">
+          <span data-dc-tpl="207" class="ic" style="background: rgba(232, 184, 90, 0.15); color: var(--am);"><svg data-dc-tpl="208" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="209" d="M8 4v5M8 11.6h.01" stroke-width="2"></path></svg></span>
+          <div data-dc-tpl="210" style="flex: 1 1 0%; min-width: 0px;"><div data-dc-tpl="211" class="tt">Незакоммиченные изменения</div><div data-dc-tpl="212" class="tb">8 файлов изменено. Checkout feature/command-palette перенесёт их в ветку.</div>
+            <div data-dc-tpl="213" style="display: flex; gap: 6px; margin-top: 8px;"><button data-dc-tpl="214" class="btn sm">Stash и checkout</button><button data-dc-tpl="215" class="btn g sm">Перенести как есть</button></div></div>
+          <button data-dc-tpl="216" class="btn g ib sm" aria-label="Закрыть"><svg data-dc-tpl="217" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 11px; height: 11px;"><path data-dc-tpl="218" d="M4 4l8 8M12 4l-8 8"></path></svg></button>
+        </div>
+        <div data-dc-tpl="219" class="toast" style="--tc: var(--rd); border-color: rgba(242, 112, 122, 0.4);">
+          <span data-dc-tpl="220" class="ic" style="background: rgba(242, 112, 122, 0.16); color: var(--rd);"><svg data-dc-tpl="221" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="222" d="M5 5l6 6M11 5l-6 6" stroke-width="2"></path></svg></span>
+          <div data-dc-tpl="223" style="flex: 1 1 0%; min-width: 0px;"><div data-dc-tpl="224" class="tt">Push отклонён: ветка устарела</div><div data-dc-tpl="225" class="tb">В origin/main есть 1 коммит, которого нет локально (non-fast-forward).</div>
+            <div data-dc-tpl="226" style="display: flex; gap: 6px; margin-top: 8px;"><button data-dc-tpl="227" class="btn p sm">Открыть помощника</button><button data-dc-tpl="228" class="btn sm">Git output</button></div></div>
+          <button data-dc-tpl="229" class="btn g ib sm" aria-label="Закрыть"><svg data-dc-tpl="230" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 11px; height: 11px;"><path data-dc-tpl="231" d="M4 4l8 8M12 4l-8 8"></path></svg></button>
+        </div>
+        <div data-dc-tpl="232" class="toast" style="--tc: var(--ac);">
+          <span data-dc-tpl="233" class="net" style="margin-top: 2px;"><span data-dc-tpl="234" class="r"></span><svg data-dc-tpl="235" class="i" viewBox="0 0 16 16" aria-hidden="true"><path data-dc-tpl="236" d="M8 2.5v11M4 9.5l4 4 4-4" stroke-width="2"></path></svg></span>
+          <div data-dc-tpl="237" style="flex: 1 1 0%; min-width: 0px;"><div data-dc-tpl="238" style="display: flex; align-items: baseline; gap: 8px;"><span data-dc-tpl="239" class="tt">Fetch origin</span><span data-dc-tpl="240" class="cap">осталось ~6 с</span></div>
+            <div data-dc-tpl="241" class="tb">Получение объектов: <span data-dc-tpl="242" class="mono" style="font-size: 11.5px;">1 284 / 2 010</span> · 3,1 МБ/с</div>
+            <div data-dc-tpl="243" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;"><div data-dc-tpl="244" style="flex: 1 1 0%; height: 4px; border-radius: 2px; background: var(--hv);"><div data-dc-tpl="245" style="width: 64%; height: 100%; border-radius: 2px; background: var(--ac);"></div></div><span data-dc-tpl="246" class="mono" style="font-size: 11px; color: var(--t2);">64%</span><button data-dc-tpl="247" class="btn sm">Отмена</button></div></div>
+        </div>
+        <div data-dc-tpl="248" class="toast" style="--tc: var(--mu);">
+          <span data-dc-tpl="249" class="ic" style="background: var(--hv); color: var(--t2);"><svg data-dc-tpl="250" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="251" d="M3 4.5h10M6 4.5V3h4v1.5M4.5 4.5l.7 9h5.6l.7-9"></path></svg></span>
+          <div data-dc-tpl="252" style="flex: 1 1 0%; min-width: 0px;"><div data-dc-tpl="253" class="tt">Ветка fix/askpass-timeout удалена</div><div data-dc-tpl="254" class="tb">Была на <span data-dc-tpl="255" class="mono" style="font-size: 11.5px;">20b3db4</span></div></div>
+          <button data-dc-tpl="256" class="btn sm" style="color: rgb(156, 195, 255);">Отменить<span data-dc-tpl="257" class="kbd" style="height: 15px;">Ctrl+Z</span></button>
+          <span data-dc-tpl="258" style="position: relative; width: 22px; height: 22px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; font: 500 10px &quot;JetBrains Mono&quot;, monospace; color: var(--t2); border-radius: 50%; background: conic-gradient(var(--ac) 0 66%, var(--hv) 66% 100%);"><span data-dc-tpl="259" style="position: absolute; inset: 2px; border-radius: 50%; background: var(--rs);"></span><span data-dc-tpl="260" style="position: relative;">8</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div data-dc-tpl="261" style="flex: 1 1 560px; min-width: 0px;">
+      <div data-dc-tpl="262" class="lbl"><b data-dc-tpl="263">09</b>Палитра команд — запрос «merge»</div>
+      <div data-dc-tpl="264" class="stg" style="min-height: 480px; background: linear-gradient(rgba(8, 9, 12, 0.55), rgba(8, 9, 12, 0.55)), repeating-linear-gradient(0deg, rgb(23, 26, 32) 0px, rgb(23, 26, 32) 25px, rgb(20, 22, 27) 25px, rgb(20, 22, 27) 26px); padding: 22px 30px;">
+        <div data-dc-tpl="265" style="max-width: 520px; margin: 0px auto; background: var(--rs); border: 1px solid var(--bd); border-radius: 8px; box-shadow: rgba(0, 0, 0, 0.6) 0px 24px 64px; overflow: hidden;">
+          <div data-dc-tpl="266" style="height: 46px; display: flex; align-items: center; gap: 10px; padding: 0px 12px; border-bottom: 1px solid var(--bd);">
+            <svg data-dc-tpl="267" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 16px; height: 16px; color: var(--t2);"><circle data-dc-tpl="268" cx="7" cy="7" r="4.5"></circle><path data-dc-tpl="269" d="M10.5 10.5 14 14"></path></svg>
+            <input data-dc-tpl="270" class="inp" aria-label="Команда или поиск" value="merge" style="flex: 1 1 0%; border: 0px; background: transparent; padding: 0px; height: 30px; font-size: 14px;">
+            <span data-dc-tpl="271" class="cap">7 результатов</span><span data-dc-tpl="272" class="kbd">Esc</span>
+          </div>
+          <div data-dc-tpl="273" style="padding: 4px 6px 6px;">
+            <div data-dc-tpl="274" class="cap" style="padding: 8px 8px 4px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 10.5px;">Команды</div>
+            
+              <div data-dc-tpl="276" class="pr" style="background: rgb(35, 50, 80); box-shadow: rgb(91, 155, 255) 2px 0px 0px inset; opacity: 1;">
+                <svg data-dc-tpl="277" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--t2);"><path data-dc-tpl="278" d="M3 5l3 3-3 3M8 11h5"></path></svg>
+                <span data-dc-tpl="279"><span class="sc-interp"></span><span data-dc-tpl="280" style="color: rgb(156, 195, 255); background: rgba(91, 155, 255, 0.16); border-radius: 2px;"><span class="sc-interp">Merge</span></span><span class="sc-interp"> в текущую ветку…</span></span>
+                <span data-dc-tpl="281" class="cap trunc"><span class="sc-interp">выбрать ветку → main</span></span>
+                <span data-dc-tpl="282" class="kbd" style="margin-left: auto; display: inline-flex;"><span class="sc-interp">Ctrl+M</span></span>
+              </div>
+            
+              <div data-dc-tpl="276" class="pr" style="background: transparent; box-shadow: none; opacity: 1;">
+                <svg data-dc-tpl="277" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--t2);"><path data-dc-tpl="278" d="M3 5l3 3-3 3M8 11h5"></path></svg>
+                <span data-dc-tpl="279"><span class="sc-interp"></span><span data-dc-tpl="280" style="color: rgb(156, 195, 255); background: rgba(91, 155, 255, 0.16); border-radius: 2px;"><span class="sc-interp">Merge</span></span><span class="sc-interp"> preview…</span></span>
+                <span data-dc-tpl="281" class="cap trunc"><span class="sc-interp">ff / no-ff, прогноз конфликтов</span></span>
+                <span data-dc-tpl="282" class="kbd" style="margin-left: auto; display: none;"><span class="sc-interp"></span></span>
+              </div>
+            
+              <div data-dc-tpl="276" class="pr" style="background: transparent; box-shadow: none; opacity: 0.5;">
+                <svg data-dc-tpl="277" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--t2);"><path data-dc-tpl="278" d="M3 5l3 3-3 3M8 11h5"></path></svg>
+                <span data-dc-tpl="279"><span class="sc-interp">Прервать </span><span data-dc-tpl="280" style="color: rgb(156, 195, 255); background: rgba(91, 155, 255, 0.16); border-radius: 2px;"><span class="sc-interp">merge</span></span><span class="sc-interp"> (abort)</span></span>
+                <span data-dc-tpl="281" class="cap trunc"><span class="sc-interp">нет активного merge</span></span>
+                <span data-dc-tpl="282" class="kbd" style="margin-left: auto; display: none;"><span class="sc-interp"></span></span>
+              </div>
+            
+            <div data-dc-tpl="283" class="cap" style="padding: 10px 8px 4px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 10.5px;">Ветки</div>
+            
+              <div data-dc-tpl="285" class="pr">
+                <svg data-dc-tpl="286" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: rgb(91, 155, 255);"><circle data-dc-tpl="287" cx="5" cy="3.5" r="1.4"></circle><circle data-dc-tpl="288" cx="5" cy="12.5" r="1.4"></circle><circle data-dc-tpl="289" cx="11" cy="5" r="1.4"></circle><path data-dc-tpl="290" d="M5 5v6M11 6.4c0 2.6-6 2.2-6 4.7"></path></svg>
+                <span data-dc-tpl="291" class="trunc"><span data-dc-tpl="292" style="color: rgb(156, 195, 255); background: rgba(91, 155, 255, 0.16); border-radius: 2px;"><span class="sc-interp">Merge</span></span><span class="sc-interp"> feature/command-palette → main</span></span>
+                <span data-dc-tpl="293" style="margin-left: auto; font-size: 11.5px; color: rgb(122, 215, 169); flex: 0 0 auto;"><span class="sc-interp">конфликтов не ожидается</span></span>
+              </div>
+            
+              <div data-dc-tpl="285" class="pr">
+                <svg data-dc-tpl="286" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: rgb(76, 195, 138);"><circle data-dc-tpl="287" cx="5" cy="3.5" r="1.4"></circle><circle data-dc-tpl="288" cx="5" cy="12.5" r="1.4"></circle><circle data-dc-tpl="289" cx="11" cy="5" r="1.4"></circle><path data-dc-tpl="290" d="M5 5v6M11 6.4c0 2.6-6 2.2-6 4.7"></path></svg>
+                <span data-dc-tpl="291" class="trunc"><span data-dc-tpl="292" style="color: rgb(156, 195, 255); background: rgba(91, 155, 255, 0.16); border-radius: 2px;"><span class="sc-interp">Merge</span></span><span class="sc-interp"> origin/release/1.1 → main</span></span>
+                <span data-dc-tpl="293" style="margin-left: auto; font-size: 11.5px; color: rgb(237, 201, 127); flex: 0 0 auto;"><span class="sc-interp">возможен конфликт в 2 файлах</span></span>
+              </div>
+            
+            <div data-dc-tpl="294" class="cap" style="padding: 10px 8px 4px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 10.5px;">Коммиты</div>
+            
+              <div data-dc-tpl="296" class="pr">
+                <span data-dc-tpl="297" class="mono" style="font-size: 12px; color: rgb(156, 195, 255); flex: 0 0 auto;"><span class="sc-interp">4b7a1d9</span></span>
+                <span data-dc-tpl="298" class="trunc"><span class="sc-interp"></span><span data-dc-tpl="299" style="color: rgb(156, 195, 255); background: rgba(91, 155, 255, 0.16); border-radius: 2px;"><span class="sc-interp">Merge</span></span><span class="sc-interp"> branch 'feature/command-palette'</span></span>
+                <span data-dc-tpl="300" class="cap" style="margin-left: auto; flex: 0 0 auto;"><span class="sc-interp">23.09.2026</span></span>
+              </div>
+            
+              <div data-dc-tpl="296" class="pr">
+                <span data-dc-tpl="297" class="mono" style="font-size: 12px; color: rgb(156, 195, 255); flex: 0 0 auto;"><span class="sc-interp">0e56ef2</span></span>
+                <span data-dc-tpl="298" class="trunc"><span class="sc-interp">fix(pull): … локальный </span><span data-dc-tpl="299" style="color: rgb(156, 195, 255); background: rgba(91, 155, 255, 0.16); border-radius: 2px;"><span class="sc-interp">merge</span></span><span class="sc-interp">/rebase</span></span>
+                <span data-dc-tpl="300" class="cap" style="margin-left: auto; flex: 0 0 auto;"><span class="sc-interp">09.09.2026</span></span>
+              </div>
+            
+          </div>
+          <div data-dc-tpl="301" style="height: 32px; display: flex; align-items: center; gap: 6px; padding: 0px 12px; border-top: 1px solid var(--bd); background: var(--pn); font-size: 11.5px; color: var(--mu);">
+            <span data-dc-tpl="302" class="kbd">↑</span><span data-dc-tpl="303" class="kbd">↓</span>навигация
+            <span data-dc-tpl="304" class="kbd" style="margin-left: 10px;">Enter</span>выполнить
+            <span data-dc-tpl="305" class="kbd" style="margin-left: 10px;">Tab</span>действия
+            <span data-dc-tpl="306" style="margin-left: auto;">префиксы: <span data-dc-tpl="307" class="mono" style="font-size: 11px; color: var(--t2);">&gt;</span> команды · <span data-dc-tpl="308" class="mono" style="font-size: 11px; color: var(--t2);">@</span> ветки · <span data-dc-tpl="309" class="mono" style="font-size: 11px; color: var(--t2);">#</span> коммиты</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div data-dc-tpl="310" style="flex: 1 1 338px; min-width: 0px;">
+      <div data-dc-tpl="311" class="lbl"><b data-dc-tpl="312">10</b>Подсказки</div>
+      <div data-dc-tpl="313" class="stg" style="min-height: 480px; padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+        <div data-dc-tpl="314" class="cap">Карточка ветки (hover в «Ветки»)</div>
+        <div data-dc-tpl="315" class="pnl" style="width: 220px;">
+          <div data-dc-tpl="316" class="tr" style="background: var(--sl); box-shadow: inset 2px 0 0 var(--ac);"><svg data-dc-tpl="317" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 9px; height: 9px; color: var(--ac);"><path data-dc-tpl="318" d="M5 2.5 11.5 8 5 13.5z" fill="currentColor" stroke="none"></path></svg><span data-dc-tpl="319" style="font-weight: 600;">main</span><span data-dc-tpl="320" style="margin-left: auto; display: flex; gap: 3px;"><span data-dc-tpl="321" class="ab up">↑2</span><span data-dc-tpl="322" class="ab dn">↓1</span></span></div>
+        </div>
+        <div data-dc-tpl="323" role="tooltip" style="margin-top: -8px; margin-left: 24px; width: 280px; background: var(--rs); border: 1px solid var(--bd); border-radius: 8px; box-shadow: rgba(0, 0, 0, 0.55) 0px 14px 36px; overflow: hidden;">
+          <div data-dc-tpl="324" style="padding: 10px 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--bd);">
+            <svg data-dc-tpl="325" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--ac);"><circle data-dc-tpl="326" cx="5" cy="3.5" r="1.4"></circle><circle data-dc-tpl="327" cx="5" cy="12.5" r="1.4"></circle><circle data-dc-tpl="328" cx="11" cy="5" r="1.4"></circle><path data-dc-tpl="329" d="M5 5v6M11 6.4c0 2.6-6 2.2-6 4.7"></path></svg>
+            <span data-dc-tpl="330" class="mono" style="font-weight: 500;">main</span><span data-dc-tpl="331" class="cap">текущая</span>
+          </div>
+          <div data-dc-tpl="332" style="padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; font-size: 12.5px;">
+            <div data-dc-tpl="333" style="display: flex; gap: 8px;"><span data-dc-tpl="334" style="width: 76px; color: var(--mu); flex: 0 0 auto;">Upstream</span><span data-dc-tpl="335" class="chip rem"><span data-dc-tpl="336" class="pre">origin/</span>main</span></div>
+            <div data-dc-tpl="337" style="display: flex; gap: 8px; align-items: center;"><span data-dc-tpl="338" style="width: 76px; color: var(--mu); flex: 0 0 auto;">Статус</span><span data-dc-tpl="339" class="ab up">↑2</span><span data-dc-tpl="340" style="color: var(--t2);">к push</span><span data-dc-tpl="341" class="ab dn">↓1</span><span data-dc-tpl="342" style="color: var(--t2);">входящий</span></div>
+            <div data-dc-tpl="343" style="display: flex; gap: 8px; align-items: center;"><span data-dc-tpl="344" style="width: 76px; color: var(--mu); flex: 0 0 auto;">Автор</span><span data-dc-tpl="345" style="width: 18px; height: 18px; border-radius: 50%; background: rgba(91, 155, 255, 0.2); color: rgb(156, 195, 255); font-size: 10.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;">A</span><span data-dc-tpl="346">avv</span><span data-dc-tpl="347" class="cap">· 2 мин назад</span></div>
+            <div data-dc-tpl="348" style="display: flex; gap: 8px;"><span data-dc-tpl="349" style="width: 76px; color: var(--mu); flex: 0 0 auto;">Последний</span><span data-dc-tpl="350" style="min-width: 0px;"><span data-dc-tpl="351" class="mono" style="font-size: 11.5px; color: rgb(156, 195, 255);">9f41c2a</span> <span data-dc-tpl="352" style="color: var(--t2);">refactor(ui): единые токены темы</span></span></div>
+          </div>
+          <div data-dc-tpl="353" style="padding: 7px 12px; background: var(--pn); border-top: 1px solid var(--bd); font-size: 11.5px; color: var(--mu); display: flex; gap: 6px; align-items: center;"><span data-dc-tpl="354" class="kbd">Ctrl+M</span>merge<span data-dc-tpl="355" class="kbd" style="margin-left: 6px;">Ctrl+D</span>rebase</div>
+        </div>
+        <div data-dc-tpl="356" class="cap" style="margin-top: 10px;">Кнопка тулбара — название и горячая клавиша</div>
+        <div data-dc-tpl="357" style="display: flex; gap: 4px; padding: 8px; background: var(--pn); border: 1px solid var(--bd); border-radius: 6px; width: max-content;">
+          <button data-dc-tpl="358" class="btn">Fetch</button><button data-dc-tpl="359" class="btn">Pull</button><button data-dc-tpl="360" class="btn">Push</button><button data-dc-tpl="361" class="btn p" style="box-shadow: rgba(91, 155, 255, 0.35) 0px 0px 0px 2px;">Коммит</button>
+        </div>
+        <div data-dc-tpl="362" style="position: relative; margin-left: 178px; margin-top: -6px;">
+          <span data-dc-tpl="363" style="position: absolute; top: -4px; left: 22px; width: 8px; height: 8px; background: rgb(44, 50, 61); transform: rotate(45deg);"></span>
+          <div data-dc-tpl="364" role="tooltip" style="position: relative; display: inline-flex; align-items: center; gap: 8px; padding: 6px 8px 6px 10px; background: rgb(44, 50, 61); border-radius: 5px; box-shadow: rgba(0, 0, 0, 0.45) 0px 8px 20px; font-size: 12px; white-space: nowrap;">Открыть диалог коммита<span data-dc-tpl="365" class="kbd" style="background: rgb(32, 36, 44);">Ctrl+K</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  
+  <div data-dc-tpl="366" style="display: flex; flex-wrap: wrap; gap: 24px;">
+    <div data-dc-tpl="367" style="flex: 1 1 944px; min-width: 0px;">
+      <div data-dc-tpl="368" class="lbl"><b data-dc-tpl="369">08</b>Контекстные меню</div>
+      <div data-dc-tpl="370" class="stg" style="padding: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); gap: 16px; align-items: start;">
+        <div data-dc-tpl="371"><div data-dc-tpl="372" class="cap" style="margin-bottom: 6px;">Коммит (merge, уже в origin)</div>
+          <div data-dc-tpl="373" class="menu"><div data-dc-tpl="374" class="mt">4b7a1d9 · Merge branch 'feature/command-palette'</div>
+            <div data-dc-tpl="376"><div data-dc-tpl="377" class="msep" style="display: none;"></div><div data-dc-tpl="378" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Checkout (detached HEAD)</span><span data-dc-tpl="379" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="376"><div data-dc-tpl="377" class="msep" style="display: none;"></div><div data-dc-tpl="378" class="mi" style="color: rgb(228, 231, 236); background: rgb(35, 50, 80);"><span class="sc-interp">Создать ветку отсюда…</span><span data-dc-tpl="379" class="s"><span class="sc-interp">F7</span></span></div></div><div data-dc-tpl="376"><div data-dc-tpl="377" class="msep" style="display: none;"></div><div data-dc-tpl="378" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Создать тег…</span><span data-dc-tpl="379" class="s"><span class="sc-interp">Shift+F7</span></span></div></div><div data-dc-tpl="376"><div data-dc-tpl="377" class="msep" style="display: block;"></div><div data-dc-tpl="378" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Сравнить с рабочей копией</span><span data-dc-tpl="379" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="376"><div data-dc-tpl="377" class="msep" style="display: none;"></div><div data-dc-tpl="378" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Interactive rebase отсюда…</span><span data-dc-tpl="379" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="376"><div data-dc-tpl="377" class="msep" style="display: block;"></div><div data-dc-tpl="378" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Cherry-pick в main</span><span data-dc-tpl="379" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="376"><div data-dc-tpl="377" class="msep" style="display: none;"></div><div data-dc-tpl="378" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Revert…</span><span data-dc-tpl="379" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="376"><div data-dc-tpl="377" class="msep" style="display: none;"></div><div data-dc-tpl="378" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Reset main сюда</span><span data-dc-tpl="379" class="s"><span class="sc-interp">▸</span></span></div></div><div data-dc-tpl="376"><div data-dc-tpl="377" class="msep" style="display: none;"></div><div data-dc-tpl="378" class="mi" style="color: rgb(125, 133, 148); background: transparent;"><span class="sc-interp">Reword…</span><span data-dc-tpl="379" class="s"><span class="sc-interp">уже в origin</span></span></div></div><div data-dc-tpl="376"><div data-dc-tpl="377" class="msep" style="display: block;"></div><div data-dc-tpl="378" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Копировать SHA</span><span data-dc-tpl="379" class="s"><span class="sc-interp">Ctrl+Shift+C</span></span></div></div><div data-dc-tpl="376"><div data-dc-tpl="377" class="msep" style="display: none;"></div><div data-dc-tpl="378" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Копировать сообщение</span><span data-dc-tpl="379" class="s"><span class="sc-interp"></span></span></div></div>
+          </div></div>
+        <div data-dc-tpl="380"><div data-dc-tpl="381" class="cap" style="margin-bottom: 6px;">Файл (частично в индексе)</div>
+          <div data-dc-tpl="382" class="menu"><div data-dc-tpl="383" class="mt">src/components/FileList.vue</div>
+            <div data-dc-tpl="385"><div data-dc-tpl="386" class="msep" style="display: none;"></div><div data-dc-tpl="387" class="mi" style="color: rgb(228, 231, 236); background: rgb(35, 50, 80);"><span class="sc-interp">Stage</span><span data-dc-tpl="388" class="s"><span class="sc-interp">Ctrl+T</span></span></div></div><div data-dc-tpl="385"><div data-dc-tpl="386" class="msep" style="display: none;"></div><div data-dc-tpl="387" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Unstage</span><span data-dc-tpl="388" class="s"><span class="sc-interp">Shift+Ctrl+T</span></span></div></div><div data-dc-tpl="385"><div data-dc-tpl="386" class="msep" style="display: none;"></div><div data-dc-tpl="387" class="mi" style="color: rgb(245, 140, 148); background: transparent;"><span class="sc-interp">Discard изменения…</span><span data-dc-tpl="388" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="385"><div data-dc-tpl="386" class="msep" style="display: block;"></div><div data-dc-tpl="387" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">История файла</span><span data-dc-tpl="388" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="385"><div data-dc-tpl="386" class="msep" style="display: none;"></div><div data-dc-tpl="387" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Blame</span><span data-dc-tpl="388" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="385"><div data-dc-tpl="386" class="msep" style="display: none;"></div><div data-dc-tpl="387" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Сравнить с ревизией…</span><span data-dc-tpl="388" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="385"><div data-dc-tpl="386" class="msep" style="display: block;"></div><div data-dc-tpl="387" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Открыть в редакторе</span><span data-dc-tpl="388" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="385"><div data-dc-tpl="386" class="msep" style="display: none;"></div><div data-dc-tpl="387" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Показать в папке</span><span data-dc-tpl="388" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="385"><div data-dc-tpl="386" class="msep" style="display: none;"></div><div data-dc-tpl="387" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Копировать путь</span><span data-dc-tpl="388" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="385"><div data-dc-tpl="386" class="msep" style="display: block;"></div><div data-dc-tpl="387" class="mi" style="color: rgb(245, 140, 148); background: transparent;"><span class="sc-interp">Удалить (git rm)…</span><span data-dc-tpl="388" class="s"><span class="sc-interp"></span></span></div></div>
+          </div></div>
+        <div data-dc-tpl="389"><div data-dc-tpl="390" class="cap" style="margin-bottom: 6px;">Локальная ветка</div>
+          <div data-dc-tpl="391" class="menu"><div data-dc-tpl="392" class="mt">feature/command-palette</div>
+            <div data-dc-tpl="394"><div data-dc-tpl="395" class="msep" style="display: none;"></div><div data-dc-tpl="396" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Checkout</span><span data-dc-tpl="397" class="s"><span class="sc-interp">Enter</span></span></div></div><div data-dc-tpl="394"><div data-dc-tpl="395" class="msep" style="display: none;"></div><div data-dc-tpl="396" class="mi" style="color: rgb(228, 231, 236); background: rgb(35, 50, 80);"><span class="sc-interp">Merge в main…</span><span data-dc-tpl="397" class="s"><span class="sc-interp">Ctrl+M</span></span></div></div><div data-dc-tpl="394"><div data-dc-tpl="395" class="msep" style="display: none;"></div><div data-dc-tpl="396" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Rebase main на эту ветку…</span><span data-dc-tpl="397" class="s"><span class="sc-interp">Ctrl+D</span></span></div></div><div data-dc-tpl="394"><div data-dc-tpl="395" class="msep" style="display: none;"></div><div data-dc-tpl="396" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Merge preview…</span><span data-dc-tpl="397" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="394"><div data-dc-tpl="395" class="msep" style="display: block;"></div><div data-dc-tpl="396" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Push в origin</span><span data-dc-tpl="397" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="394"><div data-dc-tpl="395" class="msep" style="display: none;"></div><div data-dc-tpl="396" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Set upstream…</span><span data-dc-tpl="397" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="394"><div data-dc-tpl="395" class="msep" style="display: none;"></div><div data-dc-tpl="396" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Создать worktree…</span><span data-dc-tpl="397" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="394"><div data-dc-tpl="395" class="msep" style="display: block;"></div><div data-dc-tpl="396" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Переименовать…</span><span data-dc-tpl="397" class="s"><span class="sc-interp">F2</span></span></div></div><div data-dc-tpl="394"><div data-dc-tpl="395" class="msep" style="display: none;"></div><div data-dc-tpl="396" class="mi" style="color: rgb(245, 140, 148); background: transparent;"><span class="sc-interp">Удалить…</span><span data-dc-tpl="397" class="s"><span class="sc-interp">Del</span></span></div></div>
+          </div></div>
+        <div data-dc-tpl="398"><div data-dc-tpl="399" class="cap" style="margin-bottom: 6px;">Тег</div>
+          <div data-dc-tpl="400" class="menu"><div data-dc-tpl="401" class="mt">v1.1.33 → bd94802</div>
+            <div data-dc-tpl="403"><div data-dc-tpl="404" class="msep" style="display: none;"></div><div data-dc-tpl="405" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Checkout (detached HEAD)</span><span data-dc-tpl="406" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="403"><div data-dc-tpl="404" class="msep" style="display: none;"></div><div data-dc-tpl="405" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Создать ветку от тега…</span><span data-dc-tpl="406" class="s"><span class="sc-interp">F7</span></span></div></div><div data-dc-tpl="403"><div data-dc-tpl="404" class="msep" style="display: block;"></div><div data-dc-tpl="405" class="mi" style="color: rgb(228, 231, 236); background: rgb(35, 50, 80);"><span class="sc-interp">Push тег в origin</span><span data-dc-tpl="406" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="403"><div data-dc-tpl="404" class="msep" style="display: none;"></div><div data-dc-tpl="405" class="mi" style="color: rgb(228, 231, 236); background: transparent;"><span class="sc-interp">Копировать имя</span><span data-dc-tpl="406" class="s"><span class="sc-interp"></span></span></div></div><div data-dc-tpl="403"><div data-dc-tpl="404" class="msep" style="display: block;"></div><div data-dc-tpl="405" class="mi" style="color: rgb(245, 140, 148); background: transparent;"><span class="sc-interp">Удалить локально…</span><span data-dc-tpl="406" class="s"><span class="sc-interp">Del</span></span></div></div><div data-dc-tpl="403"><div data-dc-tpl="404" class="msep" style="display: none;"></div><div data-dc-tpl="405" class="mi" style="color: rgb(245, 140, 148); background: transparent;"><span class="sc-interp">Удалить и на remote…</span><span data-dc-tpl="406" class="s"><span class="sc-interp"></span></span></div></div>
+          </div></div>
+      </div>
+    </div>
+
+    <div data-dc-tpl="407" style="flex: 1 1 408px; min-width: 0px;">
+      <div data-dc-tpl="408" class="lbl"><b data-dc-tpl="409">03</b>Загрузка</div>
+      <div data-dc-tpl="410" class="stg" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+        <div data-dc-tpl="411" class="cap">Скелет графа</div>
+        <div data-dc-tpl="412" class="pnl">
+          <div data-dc-tpl="413" class="ph"><span data-dc-tpl="414" class="pt">Журнал</span><span data-dc-tpl="415" class="cap" style="margin-left: auto; padding-right: 4px;">загрузка истории…</span></div>
+          <div data-dc-tpl="416" style="position: relative; padding: 4px 0px;">
+            <svg data-dc-tpl="417" width="40" height="182" viewBox="0 0 40 182" fill="none" aria-hidden="true" style="position: absolute; left: 0px; top: 4px;"><path data-dc-tpl="418" d="M14 13V182" stroke="#2B313B" stroke-width="2"></path><path data-dc-tpl="419" d="M14 65C14 76 28 70 28 82V118C28 130 14 124 14 135" stroke="#2B313B" stroke-width="2"></path></svg>
+            
+              <div data-dc-tpl="421" style="height: 26px; display: flex; align-items: center; gap: 10px; padding-right: 10px; position: relative;">
+                <span data-dc-tpl="422" style="width: 40px; flex: 0 0 auto; position: relative; height: 26px;"><span data-dc-tpl="423" style="position: absolute; top: 8px; left: 9px; width: 10px; height: 10px; border-radius: 50%; background: rgb(43, 49, 59);"></span></span>
+                <span data-dc-tpl="424" class="sk" style="height: 9px; width: 220px;"></span>
+                <span data-dc-tpl="425" class="sk" style="height: 9px; width: 60px; margin-left: auto;"></span>
+                <span data-dc-tpl="426" class="sk" style="height: 9px; width: 54px;"></span>
+              </div>
+            
+              <div data-dc-tpl="421" style="height: 26px; display: flex; align-items: center; gap: 10px; padding-right: 10px; position: relative;">
+                <span data-dc-tpl="422" style="width: 40px; flex: 0 0 auto; position: relative; height: 26px;"><span data-dc-tpl="423" style="position: absolute; top: 8px; left: 9px; width: 10px; height: 10px; border-radius: 50%; background: rgb(43, 49, 59);"></span></span>
+                <span data-dc-tpl="424" class="sk" style="height: 9px; width: 160px;"></span>
+                <span data-dc-tpl="425" class="sk" style="height: 9px; width: 52px; margin-left: auto;"></span>
+                <span data-dc-tpl="426" class="sk" style="height: 9px; width: 54px;"></span>
+              </div>
+            
+              <div data-dc-tpl="421" style="height: 26px; display: flex; align-items: center; gap: 10px; padding-right: 10px; position: relative;">
+                <span data-dc-tpl="422" style="width: 40px; flex: 0 0 auto; position: relative; height: 26px;"><span data-dc-tpl="423" style="position: absolute; top: 8px; left: 9px; width: 10px; height: 10px; border-radius: 50%; background: rgb(43, 49, 59);"></span></span>
+                <span data-dc-tpl="424" class="sk" style="height: 9px; width: 250px;"></span>
+                <span data-dc-tpl="425" class="sk" style="height: 9px; width: 60px; margin-left: auto;"></span>
+                <span data-dc-tpl="426" class="sk" style="height: 9px; width: 54px;"></span>
+              </div>
+            
+              <div data-dc-tpl="421" style="height: 26px; display: flex; align-items: center; gap: 10px; padding-right: 10px; position: relative;">
+                <span data-dc-tpl="422" style="width: 40px; flex: 0 0 auto; position: relative; height: 26px;"><span data-dc-tpl="423" style="position: absolute; top: 8px; left: 25px; width: 10px; height: 10px; border-radius: 50%; background: rgb(43, 49, 59);"></span></span>
+                <span data-dc-tpl="424" class="sk" style="height: 9px; width: 140px;"></span>
+                <span data-dc-tpl="425" class="sk" style="height: 9px; width: 70px; margin-left: auto;"></span>
+                <span data-dc-tpl="426" class="sk" style="height: 9px; width: 54px;"></span>
+              </div>
+            
+              <div data-dc-tpl="421" style="height: 26px; display: flex; align-items: center; gap: 10px; padding-right: 10px; position: relative;">
+                <span data-dc-tpl="422" style="width: 40px; flex: 0 0 auto; position: relative; height: 26px;"><span data-dc-tpl="423" style="position: absolute; top: 8px; left: 25px; width: 10px; height: 10px; border-radius: 50%; background: rgb(43, 49, 59);"></span></span>
+                <span data-dc-tpl="424" class="sk" style="height: 9px; width: 200px;"></span>
+                <span data-dc-tpl="425" class="sk" style="height: 9px; width: 56px; margin-left: auto;"></span>
+                <span data-dc-tpl="426" class="sk" style="height: 9px; width: 54px;"></span>
+              </div>
+            
+              <div data-dc-tpl="421" style="height: 26px; display: flex; align-items: center; gap: 10px; padding-right: 10px; position: relative;">
+                <span data-dc-tpl="422" style="width: 40px; flex: 0 0 auto; position: relative; height: 26px;"><span data-dc-tpl="423" style="position: absolute; top: 8px; left: 9px; width: 10px; height: 10px; border-radius: 50%; background: rgb(43, 49, 59);"></span></span>
+                <span data-dc-tpl="424" class="sk" style="height: 9px; width: 180px;"></span>
+                <span data-dc-tpl="425" class="sk" style="height: 9px; width: 60px; margin-left: auto;"></span>
+                <span data-dc-tpl="426" class="sk" style="height: 9px; width: 54px;"></span>
+              </div>
+            
+              <div data-dc-tpl="421" style="height: 26px; display: flex; align-items: center; gap: 10px; padding-right: 10px; position: relative;">
+                <span data-dc-tpl="422" style="width: 40px; flex: 0 0 auto; position: relative; height: 26px;"><span data-dc-tpl="423" style="position: absolute; top: 8px; left: 9px; width: 10px; height: 10px; border-radius: 50%; background: rgb(43, 49, 59);"></span></span>
+                <span data-dc-tpl="424" class="sk" style="height: 9px; width: 120px;"></span>
+                <span data-dc-tpl="425" class="sk" style="height: 9px; width: 48px; margin-left: auto;"></span>
+                <span data-dc-tpl="426" class="sk" style="height: 9px; width: 54px;"></span>
+              </div>
+            
+          </div>
+        </div>
+        <div data-dc-tpl="427" class="cap" style="margin-top: 4px;">История файла — первая загрузка</div>
+        <div data-dc-tpl="428" class="pnl" style="display: flex; align-items: center; gap: 12px; padding: 12px;">
+          <span data-dc-tpl="429" class="net" style="width: 22px; height: 22px;"><span data-dc-tpl="430" class="r" style="border-width: 2px;"></span></span>
+          <div data-dc-tpl="431" style="flex: 1 1 0%; min-width: 0px;"><div data-dc-tpl="432" style="font-weight: 500;">Загрузка истории <span data-dc-tpl="433" class="mono" style="font-size: 12px;">FileList.vue</span>…</div><div data-dc-tpl="434" class="cap mono" style="font-size: 11px; margin-top: 2px;">git log --follow · 128 коммитов</div></div>
+          <button data-dc-tpl="435" class="btn sm">Отмена</button>
+        </div>
+        <div data-dc-tpl="436" class="cap" style="margin-top: 4px;">Встроенные индикаторы</div>
+        <div data-dc-tpl="437" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <button data-dc-tpl="438" class="btn" disabled="" style="opacity: 0.7;"><span data-dc-tpl="439" class="net" style="width: 12px; height: 12px;"><span data-dc-tpl="440" class="r"></span></span>Fetch…</button>
+          <span data-dc-tpl="441" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--t2);">Удалённые<span data-dc-tpl="442" class="net" style="width: 12px; height: 12px;"><span data-dc-tpl="443" class="r"></span></span></span>
+          <span data-dc-tpl="444" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--t2);"><span data-dc-tpl="445" class="net" style="width: 12px; height: 12px;"><span data-dc-tpl="446" class="r"></span></span>Подсчёт статистики…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  
+  <div data-dc-tpl="447">
+    <div data-dc-tpl="448" class="lbl"><b data-dc-tpl="449">05</b>Панель конфликтов — merge в процессе</div>
+    <div data-dc-tpl="450" style="overflow-x: auto;">
+    <div data-dc-tpl="451" class="stg" style="min-width: 1100px; padding: 12px;">
+      <div data-dc-tpl="452" style="display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 12px; background: rgba(232, 184, 90, 0.08); border: 1px solid rgba(232, 184, 90, 0.38); border-radius: 6px;">
+        <span data-dc-tpl="453" class="ic" style="background: rgba(232, 184, 90, 0.18); color: var(--am);"><svg data-dc-tpl="454" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="455" d="M8 4v5M8 11.6h.01" stroke-width="2"></path></svg></span>
+        <span data-dc-tpl="456" style="font-weight: 600;">Merge <span data-dc-tpl="457" class="mono" style="font-weight: 500;">feature/command-palette</span> → <span data-dc-tpl="458" class="mono" style="font-weight: 500;">main</span></span>
+        <span data-dc-tpl="459" style="color: var(--t2);">— конфликтов: <b data-dc-tpl="460" style="color: rgb(237, 201, 127);">2</b> из 9 файлов</span>
+        <span data-dc-tpl="461" style="display: inline-flex; align-items: center; gap: 5px; padding: 0px 6px; height: 20px; border-radius: 4px; background: var(--rs);"><span data-dc-tpl="462" class="bdg bC">C</span><span data-dc-tpl="463" class="mono" style="font-size: 11.5px;">AppToolbar.vue</span></span>
+        <span data-dc-tpl="464" style="display: inline-flex; align-items: center; gap: 5px; padding: 0px 6px; height: 20px; border-radius: 4px; background: var(--rs);"><span data-dc-tpl="465" class="bdg bC">C</span><span data-dc-tpl="466" class="mono" style="font-size: 11.5px;">main.css</span></span>
+        <span data-dc-tpl="467" style="flex: 1 1 0%;"></span>
+        <button data-dc-tpl="468" class="btn sm">Принять ours</button>
+        <button data-dc-tpl="469" class="btn sm">Принять theirs</button>
+        <button data-dc-tpl="470" class="btn p sm">Открыть resolver</button>
+        <span data-dc-tpl="471" class="sep"></span>
+        <button data-dc-tpl="472" class="btn g sm" style="color: rgb(245, 140, 148);">Abort</button>
+        <button data-dc-tpl="473" class="btn sm" disabled="" title="Сначала разрешите все конфликты">Continue</button>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <div data-dc-tpl="474">
+    <div data-dc-tpl="475" class="lbl"><b data-dc-tpl="476">06</b>Sync Assistant — push отклонён</div>
+    <div data-dc-tpl="477" style="overflow-x: auto;">
+    <div data-dc-tpl="478" class="stg" style="min-width: 1100px; padding: 12px;">
+      <div data-dc-tpl="479" style="background: var(--pn); border-top-color: ; border-top-style: ; border-top-width: ; border-right-color: ; border-right-style: ; border-right-width: ; border-bottom-color: ; border-bottom-style: ; border-bottom-width: ; border-image-source: ; border-image-slice: ; border-image-width: ; border-image-outset: ; border-image-repeat: ; border-left: 3px solid var(--rd); border-radius: 6px; padding: 12px 12px 12px 14px;">
+        <div data-dc-tpl="480" style="display: flex; align-items: center; gap: 10px;">
+          <span data-dc-tpl="481" class="ic" style="background: rgba(242, 112, 122, 0.16); color: var(--rd);"><svg data-dc-tpl="482" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="483" d="M8 11V4M5 7l3-3 3 3" stroke-width="1.8"></path></svg></span>
+          <span data-dc-tpl="484" style="font-weight: 600;">Push отклонён — origin/main ушла вперёд на 1 коммит</span>
+          <span data-dc-tpl="485" style="color: var(--t2);">Ваши 2 коммита основаны на <span data-dc-tpl="486" class="mono" style="font-size: 12px;">bd94802</span>, а на remote уже есть <span data-dc-tpl="487" class="mono" style="font-size: 12px;">c08a5f3</span>.</span>
+          <span data-dc-tpl="488" style="flex: 1 1 0%;"></span>
+          <button data-dc-tpl="489" class="btn g sm">Git output</button>
+          <button data-dc-tpl="490" class="btn g ib sm" aria-label="Закрыть"><svg data-dc-tpl="491" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 11px; height: 11px;"><path data-dc-tpl="492" d="M4 4l8 8M12 4l-8 8"></path></svg></button>
+        </div>
+        <div data-dc-tpl="493" style="display: flex; gap: 12px; margin-top: 12px;">
+          <div data-dc-tpl="494" class="rc" style="border-color: rgba(91, 155, 255, 0.6); background: rgba(91, 155, 255, 0.07); box-shadow: rgba(91, 155, 255, 0.25) 0px 0px 0px 1px inset;">
+            <div data-dc-tpl="495" style="display: flex; align-items: center; gap: 8px;"><span data-dc-tpl="496" style="font: 600 10px / 1 &quot;IBM Plex Sans&quot;, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(255, 255, 255); background: var(--as); padding: 3px 6px; border-radius: 3px;">Рекомендуется</span><span data-dc-tpl="497" style="font-weight: 600;">Pull --rebase, затем Push</span></div>
+            <div data-dc-tpl="498" style="font-size: 12.5px; color: var(--t2); line-height: 1.45;">2 ваших коммита встанут поверх c08a5f3 — история останется линейной, remote не перезаписывается.</div>
+            <div data-dc-tpl="499" style="display: flex; align-items: center; gap: 8px; margin-top: auto;"><span data-dc-tpl="500" class="mono trunc" style="font-size: 11.5px; color: var(--mu);">git pull --rebase origin main · git push</span><button data-dc-tpl="501" class="btn p sm" style="margin-left: auto;">Выполнить</button></div>
+          </div>
+          <div data-dc-tpl="502" class="rc">
+            <div data-dc-tpl="503" style="font-weight: 600;">Merge origin/main, затем Push</div>
+            <div data-dc-tpl="504" style="font-size: 12.5px; color: var(--t2); line-height: 1.45;">Создаст merge-коммит; ваши коммиты останутся без изменений.</div>
+            <div data-dc-tpl="505" style="display: flex; align-items: center; gap: 8px; margin-top: auto;"><span data-dc-tpl="506" class="mono trunc" style="font-size: 11.5px; color: var(--mu);">git merge origin/main · git push</span><button data-dc-tpl="507" class="btn sm" style="margin-left: auto;">Выполнить</button></div>
+          </div>
+          <div data-dc-tpl="508" class="rc" style="border-color: rgba(242, 112, 122, 0.35);">
+            <div data-dc-tpl="509" style="display: flex; align-items: center; gap: 8px;"><svg data-dc-tpl="510" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--rd);"><path data-dc-tpl="511" d="M8 2.5l6 10.5H2z"></path><path data-dc-tpl="512" d="M8 7v2.6M8 11.3h.01"></path></svg><span data-dc-tpl="513" style="font-weight: 600;">Перезаписать remote (force-with-lease)</span></div>
+            <div data-dc-tpl="514" style="font-size: 12.5px; color: var(--t2); line-height: 1.45;">Удалит c08a5f3 из origin/main. Перед push создаётся резервная ссылка <span data-dc-tpl="515" class="mono" style="font-size: 11.5px; color: var(--tx);">refs/gitstream/backup/main</span> — откат в один клик.</div>
+            <div data-dc-tpl="516" style="display: flex; align-items: center; gap: 8px; margin-top: auto;"><span data-dc-tpl="517" class="mono trunc" style="font-size: 11.5px; color: var(--mu);">git push --force-with-lease</span><button data-dc-tpl="518" class="btn do sm" style="margin-left: auto;">Перезаписать…</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <div data-dc-tpl="519">
+    <div data-dc-tpl="520" class="lbl"><b data-dc-tpl="521">07</b>Баннер обновления</div>
+    <div data-dc-tpl="522" style="overflow-x: auto;">
+    <div data-dc-tpl="523" class="stg" style="min-width: 1100px; padding: 12px;">
+      <div data-dc-tpl="524" style="display: flex; align-items: center; gap: 14px; padding: 10px 10px 10px 14px; background: rgba(91, 155, 255, 0.08); border: 1px solid rgba(91, 155, 255, 0.38); border-radius: 6px;">
+        <span data-dc-tpl="525" class="ic" style="width: 30px; height: 30px; border-radius: 6px; background: var(--as); color: rgb(255, 255, 255);"><svg data-dc-tpl="526" class="i" viewBox="0 0 16 16" aria-hidden="true"><path data-dc-tpl="527" d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"></path></svg></span>
+        <div data-dc-tpl="528" style="flex: 0 0 auto;"><div data-dc-tpl="529" style="font-weight: 600;">Доступна версия 1.2.0</div><div data-dc-tpl="530" class="cap">у вас 1.1.33 · 4,8 МБ</div></div>
+        <span data-dc-tpl="531" class="sep" style="height: 30px;"></span>
+        <div data-dc-tpl="532" style="flex: 1 1 0%; min-width: 0px; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--t2);">
+          <span data-dc-tpl="533">• Встроенная форма коммита</span><span data-dc-tpl="534">• Палитра команд <span data-dc-tpl="535" class="kbd">Ctrl+Shift+P</span></span><span data-dc-tpl="536">• Worktrees в панели веток</span><span data-dc-tpl="537">• 3-way resolver конфликтов</span><span data-dc-tpl="538">• Undo для операций</span>
+        </div>
+        <button data-dc-tpl="539" class="btn g sm" style="color: var(--ac);">Что нового</button>
+        <button data-dc-tpl="540" class="btn sm">Позже</button>
+        <button data-dc-tpl="541" class="btn p sm">Скачать и установить</button>
+        <button data-dc-tpl="542" class="btn g ib sm" aria-label="Закрыть"><svg data-dc-tpl="543" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 11px; height: 11px;"><path data-dc-tpl="544" d="M4 4l8 8M12 4l-8 8"></path></svg></button>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  
+  <div data-dc-tpl="545" style="display: flex; flex-wrap: wrap; gap: 24px;">
+    <div data-dc-tpl="546" style="flex: 1 1 680px; min-width: 0px;">
+      <div data-dc-tpl="547" class="lbl"><b data-dc-tpl="548">11</b>Строка состояния</div>
+      <div data-dc-tpl="549" style="overflow-x: auto;">
+      <div data-dc-tpl="550" class="stg" style="min-width: 660px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+        <div data-dc-tpl="551" class="cap">Ожидание</div>
+        <div data-dc-tpl="552" class="sb">
+          <span data-dc-tpl="553" style="color: var(--tx);">gitstream</span><span data-dc-tpl="554" class="mono" style="font-size: 12px;">main</span>
+          <span data-dc-tpl="555" class="mono" style="font-size: 11.5px;"><span data-dc-tpl="556" style="color: rgb(156, 195, 255);">↑2</span> <span data-dc-tpl="557" style="color: rgb(237, 201, 127);">↓1</span></span>
+          <span data-dc-tpl="558">8 изменений · 4 в индексе</span>
+          <span data-dc-tpl="559" style="display: inline-flex; align-items: center; gap: 5px; color: rgb(122, 215, 169);"><svg data-dc-tpl="560" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 12px; height: 12px;"><path data-dc-tpl="561" d="M3 8.5l3 3 7-7"></path></svg>Готово</span>
+          <button data-dc-tpl="562" class="btn g sm" style="margin-left: auto;">Git output<span data-dc-tpl="563" class="kbd" style="height: 15px;">Ctrl+O</span></button>
+        </div>
+        <div data-dc-tpl="564" class="cap" style="margin-top: 6px;">Операция в процессе — с обратным отсчётом таймаута</div>
+        <div data-dc-tpl="565" class="sb">
+          <span data-dc-tpl="566" style="color: var(--tx);">gitstream</span><span data-dc-tpl="567" class="mono" style="font-size: 12px;">main</span>
+          <span data-dc-tpl="568" style="display: inline-flex; align-items: center; gap: 6px; color: var(--tx);"><span data-dc-tpl="569" class="net" style="width: 13px; height: 13px;"><span data-dc-tpl="570" class="r"></span></span>Push → origin/main</span>
+          <span data-dc-tpl="571" style="width: 120px; height: 4px; border-radius: 2px; background: var(--hv); display: inline-block;"><span data-dc-tpl="572" style="display: block; width: 38%; height: 100%; border-radius: 2px; background: var(--ac);"></span></span>
+          <span data-dc-tpl="573" class="mono" style="font-size: 11.5px; color: var(--mu);">таймаут через 24 с</span>
+          <button data-dc-tpl="574" class="btn g sm" style="margin-left: auto;">Отмена</button>
+          <button data-dc-tpl="575" class="btn g sm">Git output<span data-dc-tpl="576" class="kbd" style="height: 15px;">Ctrl+O</span></button>
+        </div>
+        <div data-dc-tpl="577" class="cap" style="margin-top: 6px;">Ошибка</div>
+        <div data-dc-tpl="578" class="sb" style="padding-left: 0px; border-color: rgba(242, 112, 122, 0.4);">
+          <span data-dc-tpl="579" style="display: inline-flex; align-items: center; gap: 6px; height: 100%; padding: 0px 10px; background: rgba(242, 112, 122, 0.14); color: rgb(245, 140, 148); font-weight: 500;"><svg data-dc-tpl="580" class="i" viewBox="0 0 16 16" aria-hidden="true" style="width: 12px; height: 12px;"><circle data-dc-tpl="581" cx="8" cy="8" r="5.5"></circle><path data-dc-tpl="582" d="M8 5.5v3M8 10.6h.01"></path></svg>Push отклонён: non-fast-forward</span>
+          <button data-dc-tpl="583" class="btn g sm" style="color: var(--ac); padding: 0px 4px;">Открыть помощника</button>
+          <span data-dc-tpl="584" class="mono" style="font-size: 12px;">main</span>
+          <span data-dc-tpl="585" class="mono" style="font-size: 11.5px;"><span data-dc-tpl="586" style="color: rgb(156, 195, 255);">↑2</span> <span data-dc-tpl="587" style="color: rgb(237, 201, 127);">↓1</span></span>
+          <button data-dc-tpl="588" class="btn g sm" style="margin-left: auto;">Git output<span data-dc-tpl="589" style="display: inline-flex; align-items: center; justify-content: center; min-width: 15px; height: 15px; border-radius: 8px; background: rgb(194, 63, 75); color: rgb(255, 255, 255); font: 500 10px &quot;JetBrains Mono&quot;, monospace;">1</span></button>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <div data-dc-tpl="590" style="flex: 1 1 672px; min-width: 0px;">
+      <div data-dc-tpl="591" class="lbl"><b data-dc-tpl="592">12</b>Сетевая операция на узле репозитория</div>
+      <div data-dc-tpl="593" class="stg" style="padding: 14px; display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;">
+        <div data-dc-tpl="594" class="pnl" style="width: 290px; flex: 0 0 auto; padding: 2px 0px;">
+          
+            <div data-dc-tpl="596" class="tr" style="padding-left: 12px; background: rgb(35, 50, 80);">
+              <svg data-dc-tpl="597" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--mu);"><path data-dc-tpl="598" d="M3.5 2.5H12v11H4.6a1.1 1.1 0 0 1-1.1-1.1z"></path><path data-dc-tpl="599" d="M3.5 12.4a1.1 1.1 0 0 1 1.1-1.1H12"></path></svg>
+              <span data-dc-tpl="600" class="trunc"><span class="sc-interp">gitstream</span></span><span data-dc-tpl="601" class="mono" style="font-size: 11px; color: var(--mu);"><span class="sc-interp">main</span></span>
+              <span data-dc-tpl="602" style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px;">
+                <span data-dc-tpl="603" style="font-size: 11px; color: rgb(156, 195, 255);"><span class="sc-interp">push</span></span>
+                <span data-dc-tpl="604" class="net" style="display: inline-block;"><span data-dc-tpl="605" class="r" style="border-color: rgb(91, 155, 255) rgba(91, 155, 255, 0.22) rgba(91, 155, 255, 0.22);"></span><svg data-dc-tpl="606" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: rgb(91, 155, 255);"><path data-dc-tpl="607" d="M8 13.5v-11M4 6.5l4-4 4 4" stroke-width="2"></path></svg></span>
+                <span data-dc-tpl="608" style="display: none; width: 16px; height: 16px; border-radius: 50%; align-items: center; justify-content: center; background: transparent; color: rgb(91, 155, 255); font: 700 10px / 1 &quot;JetBrains Mono&quot;, monospace;"><span class="sc-interp"></span></span>
+              </span>
+            </div>
+          
+            <div data-dc-tpl="596" class="tr" style="padding-left: 12px; background: transparent;">
+              <svg data-dc-tpl="597" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--mu);"><path data-dc-tpl="598" d="M3.5 2.5H12v11H4.6a1.1 1.1 0 0 1-1.1-1.1z"></path><path data-dc-tpl="599" d="M3.5 12.4a1.1 1.1 0 0 1 1.1-1.1H12"></path></svg>
+              <span data-dc-tpl="600" class="trunc"><span class="sc-interp">docs-site</span></span><span data-dc-tpl="601" class="mono" style="font-size: 11px; color: var(--mu);"><span class="sc-interp">develop</span></span>
+              <span data-dc-tpl="602" style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px;">
+                <span data-dc-tpl="603" style="font-size: 11px; color: rgb(169, 176, 188);"><span class="sc-interp">pull</span></span>
+                <span data-dc-tpl="604" class="net" style="display: inline-block;"><span data-dc-tpl="605" class="r" style="border-color: rgb(91, 155, 255) rgba(91, 155, 255, 0.22) rgba(91, 155, 255, 0.22);"></span><svg data-dc-tpl="606" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: rgb(91, 155, 255);"><path data-dc-tpl="607" d="M8 2.5v11M4 9.5l4 4 4-4" stroke-width="2"></path></svg></span>
+                <span data-dc-tpl="608" style="display: none; width: 16px; height: 16px; border-radius: 50%; align-items: center; justify-content: center; background: transparent; color: rgb(91, 155, 255); font: 700 10px / 1 &quot;JetBrains Mono&quot;, monospace;"><span class="sc-interp"></span></span>
+              </span>
+            </div>
+          
+            <div data-dc-tpl="596" class="tr" style="padding-left: 12px; background: transparent;">
+              <svg data-dc-tpl="597" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--mu);"><path data-dc-tpl="598" d="M3.5 2.5H12v11H4.6a1.1 1.1 0 0 1-1.1-1.1z"></path><path data-dc-tpl="599" d="M3.5 12.4a1.1 1.1 0 0 1 1.1-1.1H12"></path></svg>
+              <span data-dc-tpl="600" class="trunc"><span class="sc-interp">tauri-plugin-askpass</span></span><span data-dc-tpl="601" class="mono" style="font-size: 11px; color: var(--mu);"><span class="sc-interp">main</span></span>
+              <span data-dc-tpl="602" style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px;">
+                <span data-dc-tpl="603" style="font-size: 11px; color: rgb(169, 176, 188);"><span class="sc-interp">fetch</span></span>
+                <span data-dc-tpl="604" class="net" style="display: inline-block;"><span data-dc-tpl="605" class="r" style="border-color: rgb(79, 193, 201) rgba(79, 193, 201, 0.22) rgba(79, 193, 201, 0.22);"></span><svg data-dc-tpl="606" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: rgb(79, 193, 201);"><path data-dc-tpl="607" d="M8 2.5v11M4 9.5l4 4 4-4" stroke-width="2"></path></svg></span>
+                <span data-dc-tpl="608" style="display: none; width: 16px; height: 16px; border-radius: 50%; align-items: center; justify-content: center; background: transparent; color: rgb(79, 193, 201); font: 700 10px / 1 &quot;JetBrains Mono&quot;, monospace;"><span class="sc-interp"></span></span>
+              </span>
+            </div>
+          
+            <div data-dc-tpl="596" class="tr" style="padding-left: 12px; background: transparent;">
+              <svg data-dc-tpl="597" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--mu);"><path data-dc-tpl="598" d="M3.5 2.5H12v11H4.6a1.1 1.1 0 0 1-1.1-1.1z"></path><path data-dc-tpl="599" d="M3.5 12.4a1.1 1.1 0 0 1 1.1-1.1H12"></path></svg>
+              <span data-dc-tpl="600" class="trunc"><span class="sc-interp">dotfiles</span></span><span data-dc-tpl="601" class="mono" style="font-size: 11px; color: var(--mu);"><span class="sc-interp">master</span></span>
+              <span data-dc-tpl="602" style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px;">
+                <span data-dc-tpl="603" style="font-size: 11px; color: rgb(237, 201, 127);"><span class="sc-interp">ждёт ввода</span></span>
+                <span data-dc-tpl="604" class="net" style="display: none;"><span data-dc-tpl="605" class="r" style="border-color: rgb(232, 184, 90) transparent transparent;"></span><svg data-dc-tpl="606" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: rgb(232, 184, 90);"><path data-dc-tpl="607" d="M8 2.5v11M4 9.5l4 4 4-4" stroke-width="2"></path></svg></span>
+                <span data-dc-tpl="608" style="display: inline-flex; width: 16px; height: 16px; border-radius: 50%; align-items: center; justify-content: center; background: rgba(232, 184, 90, 0.18); color: rgb(232, 184, 90); font: 700 10px / 1 &quot;JetBrains Mono&quot;, monospace;"><span class="sc-interp">…</span></span>
+              </span>
+            </div>
+          
+            <div data-dc-tpl="596" class="tr" style="padding-left: 12px; background: transparent;">
+              <svg data-dc-tpl="597" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--mu);"><path data-dc-tpl="598" d="M3.5 2.5H12v11H4.6a1.1 1.1 0 0 1-1.1-1.1z"></path><path data-dc-tpl="599" d="M3.5 12.4a1.1 1.1 0 0 1 1.1-1.1H12"></path></svg>
+              <span data-dc-tpl="600" class="trunc"><span class="sc-interp">notes</span></span><span data-dc-tpl="601" class="mono" style="font-size: 11px; color: var(--mu);"><span class="sc-interp">main</span></span>
+              <span data-dc-tpl="602" style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px;">
+                <span data-dc-tpl="603" style="font-size: 11px; color: rgb(245, 140, 148);"><span class="sc-interp">fetch: ошибка</span></span>
+                <span data-dc-tpl="604" class="net" style="display: none;"><span data-dc-tpl="605" class="r" style="border-color: rgb(242, 112, 122) transparent transparent;"></span><svg data-dc-tpl="606" class="i" viewBox="0 0 16 16" aria-hidden="true" style="color: rgb(242, 112, 122);"><path data-dc-tpl="607" d="M8 2.5v11M4 9.5l4 4 4-4" stroke-width="2"></path></svg></span>
+                <span data-dc-tpl="608" style="display: inline-flex; width: 16px; height: 16px; border-radius: 50%; align-items: center; justify-content: center; background: rgba(242, 112, 122, 0.18); color: rgb(242, 112, 122); font: 700 10px / 1 &quot;JetBrains Mono&quot;, monospace;"><span class="sc-interp">!</span></span>
+              </span>
+            </div>
+          
+        </div>
+        <div data-dc-tpl="609" style="flex: 1 1 0%; min-width: 240px; display: flex; flex-direction: column; gap: 10px;">
+          <div data-dc-tpl="610" role="tooltip" style="background: var(--rs); border: 1px solid var(--bd); border-radius: 6px; box-shadow: rgba(0, 0, 0, 0.45) 0px 10px 28px; padding: 9px 11px; font-size: 12.5px;">
+            <div data-dc-tpl="611" style="font-weight: 600;">Push → origin</div>
+            <div data-dc-tpl="612" style="color: var(--t2); margin-top: 3px;"><span data-dc-tpl="613" class="mono" style="font-size: 11.5px;">main → origin/main</span> · 2 коммита</div>
+            <div data-dc-tpl="614" style="color: var(--mu); margin-top: 3px;">Таймаут через 24 с · тултип узла gitstream</div>
+          </div>
+          <div data-dc-tpl="615" style="font-size: 12px; color: var(--t2); line-height: 1.6;">
+            <div data-dc-tpl="616"><span data-dc-tpl="617" style="color: var(--ac);">↑</span> push · <span data-dc-tpl="618" style="color: var(--ac);">↓</span> pull / fetch — крутилка справа на узле, операция привязана к repoPath</div>
+            <div data-dc-tpl="619"><span data-dc-tpl="620" style="color: var(--am);">ключ</span> — ждёт ввода credentials, таймаут на паузе</div>
+            <div data-dc-tpl="621"><span data-dc-tpl="622" style="color: var(--rd);">!</span> — последняя операция завершилась ошибкой (подробности в Git output)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  
+  <div data-dc-tpl="623">
+    <div data-dc-tpl="624" class="lbl"><b data-dc-tpl="625">13</b>Контролы, бейджи и токены</div>
+    <div data-dc-tpl="626" class="stg" style="padding: 20px; display: flex; flex-wrap: wrap; gap: 28px 40px;">
+      <div data-dc-tpl="627" class="kg">
+        <div data-dc-tpl="628" class="kh">Кнопки</div>
+        <div data-dc-tpl="629" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+          <button data-dc-tpl="630" class="btn p">Коммит</button><button data-dc-tpl="631" class="btn">Fetch</button><button data-dc-tpl="632" class="btn g">Отмена</button><button data-dc-tpl="633" class="btn d">Удалить ветку</button><button data-dc-tpl="634" class="btn p" disabled="">Push</button>
+        </div>
+        <div data-dc-tpl="635" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+          <button data-dc-tpl="636" class="btn do">Перезаписать…</button>
+          <button data-dc-tpl="637" class="btn sm">Маленькая</button>
+          <button data-dc-tpl="638" class="btn ib" aria-label="Настройки"><svg data-dc-tpl="639" class="i" viewBox="0 0 16 16" aria-hidden="true"><path data-dc-tpl="640" d="M2.5 4.5h6.5M12.5 4.5h1M2.5 11.5h1M7 11.5h6.5"></path><circle data-dc-tpl="641" cx="10.8" cy="4.5" r="1.7"></circle><circle data-dc-tpl="642" cx="5.2" cy="11.5" r="1.7"></circle></svg></button>
+          <button data-dc-tpl="643" class="btn g ib" aria-label="Ещё"><svg data-dc-tpl="644" class="i" viewBox="0 0 16 16" aria-hidden="true"><path data-dc-tpl="645" d="M3.5 8h.01M8 8h.01M12.5 8h.01" stroke-width="2.4"></path></svg></button>
+          <button data-dc-tpl="646" class="btn p">Создать<span data-dc-tpl="647" class="kbd" style="background: rgba(0, 0, 0, 0.18); border-color: rgba(255, 255, 255, 0.25); color: rgb(255, 255, 255);">Enter</span></button>
+        </div>
+        <div data-dc-tpl="648" class="cap">primary · secondary · ghost · danger · disabled · danger-outline</div>
+      </div>
+      <div data-dc-tpl="649" class="kg" style="width: 280px;">
+        <div data-dc-tpl="650" class="kh">Поля ввода</div>
+        <label data-dc-tpl="651" style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--t2);">Имя remote<input data-dc-tpl="652" class="inp" value="origin"></label>
+        <label data-dc-tpl="653" style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--t2);">Фокус<input data-dc-tpl="654" class="inp fo" value="feature/command-pal"></label>
+        <label data-dc-tpl="655" style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--t2);">Ошибка<input data-dc-tpl="656" class="inp er" aria-invalid="true" value="feature/command-palette"><span data-dc-tpl="657" style="color: rgb(245, 140, 148); font-size: 11.5px;">Ветка с таким именем уже существует</span></label>
+      </div>
+      <div data-dc-tpl="658" class="kg">
+        <div data-dc-tpl="659" class="kh">Флажки и переключатели</div>
+        <label data-dc-tpl="660" class="chk"><input data-dc-tpl="661" type="checkbox" class="ck">Fetch --prune</label>
+        <label data-dc-tpl="662" class="chk"><input data-dc-tpl="663" type="checkbox" class="ck" checked="">Include untracked</label>
+        <span data-dc-tpl="664" class="chk"><span data-dc-tpl="665" class="ck" role="checkbox" aria-checked="mixed" style="background: var(--as); border-color: var(--as);"><span data-dc-tpl="666" style="width: 7px; height: 2px; background: rgb(255, 255, 255); border-radius: 1px;"></span></span>Выбрано 3 из 8</span>
+        <label data-dc-tpl="667" class="chk"><input data-dc-tpl="668" type="radio" class="rd" name="rk">Lightweight</label>
+        <label data-dc-tpl="669" class="chk"><input data-dc-tpl="670" type="radio" class="rd" name="rk" checked="">Annotated</label>
+        <label data-dc-tpl="671" class="chk"><input data-dc-tpl="672" type="checkbox" class="sw" checked="">Amend</label>
+      </div>
+      <div data-dc-tpl="673" class="kg">
+        <div data-dc-tpl="674" class="kh">Сегменты и выбор</div>
+        <div data-dc-tpl="675" class="seg"><button data-dc-tpl="676" class="on">Merge</button><button data-dc-tpl="677">Rebase</button></div>
+        <div data-dc-tpl="678" class="seg"><button data-dc-tpl="679">Unified</button><button data-dc-tpl="680" class="on">Side-by-side</button></div>
+        <div data-dc-tpl="681" style="position: relative; width: 180px;">
+          <select data-dc-tpl="682" class="inp" aria-label="Remote" style="width: 100%; appearance: none; padding-right: 26px;"><option data-dc-tpl="683">origin</option><option data-dc-tpl="684">upstream</option></select>
+          <svg data-dc-tpl="685" class="i" viewBox="0 0 16 16" aria-hidden="true" style="position: absolute; right: 8px; top: 6px; width: 12px; height: 12px; color: var(--t2); pointer-events: none;"><path data-dc-tpl="686" d="M4 6l4 4 4-4"></path></svg>
+        </div>
+      </div>
+      <div data-dc-tpl="687" class="kg">
+        <div data-dc-tpl="688" class="kh">Статусы файлов</div>
+        <div data-dc-tpl="689" style="display: grid; grid-template-columns: auto auto; gap: 7px 16px; font-size: 12.5px; color: var(--t2);">
+          <span data-dc-tpl="690" style="display: flex; gap: 7px; align-items: center;"><span data-dc-tpl="691" class="bdg bM">M</span>Изменён</span>
+          <span data-dc-tpl="692" style="display: flex; gap: 7px; align-items: center;"><span data-dc-tpl="693" class="bdg bA">A</span>Добавлен</span>
+          <span data-dc-tpl="694" style="display: flex; gap: 7px; align-items: center;"><span data-dc-tpl="695" class="bdg bD">D</span>Удалён</span>
+          <span data-dc-tpl="696" style="display: flex; gap: 7px; align-items: center;"><span data-dc-tpl="697" class="bdg bR">R</span>Переименован</span>
+          <span data-dc-tpl="698" style="display: flex; gap: 7px; align-items: center;"><span data-dc-tpl="699" class="bdg bU">?</span>Не отслеживается</span>
+          <span data-dc-tpl="700" style="display: flex; gap: 7px; align-items: center;"><span data-dc-tpl="701" class="bdg bC">C</span>Конфликт</span>
+        </div>
+      </div>
+      <div data-dc-tpl="702" class="kg">
+        <div data-dc-tpl="703" class="kh">Ссылки и счётчики</div>
+        <div data-dc-tpl="704" style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+          <span data-dc-tpl="705" class="chip head">HEAD</span><span data-dc-tpl="706" class="chip loc">main</span><span data-dc-tpl="707" class="chip rem"><span data-dc-tpl="708" class="pre">origin/</span>main</span><span data-dc-tpl="709" class="chip tag">v1.1.33</span><span data-dc-tpl="710" class="chip stc">stash@{0}</span>
+        </div>
+        <div data-dc-tpl="711" style="display: flex; gap: 6px; align-items: center;"><span data-dc-tpl="712" class="ab up">↑2</span><span data-dc-tpl="713" class="ab dn">↓1</span><span data-dc-tpl="714" class="cn">24</span><span data-dc-tpl="715" class="ab" style="background: rgba(76, 195, 138, 0.12); color: rgb(122, 215, 169);">4 в индексе</span></div>
+        <div data-dc-tpl="716" style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;"><span data-dc-tpl="717" class="kbd">Ctrl</span><span data-dc-tpl="718" class="kbd">Shift</span><span data-dc-tpl="719" class="kbd">P</span><span data-dc-tpl="720" class="kbd" style="margin-left: 6px;">Enter</span><span data-dc-tpl="721" class="kbd">Esc</span><span data-dc-tpl="722" class="kbd">F7</span><span data-dc-tpl="723" class="kbd">Alt+O</span></div>
+      </div>
+      <div data-dc-tpl="724" class="kg" style="flex: 1 1 100%;">
+        <div data-dc-tpl="725" class="kh">Токены цвета · шрифты IBM Plex Sans 13/12/11 + JetBrains Mono 12.5</div>
+        <div data-dc-tpl="726" style="display: flex; flex-wrap: wrap; gap: 10px;">
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(20, 22, 27); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">app bg</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#14161B</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(26, 29, 35); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">panel</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#1A1D23</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(32, 36, 44); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">raised</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#20242C</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(38, 43, 52); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">hover</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#262B34</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(35, 50, 80); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">selection</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#233250</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(43, 48, 58); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">border</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#2B303A</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(228, 231, 236); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">text</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#E4E7EC</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(169, 176, 188); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">text-2</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#A9B0BC</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(125, 133, 148); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">muted</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#7D8594</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(91, 155, 255); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">accent</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#5B9BFF</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(61, 126, 240); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">accent-strong</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#3D7EF0</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(76, 195, 138); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">green</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#4CC38A</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(242, 112, 122); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">red</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#F2707A</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(232, 184, 90); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">amber</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#E8B85A</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(179, 146, 240); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">purple</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#B392F0</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(79, 193, 201); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">teal</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#4FC1C9</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(240, 149, 90); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">orange</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#F0955A</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(194, 63, 75); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">danger bg</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#C23F4B</span></span>
+            </div>
+          
+            <div data-dc-tpl="728" style="width: 92px; display: flex; flex-direction: column; gap: 4px;">
+              <span data-dc-tpl="729" style="height: 30px; border-radius: 4px; background: rgb(34, 38, 46); border: 1px solid rgb(43, 48, 58);"></span>
+              <span data-dc-tpl="730" style="font-size: 11.5px; color: var(--tx);"><span class="sc-interp">border-subtle</span></span>
+              <span data-dc-tpl="731" class="mono" style="font-size: 10.5px; color: var(--mu);"><span class="sc-interp">#22262E</span></span>
+            </div>
+          
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div></div></div></div>
+
+
+
+</body></html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitStream — редизайн UI</title>
+<link rel="stylesheet" href="fonts/a.css">
+<style>
+:root{--bg:#14161B;--pn:#1A1D23;--bd:#2B303A;--tx:#E4E7EC;--t2:#A9B0BC;--ac:#5B9BFF}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 'IBM Plex Sans',system-ui,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:40px 16px 64px}
+h1{margin:0 0 6px;font-size:28px;font-weight:600}
+.lead{margin:0 0 32px;color:var(--t2)}
+.lead a{color:var(--ac)}
+section{border:1px solid var(--bd);background:var(--pn);border-radius:8px;padding:20px 24px;margin-bottom:16px}
+h2{margin:0 0 4px;font-size:18px;font-weight:600}
+h2 span{color:var(--ac);font-family:'JetBrains Mono',monospace;margin-right:8px}
+p{margin:0 0 14px;color:var(--t2)}
+ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+ul a{display:inline-block;padding:8px 14px;border:1px solid var(--bd);border-radius:6px;color:var(--tx);text-decoration:none}
+ul a:hover{border-color:var(--ac);color:var(--ac)}
+</style>
+</head>
+<body>
+<main>
+<h1>GitStream — редизайн UI</h1>
+<p class="lead">Три визуальных варианта, статичные снимки макетов с дизайн-холста. Работают офлайн, шрифты лежат в <code>fonts/</code>. Спека: <a href="../SPEC-redesign-2026.md">SPEC-redesign-2026.md</a>.</p>
+
+<section>
+<h2><span>A</span>Графит</h2>
+<p>Эволюция текущего лейаута: тёмный, плотный.</p>
+<ul>
+<li><a href="A/main.html">Главное окно</a></li>
+<li><a href="A/dialogs.html">Диалоги</a></li>
+<li><a href="A/tools.html">Окна-инструменты</a></li>
+<li><a href="A/states.html">Состояния и уведомления</a></li>
+</ul>
+</section>
+
+<section>
+<h2><span>B</span>Студия</h2>
+<p>Светлый, вкладки репозиториев, режимы История / Изменения.</p>
+<ul>
+<li><a href="B/main.html">Главное окно</a></li>
+<li><a href="B/dialogs.html">Диалоги</a></li>
+<li><a href="B/tools.html">Окна-инструменты</a></li>
+<li><a href="B/states.html">Состояния и уведомления</a></li>
+</ul>
+</section>
+
+<section>
+<h2><span>C</span>Командный центр</h2>
+<p>Клавиатура, палитра команд, side-sheets вместо модалок.</p>
+<ul>
+<li><a href="C/main.html">Главное окно</a></li>
+<li><a href="C/dialogs.html">Диалоги</a></li>
+<li><a href="C/tools.html">Окна-инструменты</a></li>
+<li><a href="C/states.html">Состояния и уведомления</a></li>
+</ul>
+</section>
+</main>
+</body>
+</html>
