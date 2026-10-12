@@ -24,6 +24,9 @@ const emit = defineEmits<{
   merge: [];
   rebase: [];
   stash: [];
+  undo: [];
+  redo: [];
+  oplog: [];
 }>();
 
 const { files, selectedFile, stageFiles, unstageFiles } = useFiles();
@@ -70,6 +73,9 @@ async function runCommand(id: string) {
       "repository.group.add": () => emit("addGroup"),
       "stats.open": () => emit("stats"),
       "stash.open": () => emit("stash"),
+      "oplog.undo": () => emit("undo"),
+      "oplog.redo": () => emit("redo"),
+      "oplog.open": () => emit("oplog"),
     },
   };
   if (command.visible && !command.visible(context)) return;
@@ -312,6 +318,12 @@ function closeBranchMenu() {
     </div>
 
     <div class="toolbar-spacer" />
+
+    <div class="toolbar-group" aria-label="Operation history">
+      <button class="toolbar-btn icon-only" @click="runCommand('oplog.undo')" title="Undo (Ctrl+Z)">↶</button>
+      <button class="toolbar-btn icon-only" @click="runCommand('oplog.redo')" title="Redo (Ctrl+Shift+Z)">↷</button>
+      <button class="toolbar-btn icon-only" @click="runCommand('oplog.open')" title="Operations">≡</button>
+    </div>
 
     <div class="toolbar-group-center">
       <div class="menu-button-wrapper" ref="fetchWrapper">

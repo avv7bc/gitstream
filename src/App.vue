@@ -32,6 +32,7 @@ import AddTagDialog from "./components/dialogs/AddTagDialog.vue";
 import StashSaveDialog from "./components/dialogs/StashSaveDialog.vue";
 import UpdateBanner from "./components/UpdateBanner.vue";
 import ToastStack from "./components/ToastStack.vue";
+import OplogPanel from "./components/OplogPanel.vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useUpdate } from "@/composables/useUpdate";
 import type { CommitInfo } from "@/types";
@@ -55,7 +56,18 @@ const { clearDiff } = useDiff();
 const { pull, push, fetchRemote, fetchAll } = useRemote();
 const { target: compareTarget, close: closeFileCompare } = useFileCompare();
 const { refresh: refreshConflicts } = useConflicts();
+const { undo, redo } = useOplog();
+const showOplog = ref(false);
 const { updateInfo, nextMajorInfo, checkForUpdate, dismissNextMajor } = useUpdate();
+
+async function undoLast() {
+  const entry = (await import("@/composables/useOplog")).useOplog().entries.value.find((item) => item.kind !== "undo" && !item.undone);
+  if (!entry) return;
+  try { await undo(entry.id); await refreshAll(); } catch (e) { logError(String(e)); }
+}
+async function redoLast() {
+  try { await redo(); await refreshAll(); } catch (e) { logError(String(e)); }
+}
 
 async function refreshAll() {
   await Promise.all([
@@ -403,6 +415,9 @@ function onKeydown(e: KeyboardEvent) {
       "branch.create": () => { if (repoPath.value) branchPanelRef.value?.openCreateBranch(null); },
       "tag.create": () => { if (repoPath.value) openAddTag(null); },
       "log.toggle": () => toggleLog(),
+      "oplog.undo": () => undoLast(),
+      "oplog.redo": () => redoLast(),
+      "oplog.open": () => { showOplog.value = !showOplog.value; },
       "remote.pull": () => { showPullDialog.value = true; },
       "remote.push": () => handlePushRequest("origin", false),
       "settings.open": () => { showSettingsDialog.value = !showSettingsDialog.value; },
@@ -559,6 +574,9 @@ function onMouseUp() {
       @merge="handleToolbarMerge"
       @rebase="handleToolbarRebase"
       @stash="showStashSaveDialog = true"
+      @undo="undoLast"
+      @redo="redoLast"
+      @oplog="showOplog = !showOplog"
     />
 
     <ConflictBar @changed="refreshAll()" />
@@ -637,6 +655,7 @@ function onMouseUp() {
     </div>
 
     <!-- Status Bar -->
+    <OplogPanel v-if="showOplog" @close="showOplog = false" />
     <StatusBar />
 
     <!-- Dialogs -->

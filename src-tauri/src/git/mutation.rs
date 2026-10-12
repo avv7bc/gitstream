@@ -156,21 +156,21 @@ fn apply_patch(repo_path: &Path, patch: &str, reverse: bool, cached: bool) -> Re
 }
 
 /// stage выбранного хунка: патч из unstaged-диффа → индекс.
-pub fn stage_hunk(repo_path: &Path, patch: &str) -> Result<(), GitError> {
+fn stage_hunk_inner(repo_path: &Path, patch: &str) -> Result<(), GitError> {
     apply_patch(repo_path, patch, false, true)
 }
 
 /// unstage выбранного хунка: патч из staged-диффа → откат в индексе.
-pub fn unstage_hunk(repo_path: &Path, patch: &str) -> Result<(), GitError> {
+fn unstage_hunk_inner(repo_path: &Path, patch: &str) -> Result<(), GitError> {
     apply_patch(repo_path, patch, true, true)
 }
 
 /// discard выбранного хунка: патч из unstaged-диффа → откат в рабочем дереве.
-pub fn discard_hunk(repo_path: &Path, patch: &str) -> Result<(), GitError> {
+fn discard_hunk_inner(repo_path: &Path, patch: &str) -> Result<(), GitError> {
     apply_patch(repo_path, patch, true, false)
 }
 
-pub fn stage(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+fn stage_inner(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
     let mut args = vec!["add", "--"];
     let file_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
     args.extend(file_refs);
@@ -178,7 +178,7 @@ pub fn stage(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
     Ok(())
 }
 
-pub fn unstage(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+fn unstage_inner(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
     let mut args = vec!["restore", "--staged", "--"];
     let file_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
     args.extend(file_refs);
@@ -186,7 +186,7 @@ pub fn unstage(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
     Ok(())
 }
 
-pub fn discard(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+fn discard_inner(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
     let mut args = vec!["restore", "--"];
     let file_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
     args.extend(file_refs);
@@ -200,7 +200,7 @@ pub fn discard(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
 /// файла пробуем `git rm -- <file>`; только если и одиночный вызов не прошёл —
 /// удаляем файл с диска напрямую (untracked-случай). Tracked-файлы при этом
 /// остаются правильно застейджены через git rm, а не просто удалены с диска.
-pub fn remove(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+fn remove_inner(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
     for f in files {
         validate_file_path(f)?;
     }
@@ -223,7 +223,7 @@ pub fn remove(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
 
 /// Удаляет файлы только с диска (git не трогаем — tracked станет
 /// "deleted, unstaged").
-pub fn delete(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+fn delete_inner(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
     for f in files {
         validate_file_path(f)?;
     }
@@ -236,7 +236,7 @@ pub fn delete(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
     Ok(())
 }
 
-pub fn commit(repo_path: &Path, message: &str, amend: bool) -> Result<String, GitError> {
+fn commit_inner(repo_path: &Path, message: &str, amend: bool) -> Result<String, GitError> {
     let mut args = vec!["commit", "-m", message];
     if amend {
         args.push("--amend");
@@ -254,13 +254,16 @@ fn try_set_upstream(repo_path: &Path, branch: &str) {
         let upstream = format!("{}/{}", remote, branch);
         let ref_path = format!("refs/remotes/{}", upstream);
         if super::query::run_git(repo_path, &["rev-parse", "--verify", &ref_path]).is_ok() {
-            let _ = run_git_mut(repo_path, &["branch", "--set-upstream-to", &upstream, branch]);
+            let _ = run_git_mut(
+                repo_path,
+                &["branch", "--set-upstream-to", &upstream, branch],
+            );
             return;
         }
     }
 }
 
-pub fn checkout(repo_path: &Path, branch: &str) -> Result<(), GitError> {
+fn checkout_inner(repo_path: &Path, branch: &str) -> Result<(), GitError> {
     validate_ref_name(branch)?;
     let result = run_git_mut(repo_path, &["switch", "--", branch]);
     if result.is_ok() {
@@ -274,7 +277,7 @@ pub fn checkout(repo_path: &Path, branch: &str) -> Result<(), GitError> {
     result.map(|_| ())
 }
 
-pub fn checkout_remote(
+fn checkout_remote_inner(
     repo_path: &Path,
     remote_branch: &str,
     local_name: Option<&str>,
@@ -297,24 +300,24 @@ pub fn checkout_remote(
     Ok(())
 }
 
-pub fn merge(repo_path: &Path, branch: &str) -> Result<String, GitError> {
+fn merge_inner(repo_path: &Path, branch: &str) -> Result<String, GitError> {
     validate_ref_name(branch)?;
     run_git_mut(repo_path, &["merge", branch])
 }
 
 /// Перебазировать текущую ветку на `onto`. Конфликты разрешаются через ConflictBar.
-pub fn rebase(repo_path: &Path, onto: &str) -> Result<String, GitError> {
+fn rebase_inner(repo_path: &Path, onto: &str) -> Result<String, GitError> {
     validate_ref_name(onto)?;
     run_git_mut(repo_path, &["-c", "core.editor=true", "rebase", onto])
 }
 
 /// Разрешить конфликт в файлах в пользу нашей (`--ours`) версии и пометить resolved.
-pub fn accept_ours(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+fn accept_ours_inner(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
     resolve_side(repo_path, files, "--ours")
 }
 
 /// Разрешить конфликт в файлах в пользу их (`--theirs`) версии и пометить resolved.
-pub fn accept_theirs(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+fn accept_theirs_inner(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
     resolve_side(repo_path, files, "--theirs")
 }
 
@@ -330,7 +333,7 @@ fn resolve_side(repo_path: &Path, files: &[String], side: &str) -> Result<(), Gi
 }
 
 /// Прервать незавершённую операцию по состоянию репозитория.
-pub fn op_abort(repo_path: &Path, state: &str) -> Result<(), GitError> {
+fn op_abort_inner(repo_path: &Path, state: &str) -> Result<(), GitError> {
     let args: &[&str] = match state {
         "rebasing" => &["rebase", "--abort"],
         "cherry-picking" => &["cherry-pick", "--abort"],
@@ -342,7 +345,7 @@ pub fn op_abort(repo_path: &Path, state: &str) -> Result<(), GitError> {
 }
 
 /// Продолжить незавершённую операцию (после разрешения конфликтов).
-pub fn op_continue(repo_path: &Path, state: &str) -> Result<(), GitError> {
+fn op_continue_inner(repo_path: &Path, state: &str) -> Result<(), GitError> {
     // GIT_EDITOR=true — не открываем редактор для сообщения.
     let args: Vec<&str> = match state {
         "rebasing" => vec!["-c", "core.editor=true", "rebase", "--continue"],
@@ -355,7 +358,7 @@ pub fn op_continue(repo_path: &Path, state: &str) -> Result<(), GitError> {
 }
 
 /// `mode`: "soft" | "mixed" | "hard".
-pub fn reset(repo_path: &Path, oid: &str, mode: &str) -> Result<(), GitError> {
+fn reset_inner(repo_path: &Path, oid: &str, mode: &str) -> Result<(), GitError> {
     let flag = match mode {
         "soft" => "--soft",
         "hard" => "--hard",
@@ -365,7 +368,7 @@ pub fn reset(repo_path: &Path, oid: &str, mode: &str) -> Result<(), GitError> {
     Ok(())
 }
 
-pub fn squash(repo_path: &Path, oids: &[String], message: &str) -> Result<(), GitError> {
+fn squash_inner(repo_path: &Path, oids: &[String], message: &str) -> Result<(), GitError> {
     if oids.len() < 2 {
         return Err(GitError::CommandFailed {
             message: "Need at least 2 commits to squash".into(),
@@ -383,7 +386,7 @@ pub fn squash(repo_path: &Path, oids: &[String], message: &str) -> Result<(), Gi
 }
 
 /// Returns the new commit oid (amend/rebase creates a new hash).
-pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<String, GitError> {
+fn reword_commit_inner(repo_path: &Path, oid: &str, new_message: &str) -> Result<String, GitError> {
     use super::query::run_git;
 
     let head_raw = run_git(repo_path, &["rev-parse", "HEAD"])?;
@@ -474,7 +477,7 @@ fn make_script_executable(_path: &std::path::Path) -> Result<(), GitError> {
     Ok(()) // Windows doesn't use executable bits; Git for Windows runs .sh via its bundled shell
 }
 
-pub fn revert(repo_path: &Path, oid: &str, no_commit: bool) -> Result<(), GitError> {
+fn revert_inner(repo_path: &Path, oid: &str, no_commit: bool) -> Result<(), GitError> {
     let mut args: Vec<&str> = vec!["revert", "--no-edit"];
     if no_commit {
         args.push("--no-commit");
@@ -484,7 +487,7 @@ pub fn revert(repo_path: &Path, oid: &str, no_commit: bool) -> Result<(), GitErr
     Ok(())
 }
 
-pub fn cherry_pick(repo_path: &Path, oid: &str) -> Result<(), GitError> {
+fn cherry_pick_inner(repo_path: &Path, oid: &str) -> Result<(), GitError> {
     run_git_mut(repo_path, &["cherry-pick", oid])?;
     Ok(())
 }
@@ -493,7 +496,7 @@ fn stash_ref(index: usize) -> String {
     format!("stash@{{{}}}", index)
 }
 
-pub fn stash_save(
+fn stash_save_inner(
     repo_path: &Path,
     message: Option<&str>,
     include_untracked: bool,
@@ -512,22 +515,22 @@ pub fn stash_save(
     Ok(())
 }
 
-pub fn stash_apply(repo_path: &Path, index: usize) -> Result<(), GitError> {
+fn stash_apply_inner(repo_path: &Path, index: usize) -> Result<(), GitError> {
     run_git_mut(repo_path, &["stash", "apply", &stash_ref(index)])?;
     Ok(())
 }
 
-pub fn stash_pop(repo_path: &Path, index: usize) -> Result<(), GitError> {
+fn stash_pop_inner(repo_path: &Path, index: usize) -> Result<(), GitError> {
     run_git_mut(repo_path, &["stash", "pop", &stash_ref(index)])?;
     Ok(())
 }
 
-pub fn stash_drop(repo_path: &Path, index: usize) -> Result<(), GitError> {
+fn stash_drop_inner(repo_path: &Path, index: usize) -> Result<(), GitError> {
     run_git_mut(repo_path, &["stash", "drop", &stash_ref(index)])?;
     Ok(())
 }
 
-pub fn create_branch(
+fn create_branch_inner(
     repo_path: &Path,
     name: &str,
     start_point: Option<&str>,
@@ -553,21 +556,21 @@ pub fn create_branch(
     Ok(())
 }
 
-pub fn rename_branch(repo_path: &Path, old_name: &str, new_name: &str) -> Result<(), GitError> {
+fn rename_branch_inner(repo_path: &Path, old_name: &str, new_name: &str) -> Result<(), GitError> {
     validate_ref_name(old_name)?;
     validate_ref_name(new_name)?;
     run_git_mut(repo_path, &["branch", "-m", old_name, new_name])?;
     Ok(())
 }
 
-pub fn delete_branch(repo_path: &Path, branch: &str, force: bool) -> Result<(), GitError> {
+fn delete_branch_inner(repo_path: &Path, branch: &str, force: bool) -> Result<(), GitError> {
     validate_ref_name(branch)?;
     let flag = if force { "-D" } else { "-d" };
     run_git_mut(repo_path, &["branch", flag, branch])?;
     Ok(())
 }
 
-pub fn create_tag(
+fn create_tag_inner(
     repo_path: &Path,
     name: &str,
     message: Option<&str>,
@@ -592,7 +595,7 @@ pub fn create_tag(
     Ok(())
 }
 
-pub fn delete_tag(repo_path: &Path, name: &str) -> Result<(), GitError> {
+fn delete_tag_inner(repo_path: &Path, name: &str) -> Result<(), GitError> {
     validate_ref_name(name)?;
     run_git_mut(repo_path, &["tag", "-d", name])?;
     Ok(())
@@ -659,9 +662,7 @@ pub fn ensure_credential_helper() -> Result<(), GitError> {
 
     let existing = run(&["config", "--global", "--get", "credential.helper"])?;
     // `git config --get` выходит с кодом 1, если ключа нет — это не ошибка.
-    if existing.status.success()
-        && !String::from_utf8_lossy(&existing.stdout).trim().is_empty()
-    {
+    if existing.status.success() && !String::from_utf8_lossy(&existing.stdout).trim().is_empty() {
         return Ok(());
     }
 
@@ -731,7 +732,7 @@ pub fn set_branch_upstream(
 /// (`origin/feature` и т.п.) не обновляются, новые не появляются, и панель
 /// Branches/граф остаются устаревшими до ручного Fetch. SmartGit делает
 /// Pull = Fetch всего remote + merge/rebase — повторяем это поведение.
-pub fn integrate_pulled(
+fn integrate_pulled_inner(
     repo_path: &Path,
     remote: &str,
     branch: &str,
@@ -739,8 +740,7 @@ pub fn integrate_pulled(
 ) -> Result<String, GitError> {
     let target = format!("{}/{}", remote, branch);
     let full_ref = format!("refs/remotes/{}", target);
-    if super::query::run_git(repo_path, &["rev-parse", "--verify", "--quiet", &full_ref]).is_err()
-    {
+    if super::query::run_git(repo_path, &["rev-parse", "--verify", "--quiet", &full_ref]).is_err() {
         return Err(GitError::CommandFailed {
             message: format!("Remote branch '{}' not found", target),
             hint: Some(format!(
@@ -750,9 +750,9 @@ pub fn integrate_pulled(
         });
     }
     if rebase {
-        self::rebase(repo_path, &target)
+        self::rebase_inner(repo_path, &target)
     } else {
-        merge(repo_path, &target)
+        merge_inner(repo_path, &target)
     }
 }
 
@@ -769,7 +769,12 @@ pub fn push_args(remote: &str, branch: &str, force: bool) -> Vec<String> {
             branch.into(),
         ]
     } else {
-        vec!["push".into(), "--set-upstream".into(), remote.into(), branch.into()]
+        vec![
+            "push".into(),
+            "--set-upstream".into(),
+            remote.into(),
+            branch.into(),
+        ]
     }
 }
 
@@ -783,7 +788,12 @@ pub fn push_branch_args(remote: &str, branch: &str, force: bool) -> Vec<String> 
             branch.into(),
         ]
     } else {
-        vec!["push".into(), "--set-upstream".into(), remote.into(), branch.into()]
+        vec![
+            "push".into(),
+            "--set-upstream".into(),
+            remote.into(),
+            branch.into(),
+        ]
     }
 }
 
@@ -793,7 +803,10 @@ pub fn push_branch_args(remote: &str, branch: &str, force: bool) -> Vec<String> 
 /// Ошибка не критична (нечего сохранять) — просто логируется.
 pub fn backup_remote_tip(repo_path: &Path, remote: &str, branch: &str) {
     let remote_ref = format!("{}/{}", remote, branch);
-    let oid = match super::query::run_git(repo_path, &["rev-parse", "--verify", "--quiet", &remote_ref]) {
+    let oid = match super::query::run_git(
+        repo_path,
+        &["rev-parse", "--verify", "--quiet", &remote_ref],
+    ) {
         Ok(s) if !s.trim().is_empty() => s.trim().to_string(),
         _ => return,
     };
@@ -821,7 +834,12 @@ pub fn push_tag_args(remote: &str, name: &str, delete: bool, force: bool) -> Vec
 }
 
 pub fn delete_remote_branch_args(remote: &str, branch: &str) -> Vec<String> {
-    vec!["push".into(), remote.into(), "--delete".into(), branch.into()]
+    vec![
+        "push".into(),
+        remote.into(),
+        "--delete".into(),
+        branch.into(),
+    ]
 }
 
 /// Разбирает заголовок хунка "@@ -a,b +c,d @@ tail".
@@ -1035,7 +1053,7 @@ mod tag_tests {
     #[test]
     fn creates_lightweight_tag() {
         let dir = temp_repo();
-        create_tag(&dir, "v1.0", None, None, false).unwrap();
+        create_tag_inner(&dir, "v1.0", None, None, false).unwrap();
         assert!(list_tags(&dir).contains("v1.0"));
         fs::remove_dir_all(&dir).ok();
     }
@@ -1043,7 +1061,7 @@ mod tag_tests {
     #[test]
     fn creates_annotated_tag_with_message() {
         let dir = temp_repo();
-        create_tag(&dir, "v2.0", Some("release two"), None, false).unwrap();
+        create_tag_inner(&dir, "v2.0", Some("release two"), None, false).unwrap();
         let out = Command::new("git")
             .current_dir(&dir)
             .args(["cat-file", "-t", "v2.0"])
@@ -1056,17 +1074,17 @@ mod tag_tests {
     #[test]
     fn force_overwrites_existing_tag() {
         let dir = temp_repo();
-        create_tag(&dir, "v1.0", None, None, false).unwrap();
-        assert!(create_tag(&dir, "v1.0", None, None, false).is_err());
-        create_tag(&dir, "v1.0", None, None, true).unwrap();
+        create_tag_inner(&dir, "v1.0", None, None, false).unwrap();
+        assert!(create_tag_inner(&dir, "v1.0", None, None, false).is_err());
+        create_tag_inner(&dir, "v1.0", None, None, true).unwrap();
         fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
     fn deletes_tag() {
         let dir = temp_repo();
-        create_tag(&dir, "v1.0", None, None, false).unwrap();
-        delete_tag(&dir, "v1.0").unwrap();
+        create_tag_inner(&dir, "v1.0", None, None, false).unwrap();
+        delete_tag_inner(&dir, "v1.0").unwrap();
         assert!(!list_tags(&dir).contains("v1.0"));
         fs::remove_dir_all(&dir).ok();
     }
@@ -1074,7 +1092,7 @@ mod tag_tests {
     #[test]
     fn remove_tracked_file_stages_deletion() {
         let dir = temp_repo();
-        remove(&dir, &["a.txt".to_string()]).unwrap();
+        remove_inner(&dir, &["a.txt".to_string()]).unwrap();
         assert!(!dir.join("a.txt").exists());
         let out = Command::new("git")
             .current_dir(&dir)
@@ -1090,7 +1108,7 @@ mod tag_tests {
     fn remove_untracked_file_falls_back_to_disk_delete() {
         let dir = temp_repo();
         fs::write(dir.join("u.txt"), "x").unwrap();
-        remove(&dir, &["u.txt".to_string()]).unwrap();
+        remove_inner(&dir, &["u.txt".to_string()]).unwrap();
         assert!(!dir.join("u.txt").exists());
         fs::remove_dir_all(&dir).ok();
     }
@@ -1099,7 +1117,7 @@ mod tag_tests {
     fn remove_mixed_tracked_and_untracked_batch() {
         let dir = temp_repo();
         fs::write(dir.join("u.txt"), "x").unwrap();
-        remove(&dir, &["a.txt".to_string(), "u.txt".to_string()]).unwrap();
+        remove_inner(&dir, &["a.txt".to_string(), "u.txt".to_string()]).unwrap();
         assert!(!dir.join("a.txt").exists());
         assert!(!dir.join("u.txt").exists());
         let out = Command::new("git")
@@ -1115,7 +1133,7 @@ mod tag_tests {
     #[test]
     fn delete_removes_file_from_disk_only() {
         let dir = temp_repo();
-        delete(&dir, &["a.txt".to_string()]).unwrap();
+        delete_inner(&dir, &["a.txt".to_string()]).unwrap();
         assert!(!dir.join("a.txt").exists());
         let out = Command::new("git")
             .current_dir(&dir)
@@ -1144,11 +1162,25 @@ mod tag_tests {
         // force ⇒ --force; prune_tags ⇒ --prune + --prune-tags даже без явного prune.
         assert_eq!(
             fetch_args("origin", false, true, true),
-            vec!["fetch", "--tags", "--force", "--prune", "--prune-tags", "origin"]
+            vec![
+                "fetch",
+                "--tags",
+                "--force",
+                "--prune",
+                "--prune-tags",
+                "origin"
+            ]
         );
         assert_eq!(
             fetch_all_args(false, true, true),
-            vec!["fetch", "--all", "--tags", "--force", "--prune", "--prune-tags"]
+            vec![
+                "fetch",
+                "--all",
+                "--tags",
+                "--force",
+                "--prune",
+                "--prune-tags"
+            ]
         );
     }
 
@@ -1160,7 +1192,13 @@ mod tag_tests {
         );
         assert_eq!(
             push_args("origin", "main", true),
-            vec!["push", "--force-with-lease", "--set-upstream", "origin", "main"]
+            vec![
+                "push",
+                "--force-with-lease",
+                "--set-upstream",
+                "origin",
+                "main"
+            ]
         );
     }
 
@@ -1172,7 +1210,13 @@ mod tag_tests {
         );
         assert_eq!(
             push_branch_args("origin", "main", true),
-            vec!["push", "--force-with-lease", "--set-upstream", "origin", "main"]
+            vec![
+                "push",
+                "--force-with-lease",
+                "--set-upstream",
+                "origin",
+                "main"
+            ]
         );
     }
 
@@ -1201,7 +1245,6 @@ mod tag_tests {
             vec!["push", "origin", ":refs/tags/v1.0"]
         );
     }
-
 }
 
 #[cfg(test)]
@@ -1385,7 +1428,10 @@ mod init_tests {
     #[test]
     fn clone_args_shape() {
         let args = clone_args("https://example.com/r.git", "/dest/r");
-        assert_eq!(args, vec!["clone", "--", "https://example.com/r.git", "/dest/r"]);
+        assert_eq!(
+            args,
+            vec!["clone", "--", "https://example.com/r.git", "/dest/r"]
+        );
     }
 
     #[test]
@@ -1464,7 +1510,7 @@ mod pull_tests {
     #[test]
     fn missing_remote_branch_is_reported() {
         let dir = temp_repo();
-        let err = integrate_pulled(&dir, "origin", "main", false).unwrap_err();
+        let err = integrate_pulled_inner(&dir, "origin", "main", false).unwrap_err();
         assert!(err.to_string().contains("origin/main"), "{}", err);
         fs::remove_dir_all(&dir).ok();
     }
@@ -1480,7 +1526,7 @@ mod pull_tests {
         git(&dir, &["checkout", "-q", "main"]);
         git(&dir, &["update-ref", "refs/remotes/origin/main", &c2]);
 
-        integrate_pulled(&dir, "origin", "main", false).unwrap();
+        integrate_pulled_inner(&dir, "origin", "main", false).unwrap();
         assert_eq!(git(&dir, &["rev-parse", "HEAD"]), c2);
         fs::remove_dir_all(&dir).ok();
     }
@@ -1492,13 +1538,214 @@ mod pull_tests {
         git(&dir, &["commit", "-q", "--allow-empty", "-m", "remote"]);
         let remote_tip = git(&dir, &["rev-parse", "HEAD"]);
         git(&dir, &["checkout", "-q", "main"]);
-        git(&dir, &["update-ref", "refs/remotes/origin/main", &remote_tip]);
+        git(
+            &dir,
+            &["update-ref", "refs/remotes/origin/main", &remote_tip],
+        );
         git(&dir, &["commit", "-q", "--allow-empty", "-m", "local"]);
 
-        integrate_pulled(&dir, "origin", "main", true).unwrap();
+        integrate_pulled_inner(&dir, "origin", "main", true).unwrap();
         // Локальный коммит переигран поверх remote-вершины: линейная история.
         assert_eq!(git(&dir, &["rev-parse", "HEAD~1"]), remote_tip);
         assert_eq!(git(&dir, &["log", "-1", "--format=%s"]), "local");
         fs::remove_dir_all(&dir).ok();
     }
+}
+
+pub fn stage_hunk(repo_path: &Path, patch: &str) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "stage.hunk", || {
+        stage_hunk_inner(repo_path, patch)
+    })
+}
+
+pub fn unstage_hunk(repo_path: &Path, patch: &str) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "unstage.hunk", || {
+        unstage_hunk_inner(repo_path, patch)
+    })
+}
+
+pub fn discard_hunk(repo_path: &Path, patch: &str) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "discard.hunk", || {
+        discard_hunk_inner(repo_path, patch)
+    })
+}
+
+pub fn stage(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "stage", || stage_inner(repo_path, files))
+}
+
+pub fn unstage(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "unstage", || unstage_inner(repo_path, files))
+}
+
+pub fn discard(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "discard", || discard_inner(repo_path, files))
+}
+
+pub fn remove(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "remove", || remove_inner(repo_path, files))
+}
+
+pub fn delete(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "delete", || delete_inner(repo_path, files))
+}
+
+pub fn commit(repo_path: &Path, message: &str, amend: bool) -> Result<String, GitError> {
+    super::oplog::mutate(
+        repo_path,
+        if amend { "commit.amend" } else { "commit" },
+        || commit_inner(repo_path, message, amend),
+    )
+}
+
+pub fn checkout(repo_path: &Path, branch: &str) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "checkout", || checkout_inner(repo_path, branch))
+}
+
+pub fn checkout_remote(
+    repo_path: &Path,
+    remote_branch: &str,
+    local_name: Option<&str>,
+) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "checkout.remote", || {
+        checkout_remote_inner(repo_path, remote_branch, local_name)
+    })
+}
+
+pub fn merge(repo_path: &Path, branch: &str) -> Result<String, GitError> {
+    super::oplog::mutate(repo_path, "merge", || merge_inner(repo_path, branch))
+}
+
+pub fn rebase(repo_path: &Path, onto: &str) -> Result<String, GitError> {
+    super::oplog::mutate(repo_path, "rebase", || rebase_inner(repo_path, onto))
+}
+
+pub fn accept_ours(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "accept.ours", || {
+        accept_ours_inner(repo_path, files)
+    })
+}
+
+pub fn accept_theirs(repo_path: &Path, files: &[String]) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "accept.theirs", || {
+        accept_theirs_inner(repo_path, files)
+    })
+}
+
+pub fn op_abort(repo_path: &Path, state: &str) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "op.abort", || op_abort_inner(repo_path, state))
+}
+
+pub fn op_continue(repo_path: &Path, state: &str) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "op.continue", || {
+        op_continue_inner(repo_path, state)
+    })
+}
+
+pub fn reset(repo_path: &Path, oid: &str, mode: &str) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, &format!("reset.{mode}"), || {
+        reset_inner(repo_path, oid, mode)
+    })
+}
+
+pub fn squash(repo_path: &Path, oids: &[String], message: &str) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "squash", || {
+        squash_inner(repo_path, oids, message)
+    })
+}
+
+pub fn reword_commit(repo_path: &Path, oid: &str, new_message: &str) -> Result<String, GitError> {
+    super::oplog::mutate(repo_path, "reword.commit", || {
+        reword_commit_inner(repo_path, oid, new_message)
+    })
+}
+
+pub fn revert(repo_path: &Path, oid: &str, no_commit: bool) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "revert", || {
+        revert_inner(repo_path, oid, no_commit)
+    })
+}
+
+pub fn cherry_pick(repo_path: &Path, oid: &str) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "cherry.pick", || {
+        cherry_pick_inner(repo_path, oid)
+    })
+}
+
+pub fn stash_save(
+    repo_path: &Path,
+    message: Option<&str>,
+    include_untracked: bool,
+) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "stash.save", || {
+        stash_save_inner(repo_path, message, include_untracked)
+    })
+}
+
+pub fn stash_apply(repo_path: &Path, index: usize) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "stash.apply", || {
+        stash_apply_inner(repo_path, index)
+    })
+}
+
+pub fn stash_pop(repo_path: &Path, index: usize) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "stash.pop", || stash_pop_inner(repo_path, index))
+}
+
+pub fn stash_drop(repo_path: &Path, index: usize) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "stash.drop", || {
+        stash_drop_inner(repo_path, index)
+    })
+}
+
+pub fn create_branch(
+    repo_path: &Path,
+    name: &str,
+    start_point: Option<&str>,
+    checkout: bool,
+) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "create.branch", || {
+        create_branch_inner(repo_path, name, start_point, checkout)
+    })
+}
+
+pub fn rename_branch(repo_path: &Path, old_name: &str, new_name: &str) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "rename.branch", || {
+        rename_branch_inner(repo_path, old_name, new_name)
+    })
+}
+
+pub fn delete_branch(repo_path: &Path, branch: &str, force: bool) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "delete.branch", || {
+        delete_branch_inner(repo_path, branch, force)
+    })
+}
+
+pub fn create_tag(
+    repo_path: &Path,
+    name: &str,
+    message: Option<&str>,
+    target: Option<&str>,
+    force: bool,
+) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "create.tag", || {
+        create_tag_inner(repo_path, name, message, target, force)
+    })
+}
+
+pub fn delete_tag(repo_path: &Path, name: &str) -> Result<(), GitError> {
+    super::oplog::mutate(repo_path, "delete.tag", || {
+        delete_tag_inner(repo_path, name)
+    })
+}
+
+pub fn integrate_pulled(
+    repo_path: &Path,
+    remote: &str,
+    branch: &str,
+    rebase: bool,
+) -> Result<String, GitError> {
+    super::oplog::mutate(repo_path, "integrate.pulled", || {
+        integrate_pulled_inner(repo_path, remote, branch, rebase)
+    })
 }

@@ -44,6 +44,11 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_repo_info,
+            commands::get_oplog,
+            commands::preview_undo,
+            commands::do_undo,
+            commands::do_redo,
+            commands::get_reflog,
             commands::get_repo_state,
             commands::get_status,
             commands::list_all_files,

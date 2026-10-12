@@ -4,3 +4,6 @@ pub mod graph;
 pub mod mutation;
 pub mod query;
 pub mod types;
+
+pub mod oplog;
+pub mod reflog;

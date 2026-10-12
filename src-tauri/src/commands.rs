@@ -8,7 +8,7 @@ use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
 
-use crate::git::{diagnose, mutation, query, types::*};
+use crate::git::{diagnose, mutation, oplog, query, reflog, types::*};
 use crate::update::{self, UpdateCheck};
 
 #[derive(serde::Serialize, Clone)]
@@ -106,7 +106,9 @@ async fn run_network_git(
                     Ok(_) => {
                         // git пишет прогресс с \r внутри строки — берём последний сегмент
                         let stripped = line.trim_end_matches(['\r', '\n']);
-                        let trimmed = stripped.rsplit('\r').find(|s| !s.trim().is_empty())
+                        let trimmed = stripped
+                            .rsplit('\r')
+                            .find(|s| !s.trim().is_empty())
                             .unwrap_or(stripped)
                             .trim();
                         if !trimmed.is_empty() {
@@ -138,7 +140,9 @@ async fn run_network_git(
             Ok(None) => {}
             Err(e) => return Err(format!("git wait failed: {}", e)),
         }
-        let prompting = active.as_ref().is_some_and(|a| a.load(Ordering::SeqCst) > 0);
+        let prompting = active
+            .as_ref()
+            .is_some_and(|a| a.load(Ordering::SeqCst) > 0);
         if !prompting {
             if remaining <= poll {
                 let _ = child.start_kill();
@@ -387,6 +391,40 @@ pub async fn get_diff_commit_file(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub fn get_oplog(repo_path: String) -> Result<Vec<oplog::OpSnapshot>, String> {
+    oplog::get_oplog(Path::new(&repo_path)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn preview_undo(repo_path: String, id: u64) -> Result<oplog::UndoPreview, String> {
+    oplog::preview_undo(Path::new(&repo_path), id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_undo(repo_path: String, id: u64, confirmation: Option<String>) -> Result<(), String> {
+    oplog::undo(Path::new(&repo_path), id, confirmation.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn do_redo(repo_path: String, confirmation: Option<String>) -> Result<(), String> {
+    oplog::redo(Path::new(&repo_path), confirmation.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_reflog(
+    repo_path: String,
+    refname: Option<String>,
+    limit: Option<usize>,
+) -> Result<Vec<reflog::ReflogEntry>, String> {
+    reflog::get(
+        Path::new(&repo_path),
+        refname.as_deref(),
+        limit.unwrap_or(100),
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -693,11 +731,7 @@ pub async fn get_tag_sync_status(
     let out = run_network_git(
         &app,
         Some(Path::new(&repo_path)),
-        &[
-            "ls-remote".to_string(),
-            "--tags".to_string(),
-            remote,
-        ],
+        &["ls-remote".to_string(), "--tags".to_string(), remote],
         timeout_secs,
         "fetch",
     )
@@ -733,7 +767,14 @@ pub async fn do_delete_remote_branch(
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let args = mutation::delete_remote_branch_args(&remote, &branch);
-    run_network_git(&app, Some(Path::new(&repo_path)), &args, timeout_secs, "push").await
+    run_network_git(
+        &app,
+        Some(Path::new(&repo_path)),
+        &args,
+        timeout_secs,
+        "push",
+    )
+    .await
 }
 
 #[tauri::command]
