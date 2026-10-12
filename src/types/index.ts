@@ -51,6 +51,17 @@ export interface CommitInfo {
   unpushed: boolean;
 }
 
+export interface LogFilter {
+  author?: string;
+  since?: string;
+  until?: string;
+  grep?: string;
+  path?: string;
+  pickaxe?: string;
+  regex?: string;
+  all_branches?: boolean;
+}
+
 export interface RefLabel {
   name: string;
   kind: "local-branch" | "remote-branch" | "tag" | "head" | "stash" | "current-branch";

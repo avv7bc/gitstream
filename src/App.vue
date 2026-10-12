@@ -35,6 +35,7 @@ import ToastStack from "./components/ToastStack.vue";
 import OplogPanel from "./components/OplogPanel.vue";
 import WorktreePanel from "./components/WorktreePanel.vue";
 import InteractiveRebaseDialog from "./components/dialogs/InteractiveRebaseDialog.vue";
+import CommandPalette from "./components/CommandPalette.vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useUpdate } from "@/composables/useUpdate";
 import type { CommitInfo } from "@/types";
@@ -62,6 +63,7 @@ const { refresh: refreshConflicts } = useConflicts();
 const { undo, redo } = useOplog();
 const showOplog = ref(false);
 const showInteractiveRebase = ref(false);
+const showCommandPalette = ref(false);
 const { updateInfo, nextMajorInfo, checkForUpdate, dismissNextMajor } = useUpdate();
 
 async function undoLast() {
@@ -255,13 +257,13 @@ async function handleStashSave(payload: { message: string | null; includeUntrack
   }
 }
 
-function handlePullRequest(remote: string, rebase: boolean) {
+function handlePullRequest(remote: string, rebase: boolean, branch?: string) {
   showPullDialog.value = false;
   requestAnimationFrame(() => {
     requestAnimationFrame(async () => {
       document.body.style.cursor = "wait";
       try {
-        await pull(remote, rebase);
+        await pull(remote, rebase, branch);
         await refreshAll();
       } finally {
         document.body.style.cursor = "";
@@ -345,6 +347,7 @@ function handleToolbarRebase() {
 
 // --- Modal registry + open-order stack: Esc closes the topmost (last opened) ---
 const modalRegistry: { key: string; isOpen: () => boolean; close: () => void }[] = [
+  { key: "commandPalette", isOpen: () => showCommandPalette.value, close: () => { showCommandPalette.value = false; } },
   { key: "commit", isOpen: () => showCommitDialog.value, close: () => { showCommitDialog.value = false; refreshAll(); } },
   { key: "stashSave", isOpen: () => showStashSaveDialog.value, close: () => { showStashSaveDialog.value = false; } },
   { key: "push", isOpen: () => showPushDialog.value, close: () => { showPushDialog.value = false; } },
@@ -403,8 +406,8 @@ function onEscapeCapture(e: KeyboardEvent) {
   closeTopModal();
 }
 
-function onKeydown(e: KeyboardEvent) {
-  const commandContext: CommandContext = {
+function buildCommandContext(): CommandContext {
+  return {
     repoPath: repoPath.value,
     selectedFile: selectedFile.value,
     selectedFileStaged: files.value.find((file) => file.path === selectedFile.value)?.staged,
@@ -424,11 +427,16 @@ function onKeydown(e: KeyboardEvent) {
       "oplog.open": () => { showOplog.value = !showOplog.value; },
       "history.interactive": () => { showInteractiveRebase.value = true; },
       "remote.pull": () => { showPullDialog.value = true; },
-      "remote.push": () => handlePushRequest("origin", false),
+      "remote.push": () => { showPushDialog.value = true; },
+      "palette.open": () => { showCommandPalette.value = true; },
       "settings.open": () => { showSettingsDialog.value = !showSettingsDialog.value; },
       "remote.fetch": () => handleToolbarFetch(),
     },
   };
+}
+
+function onKeydown(e: KeyboardEvent) {
+  const commandContext = buildCommandContext();
   if (dispatchHotkey(e, commandContext)) return;
 }
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -666,6 +674,7 @@ function onMouseUp() {
     <StatusBar />
 
     <!-- Dialogs -->
+    <CommandPalette v-if="showCommandPalette" :context="buildCommandContext()" @close="showCommandPalette = false" />
     <CommitDialog v-if="showCommitDialog" @close="showCommitDialog = false; refreshAll()" />
     <PushDialog v-if="showPushDialog" @close="showPushDialog = false" @push="handlePushRequest" />
     <PullDialog v-if="showPullDialog" @close="showPullDialog = false" @pull="handlePullRequest" @fetch="handleFetchRequest" />

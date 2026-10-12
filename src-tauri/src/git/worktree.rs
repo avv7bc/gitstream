@@ -49,7 +49,7 @@ pub fn list(repo: &Path) -> Result<Vec<WorktreeInfo>, GitError> {
             }
             continue;
         }
-        let (key, value) = line.split_once(' ').map_or((line, ""), |x| x);
+        let (key, value) = line.split_once(' ').unwrap_or((line, ""));
         match key {
             "worktree" => {
                 if let Some(item) = current.take() {

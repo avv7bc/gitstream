@@ -250,10 +250,15 @@ pub fn list_files_at(repo_path: String, oid: String) -> Result<Vec<String>, Stri
 }
 
 #[tauri::command]
-pub async fn get_log(repo_path: String, limit: Option<usize>) -> Result<Vec<CommitInfo>, String> {
+pub async fn get_log(
+    repo_path: String,
+    limit: Option<usize>,
+    filter: Option<crate::git::types::LogFilter>,
+) -> Result<Vec<CommitInfo>, String> {
     let path = PathBuf::from(repo_path);
     tokio::task::spawn_blocking(move || {
-        query::log(&path, limit.unwrap_or(500)).map_err(|e| e.to_string())
+        query::log_with_filter(&path, limit.unwrap_or(500), filter.as_ref())
+            .map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())?
@@ -318,6 +323,14 @@ pub fn preview_merge(
     branch: String,
 ) -> Result<Option<crate::git::types::MergePreview>, String> {
     query::preview_merge(Path::new(&repo_path), &branch).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn preview_rebase(
+    repo_path: String,
+    onto: String,
+) -> Result<Option<crate::git::types::MergePreview>, String> {
+    query::preview_rebase(Path::new(&repo_path), &onto).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -650,10 +663,14 @@ pub async fn do_pull(
     repo_path: String,
     remote: String,
     rebase: bool,
+    branch: Option<String>,
     timeout_secs: Option<u64>,
 ) -> Result<String, String> {
     let path = PathBuf::from(&repo_path);
-    let branch = query::require_current_branch_name(&path).map_err(|e| e.to_string())?;
+    let branch = match branch.filter(|name| !name.trim().is_empty()) {
+        Some(branch) => branch,
+        None => query::require_current_branch_name(&path).map_err(|e| e.to_string())?,
+    };
     // Pull = полный fetch remote'а + merge/rebase (как в SmartGit), а не
     // `git pull <remote> <branch>`: та команда тянет только одну ветку, и
     // остальные remote-ветки в панели Branches/графе оставались устаревшими
@@ -678,6 +695,9 @@ pub async fn do_push(
 ) -> Result<String, String> {
     let path = Path::new(&repo_path);
     let branch = query::require_current_branch_name(path).map_err(|e| e.to_string())?;
+    if force {
+        mutation::backup_remote_tip(path, &remote, &branch);
+    }
     let args = mutation::push_args(&remote, &branch, force);
     run_network_git(&app, Some(path), &args, timeout_secs, "push").await
 }

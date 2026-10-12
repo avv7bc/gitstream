@@ -49,6 +49,7 @@ const builtIns: Command[] = [
   { id: "stats.open", label: "Repository statistics", scope: "toolbar", enabled: hasRepo, execute: action("stats.open") },
   { id: "stash.open", label: "Stash", scope: "toolbar", enabled: hasRepo, execute: action("stash.open") },
   { id: "settings.open", label: "Settings", scope: ["global", "toolbar"], shortcut: ["Ctrl+P", "Meta+P", "Alt+P"], execute: action("settings.open") },
+  { id: "palette.open", label: "Command Palette", scope: "global", shortcut: ctrlMeta("P", "+Shift"), execute: action("palette.open") },
   { id: "log.toggle", label: "Git output", scope: "global", shortcut: ["Ctrl+O", "Alt+O", "Meta+O"], execute: action("log.toggle") },
   { id: "oplog.undo", label: "Undo", scope: ["global", "toolbar"], shortcut: ["Ctrl+Z", "Meta+Z"], enabled: hasRepo, execute: action("oplog.undo") },
   { id: "oplog.redo", label: "Redo", scope: ["global", "toolbar"], shortcut: ["Ctrl+Shift+Z", "Meta+Shift+Z"], enabled: hasRepo, execute: action("oplog.redo") },

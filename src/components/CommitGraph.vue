@@ -22,7 +22,7 @@ const emit = defineEmits<{
   reword: [payload: { oid: string; message: string; isHead: boolean }];
 }>();
 
-const { commits, selectedCommit, hasMore, isLoadingMore, loadMore, resetTo, revertCommit, cherryPick } = useLog();
+const { commits, selectedCommit, hasMore, isLoadingMore, loadMore, resetTo, revertCommit, cherryPick, setFilter } = useLog();
 const { branches } = useBranches();
 const currentBranch = computed(() => branches.value.find((b) => b.is_current));
 const showResetConfirm = ref(false);
@@ -509,6 +509,12 @@ const maxAuthorLen = computed(() => {
 });
 
 const filteredCommits = computed(() => filterCommits(commits.value, graphFilter.value));
+let filterTimer: ReturnType<typeof setTimeout> | null = null;
+watch(graphFilter, (value) => {
+  if (filterTimer) clearTimeout(filterTimer);
+  filterTimer = setTimeout(() => { void setFilter(value.trim() ? { grep: value.trim() } : {}); }, 250);
+});
+onUnmounted(() => { if (filterTimer) clearTimeout(filterTimer); });
 
 function refClass(r: RefLabel): string {
   return `ref-label ref-${r.kind}`;

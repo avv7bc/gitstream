@@ -62,6 +62,7 @@ fn main() {
             commands::get_remotes,
             commands::get_remote_urls,
             commands::preview_merge,
+            commands::preview_rebase,
             commands::add_remote,
             commands::remove_remote,
             commands::rename_remote,

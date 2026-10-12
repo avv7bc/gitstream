@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Clone, Debug)]
 pub struct FileStatus {
@@ -76,6 +76,18 @@ pub struct MergePreview {
     pub clean: bool,
     pub conflicted_files: Vec<String>,
     pub fast_forward: bool,
+}
+
+#[derive(Deserialize, Clone, Debug, Default)]
+pub struct LogFilter {
+    pub author: Option<String>,
+    pub since: Option<String>,
+    pub until: Option<String>,
+    pub grep: Option<String>,
+    pub path: Option<String>,
+    pub pickaxe: Option<String>,
+    pub regex: Option<String>,
+    pub all_branches: Option<bool>,
 }
 
 #[derive(Serialize, Clone, Debug)]

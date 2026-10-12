@@ -92,6 +92,71 @@ pub fn preview_merge(repo_path: &Path, branch: &str) -> Result<Option<MergePrevi
     Ok(Some(preview))
 }
 
+/// Preview a rebase by replaying at most fifty commits through merge-tree.
+/// Each generated tree becomes the base for the next commit; no index or
+/// worktree is touched. `None` means the repository's Git is too old or the
+/// rebase is too large to preview safely in the dialog.
+pub fn preview_rebase(repo_path: &Path, onto: &str) -> Result<Option<MergePreview>, GitError> {
+    if onto.is_empty() || onto.starts_with('-') {
+        return Err(GitError::CommandFailed {
+            message: "Invalid rebase upstream".into(),
+            hint: None,
+        });
+    }
+    let version = Command::new("git")
+        .arg("--version")
+        .output()
+        .map_err(|e| GitError::CommandFailed {
+            message: format!("Failed to run git: {e}"),
+            hint: None,
+        })?;
+    if !supports_merge_preview(&String::from_utf8_lossy(&version.stdout)) {
+        return Ok(None);
+    }
+    let range = format!("{onto}..HEAD");
+    let commits = run_git(repo_path, &["rev-list", "--reverse", "--max-count=51", &range])?;
+    let commits: Vec<&str> = commits.lines().filter(|line| !line.trim().is_empty()).collect();
+    if commits.len() > 50 {
+        return Ok(None);
+    }
+    let had_commits = !commits.is_empty();
+    let mut base = onto.to_string();
+    for commit in commits {
+        let output = Command::new("git")
+            .args(["-c", "core.quotePath=false", "-C"])
+            .arg(repo_path)
+            .args(["merge-tree", "--write-tree", &base, commit])
+            .output()
+            .map_err(|e| GitError::CommandFailed {
+                message: format!("Failed to run git merge-tree: {e}"),
+                hint: None,
+            })?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let output_text = format!("{stdout}\n{stderr}");
+        if !output.status.success() {
+            return Ok(Some(parse_merge_tree_output_with_status(
+                &output_text,
+                false,
+                true,
+            )));
+        }
+        let Some(tree) = stdout.lines().next().map(str::trim).filter(|line| !line.is_empty()) else {
+            return Ok(Some(MergePreview {
+                clean: false,
+                conflicted_files: Vec::new(),
+                fast_forward: false,
+            }));
+        };
+        base = tree.to_string();
+    }
+    Ok(Some(MergePreview {
+        clean: true,
+        conflicted_files: Vec::new(),
+        fast_forward: !had_commits,
+    }))
+}
+
 /// Parse merge-tree output when the caller only has its text. This keeps the
 /// helper useful for tests and callers that do not spawn the command.
 pub fn parse_merge_tree_output(output: &str, fast_forward: bool) -> MergePreview {
@@ -459,7 +524,16 @@ fn upstream_refs(repo_path: &Path) -> Vec<String> {
         .unwrap_or_default()
 }
 
+#[allow(dead_code)]
 pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> {
+    log_with_filter(repo_path, limit, None)
+}
+
+pub fn log_with_filter(
+    repo_path: &Path,
+    limit: usize,
+    filter: Option<&LogFilter>,
+) -> Result<Vec<CommitInfo>, GitError> {
     // Пустой репозиторий (`git init` без коммитов): HEAD ещё не существует,
     // `git log` падает с кодом 128. Это не ошибка — лог просто пуст.
     // Проверка через rev-parse не зависит от локали git.
@@ -486,11 +560,42 @@ pub fn log(repo_path: &Path, limit: usize) -> Result<Vec<CommitInfo>, GitError> 
     // с коммитами других веток (как --date-order). Это даёт чистый граф в
     // стиле gitk: лейн смерженной ветки не «зигзагует» через mainline, а
     // тянется сплошным столбцом справа до своего мержа.
-    let mut args: Vec<String> = vec!["log".into(), "--branches".into(), "HEAD".into()];
-    args.extend(upstream_refs(repo_path));
+    let all_branches = filter.and_then(|f| f.all_branches).unwrap_or(false);
+    let mut args: Vec<String> = vec!["log".into()];
+    if all_branches {
+        args.push("--all".into());
+    } else {
+        args.push("--branches".into());
+        args.push("HEAD".into());
+        args.extend(upstream_refs(repo_path));
+    }
     args.push("--topo-order".into());
+    if let Some(f) = filter {
+        if let Some(value) = f.author.as_deref().filter(|v| !v.is_empty()) {
+            args.push(format!("--author={value}"));
+        }
+        if let Some(value) = f.since.as_deref().filter(|v| !v.is_empty()) {
+            args.push(format!("--since={value}"));
+        }
+        if let Some(value) = f.until.as_deref().filter(|v| !v.is_empty()) {
+            args.push(format!("--until={value}"));
+        }
+        if let Some(value) = f.grep.as_deref().filter(|v| !v.is_empty()) {
+            args.push(format!("--grep={value}"));
+        }
+        if let Some(value) = f.pickaxe.as_deref().filter(|v| !v.is_empty()) {
+            args.push(format!("-S{value}"));
+        }
+        if let Some(value) = f.regex.as_deref().filter(|v| !v.is_empty()) {
+            args.push(format!("-G{value}"));
+        }
+    }
     args.push(format!("--format={}", LOG_FORMAT));
     args.push(limit_str);
+    if let Some(path) = filter.and_then(|f| f.path.as_deref()).filter(|v| !v.is_empty()) {
+        args.push("--".into());
+        args.push(path.into());
+    }
     let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
     let output = run_git(repo_path, &arg_refs)?;
     // Список remote'ов нужен parse_ref_labels: иначе локальные ветки

@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { invoke } from "@/composables/useProgress";
-import type { CommitInfo } from "@/types";
+import type { CommitInfo, LogFilter } from "@/types";
 import { useRepo } from "@/composables/useRepo";
 
 const PAGE_SIZE = 500;
@@ -9,6 +9,7 @@ const commits = ref<CommitInfo[]>([]);
 const selectedCommit = ref<string | null>(null);
 const hasMore = ref(true);
 const isLoadingMore = ref(false);
+const activeFilter = ref<LogFilter>({});
 
 // Защита от гонки перекрывающихся refresh: применяем только самый свежий ответ.
 // loadMore тоже использует этот счётчик, чтобы откатывающийся refresh не
@@ -32,6 +33,7 @@ export function useLog() {
     const data = await invoke<CommitInfo[]>("get_log", {
       repoPath: repoPath.value,
       limit: target,
+      filter: activeFilter.value,
     });
     // Более новый refresh уже стартовал — отбрасываем устаревший ответ.
     if (seq !== refreshSeq) return;
@@ -63,6 +65,7 @@ export function useLog() {
       const data = await invoke<CommitInfo[]>("get_log", {
         repoPath: repoPath.value,
         limit: target,
+        filter: activeFilter.value,
       });
       // Параллельный refresh уже применил свой результат — не затираем его.
       if (seq !== refreshSeq) return;
@@ -109,6 +112,11 @@ export function useLog() {
     hasMore.value = true;
   }
 
+  async function setFilter(filter: LogFilter) {
+    activeFilter.value = { ...filter };
+    await refresh();
+  }
+
   return {
     commits,
     selectedCommit,
@@ -122,5 +130,6 @@ export function useLog() {
     cherryPick,
     squashCommits,
     rewordCommit,
+    setFilter,
   };
 }

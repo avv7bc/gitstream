@@ -74,13 +74,14 @@ export function useRemote() {
     );
   }
 
-  async function pull(remote: string, rebase: boolean) {
+  async function pull(remote: string, rebase: boolean, branch?: string) {
     if (!repoPath.value) return;
     const ok = await wrapAsync(() =>
       invoke("do_pull", {
         repoPath: repoPath.value!,
         remote,
         rebase,
+        branch,
         timeoutSecs: networkTimeoutSecs.value,
       }), `Pulled from ${remote}`
     );

@@ -6,10 +6,11 @@ import { useRepo } from "@/composables/useRepo";
 import { useDraggable } from "@/composables/useDraggable";
 import { useI18n } from "@/composables/useI18n";
 import type { RemoteInfo } from "@/types";
+import type { MergePreview } from "@/types";
 
 const emit = defineEmits<{
   close: [];
-  pull: [remote: string, rebase: boolean];
+  pull: [remote: string, rebase: boolean, branch?: string];
   fetch: [remote: string];
 }>();
 
@@ -19,10 +20,22 @@ const { repoPath, repoInfo } = useRepo();
 const remoteInfos = ref<RemoteInfo[]>([]);
 const selectedRemote = ref("origin");
 const pullMode = ref<"merge" | "rebase">("merge");
+const preview = ref<MergePreview | null>(null);
+const previewSupported = ref(true);
+const previewLoading = ref(false);
 
 const currentBranch = computed(() => repoInfo.value?.current_branch ?? "");
 const currentBranchInfo = computed(() => branches.value.find((b) => b.is_current));
 const behindCount = computed(() => currentBranchInfo.value?.behind ?? 0);
+const trackingBranch = computed(() => {
+  const upstream = currentBranchInfo.value?.upstream;
+  if (upstream) {
+    const slash = upstream.indexOf("/");
+    if (slash > 0 && upstream.slice(0, slash) === selectedRemote.value) return upstream.slice(slash + 1);
+  }
+  return currentBranch.value;
+});
+const previewBranch = computed(() => `${selectedRemote.value}/${trackingBranch.value}`);
 
 const selectedRemoteUrl = computed(
   () => remoteInfos.value.find((r) => r.name === selectedRemote.value)?.url ?? "",
@@ -43,8 +56,27 @@ async function loadRemoteUrls() {
   }
 }
 
+async function loadPreview() {
+  preview.value = null;
+  previewSupported.value = true;
+  if (!repoPath.value || !trackingBranch.value || !selectedRemote.value) return;
+  previewLoading.value = true;
+  try {
+    const command = pullMode.value === "rebase" ? "preview_rebase" : "preview_merge";
+    preview.value = await invoke<MergePreview | null>(command, {
+      repoPath: repoPath.value,
+      ...(pullMode.value === "rebase" ? { onto: previewBranch.value } : { branch: previewBranch.value }),
+    });
+    previewSupported.value = preview.value !== null;
+  } catch {
+    previewSupported.value = false;
+  } finally {
+    previewLoading.value = false;
+  }
+}
+
 function handlePull() {
-  emit("pull", selectedRemote.value, pullMode.value === "rebase");
+  emit("pull", selectedRemote.value, pullMode.value === "rebase", trackingBranch.value || undefined);
 }
 
 function handleFetch() {
@@ -54,12 +86,14 @@ function handleFetch() {
 onMounted(() => {
   dialogRef.value?.focus();
   loadRemoteUrls();
+  void loadPreview();
 });
 
 watch(repoPath, () => loadRemoteUrls());
 watch(remotes, (names) => {
   if (names.length && !names.includes(selectedRemote.value)) selectedRemote.value = names[0];
 }, { immediate: true });
+watch([selectedRemote, pullMode, trackingBranch, repoPath], () => { void loadPreview(); });
 </script>
 
 <template>
@@ -114,8 +148,14 @@ watch(remotes, (names) => {
 
         <p v-if="selectedRemoteUrl || behindCount > 0" class="behind-info">
           {{ behindCount }} commits behind
-          <strong>{{ selectedRemote }}/{{ currentBranch }}</strong>
+          <strong>{{ selectedRemote }}/{{ trackingBranch }}</strong>
         </p>
+        <p v-if="previewLoading" class="dialog-hint">Checking {{ pullMode }} preview…</p>
+        <div v-else-if="previewSupported && preview" class="preview" :class="{ conflict: !preview.clean }">
+          <strong>{{ preview.clean ? (preview.fast_forward ? 'Fast-forward possible' : 'No conflicts expected') : 'Conflicts may need resolving' }}</strong>
+          <span v-if="preview.conflicted_files.length">{{ preview.conflicted_files.join(', ') }}</span>
+        </div>
+        <p v-else class="dialog-hint">Pull preview requires Git 2.38 or newer.</p>
       </div>
 
       <div class="dialog-footer">
@@ -224,4 +264,16 @@ watch(remotes, (names) => {
 .behind-info strong {
   color: var(--text-secondary);
 }
+
+.preview {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 9px;
+  border: 1px solid var(--border-subtle);
+  color: var(--green);
+  font-size: var(--font-size-sm);
+}
+.preview.conflict { color: var(--red); }
+.preview span { color: var(--text-muted); overflow-wrap: anywhere; }
 </style>
