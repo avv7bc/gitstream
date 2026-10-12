@@ -44,7 +44,9 @@ pub fn supports_merge_preview(version_output: &str) -> bool {
     };
     let mut parts = version.split('.').filter_map(|part| {
         let digits: String = part.chars().take_while(|c| c.is_ascii_digit()).collect();
-        (!digits.is_empty()).then(|| digits.parse::<u32>().ok()).flatten()
+        (!digits.is_empty())
+            .then(|| digits.parse::<u32>().ok())
+            .flatten()
     });
     let major = parts.next().unwrap_or(0);
     let minor = parts.next().unwrap_or(0);
@@ -59,13 +61,14 @@ pub fn preview_merge(repo_path: &Path, branch: &str) -> Result<Option<MergePrevi
             hint: None,
         });
     }
-    let version = Command::new("git")
-        .arg("--version")
-        .output()
-        .map_err(|e| GitError::CommandFailed {
-            message: format!("Failed to run git: {e}"),
-            hint: None,
-        })?;
+    let version =
+        Command::new("git")
+            .arg("--version")
+            .output()
+            .map_err(|e| GitError::CommandFailed {
+                message: format!("Failed to run git: {e}"),
+                hint: None,
+            })?;
     let version = String::from_utf8_lossy(&version.stdout);
     if !supports_merge_preview(&version) {
         return Ok(None);
@@ -93,9 +96,8 @@ pub fn preview_merge(repo_path: &Path, branch: &str) -> Result<Option<MergePrevi
 }
 
 /// Preview a rebase by replaying at most fifty commits through merge-tree.
-/// Each generated tree becomes the base for the next commit; no index or
-/// worktree is touched. `None` means the repository's Git is too old or the
-/// rebase is too large to preview safely in the dialog.
+/// No index or worktree is touched. `None` means Git is too old or the range
+/// requires commit replay that cannot be represented safely by merge-tree.
 pub fn preview_rebase(repo_path: &Path, onto: &str) -> Result<Option<MergePreview>, GitError> {
     if onto.is_empty() || onto.starts_with('-') {
         return Err(GitError::CommandFailed {
@@ -103,23 +105,34 @@ pub fn preview_rebase(repo_path: &Path, onto: &str) -> Result<Option<MergePrevie
             hint: None,
         });
     }
-    let version = Command::new("git")
-        .arg("--version")
-        .output()
-        .map_err(|e| GitError::CommandFailed {
-            message: format!("Failed to run git: {e}"),
-            hint: None,
-        })?;
+    let version =
+        Command::new("git")
+            .arg("--version")
+            .output()
+            .map_err(|e| GitError::CommandFailed {
+                message: format!("Failed to run git: {e}"),
+                hint: None,
+            })?;
     if !supports_merge_preview(&String::from_utf8_lossy(&version.stdout)) {
         return Ok(None);
     }
     let range = format!("{onto}..HEAD");
-    let commits = run_git(repo_path, &["rev-list", "--reverse", "--max-count=51", &range])?;
-    let commits: Vec<&str> = commits.lines().filter(|line| !line.trim().is_empty()).collect();
+    let commits = run_git(
+        repo_path,
+        &["rev-list", "--reverse", "--max-count=51", &range],
+    )?;
+    let commits: Vec<&str> = commits
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .collect();
     if commits.len() > 50 {
         return Ok(None);
     }
     let had_commits = !commits.is_empty();
+    // `merge-tree --write-tree` returns a tree object. Turn each result into a
+    // synthetic commit before using it as the next merge base; this preserves
+    // the commit/tree distinction and lets Git perform a real three-way replay
+    // without touching refs, the index, or the worktree.
     let mut base = onto.to_string();
     for commit in commits {
         let output = Command::new("git")
@@ -141,14 +154,33 @@ pub fn preview_rebase(repo_path: &Path, onto: &str) -> Result<Option<MergePrevie
                 true,
             )));
         }
-        let Some(tree) = stdout.lines().next().map(str::trim).filter(|line| !line.is_empty()) else {
+        let Some(tree) = stdout.lines().next().map(str::trim).filter(|line| {
+            (40..=64).contains(&line.len()) && line.chars().all(|c| c.is_ascii_hexdigit())
+        }) else {
             return Ok(Some(MergePreview {
                 clean: false,
                 conflicted_files: Vec::new(),
                 fast_forward: false,
             }));
         };
-        base = tree.to_string();
+        let synthetic = Command::new("git")
+            .args(["-C"])
+            .arg(repo_path)
+            .args(["commit-tree", tree, "-p", &base, "-m", "GitStream preview"])
+            .env("GIT_AUTHOR_NAME", "GitStream Preview")
+            .env("GIT_AUTHOR_EMAIL", "preview@gitstream.invalid")
+            .env("GIT_COMMITTER_NAME", "GitStream Preview")
+            .env("GIT_COMMITTER_EMAIL", "preview@gitstream.invalid")
+            .env("GIT_EDITOR", "true")
+            .output()
+            .map_err(|e| GitError::CommandFailed {
+                message: format!("Failed to create preview commit: {e}"),
+                hint: None,
+            })?;
+        if !synthetic.status.success() {
+            return Ok(None);
+        }
+        base = String::from_utf8_lossy(&synthetic.stdout).trim().to_owned();
     }
     Ok(Some(MergePreview {
         clean: true,
@@ -177,7 +209,10 @@ pub fn parse_merge_tree_output_with_status(
         if trimmed.starts_with("CONFLICT") || trimmed.contains("Merge conflict in ") {
             conflict_output = true;
         }
-        if let Some(path) = line.split_once("Merge conflict in ").map(|(_, path)| path.trim()) {
+        if let Some(path) = line
+            .split_once("Merge conflict in ")
+            .map(|(_, path)| path.trim())
+        {
             if !path.is_empty() && !conflicted_files.iter().any(|item| item == path) {
                 conflicted_files.push(path.to_string());
             }
@@ -192,7 +227,12 @@ pub fn parse_merge_tree_output_with_status(
 
 #[cfg(test)]
 mod merge_preview_tests {
-    use super::{parse_merge_tree_output, parse_merge_tree_output_with_status, supports_merge_preview};
+    use super::{
+        parse_merge_tree_output, parse_merge_tree_output_with_status, preview_rebase,
+        supports_merge_preview,
+    };
+    use std::fs;
+    use std::process::Command;
 
     #[test]
     fn merge_preview_requires_git_238() {
@@ -223,6 +263,34 @@ mod merge_preview_tests {
     fn generic_conflict_output_is_not_clean() {
         let result = parse_merge_tree_output("CONFLICT (content)", false);
         assert!(!result.clean);
+    }
+
+    #[test]
+    fn rebase_preview_replays_tree_as_synthetic_commit() {
+        let dir = std::env::temp_dir().join(format!("gitstream-preview-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let git = |args: &[&str]| {
+            assert!(Command::new("git")
+                .current_dir(&dir)
+                .args(args)
+                .status()
+                .unwrap()
+                .success());
+        };
+        git(&["init", "-q"]);
+        git(&["config", "user.name", "T"]);
+        git(&["config", "user.email", "t@e"]);
+        fs::write(dir.join("f"), "one\n").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-qm", "one"]);
+        let base = super::run_git(&dir, &["rev-parse", "HEAD"]).unwrap();
+        fs::write(dir.join("f"), "one\ntwo\n").unwrap();
+        git(&["commit", "-qam", "two"]);
+        let preview = preview_rebase(&dir, base.trim()).unwrap().unwrap();
+        assert!(preview.clean);
+        assert!(!preview.fast_forward);
+        let _ = fs::remove_dir_all(dir);
     }
 }
 
@@ -274,7 +342,10 @@ enum BlobSrc<'a> {
 /// Расширение пути — растровое изображение, показываемое в `<img>`.
 fn is_image_path(path: &str) -> bool {
     matches!(
-        path.rsplit('.').next().map(str::to_ascii_lowercase).as_deref(),
+        path.rsplit('.')
+            .next()
+            .map(str::to_ascii_lowercase)
+            .as_deref(),
         Some("png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" | "avif")
     )
 }
@@ -293,7 +364,9 @@ fn image_of(repo_path: &Path, src: &BlobSrc, path: &str) -> Option<String> {
 /// Размер файла в байтах из указанного источника.
 fn size_of(repo_path: &Path, src: &BlobSrc, path: &str) -> Option<u64> {
     match src {
-        BlobSrc::Disk => std::fs::metadata(repo_path.join(path)).ok().map(|m| m.len()),
+        BlobSrc::Disk => std::fs::metadata(repo_path.join(path))
+            .ok()
+            .map(|m| m.len()),
         BlobSrc::Rev(rev) => run_git(repo_path, &["cat-file", "-s", &format!("{}:{}", rev, path)])
             .ok()
             .and_then(|s| s.trim().parse().ok()),
@@ -424,7 +497,13 @@ pub fn list_all_files(repo_path: &Path) -> Result<Vec<String>, GitError> {
     // не попадает, поэтому полная структура папок не строится.
     let output = run_git(
         repo_path,
-        &["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+        &[
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "-z",
+        ],
     )?;
     let files = output
         .split('\0')
@@ -508,20 +587,21 @@ fn unpushed_set(repo_path: &Path) -> std::collections::HashSet<String> {
 // локальных веток, а не все `--remotes`, иначе в граф лезут orphan remote-ветки
 // (origin/Demo-topic и т.п.), не связанные ни с одной локальной веткой.
 fn upstream_refs(repo_path: &Path) -> Vec<String> {
-    run_git(repo_path, &["for-each-ref", "--format=%(upstream)", "refs/heads/"])
-        .map(|o| {
-            o.lines()
-                .filter(|l| !l.is_empty())
-                // %(upstream) печатает настроенный upstream, даже если ref не
-                // существует (ветка удалена на remote / ещё не зафетчена). Такой
-                // ref уронил бы `git log` с кодом 128 → пустой граф. Отсеиваем.
-                .filter(|r| {
-                    run_git(repo_path, &["rev-parse", "--verify", "--quiet", r]).is_ok()
-                })
-                .map(|s| s.to_string())
-                .collect()
-        })
-        .unwrap_or_default()
+    run_git(
+        repo_path,
+        &["for-each-ref", "--format=%(upstream)", "refs/heads/"],
+    )
+    .map(|o| {
+        o.lines()
+            .filter(|l| !l.is_empty())
+            // %(upstream) печатает настроенный upstream, даже если ref не
+            // существует (ветка удалена на remote / ещё не зафетчена). Такой
+            // ref уронил бы `git log` с кодом 128 → пустой граф. Отсеиваем.
+            .filter(|r| run_git(repo_path, &["rev-parse", "--verify", "--quiet", r]).is_ok())
+            .map(|s| s.to_string())
+            .collect()
+    })
+    .unwrap_or_default()
 }
 
 #[allow(dead_code)]
@@ -592,7 +672,10 @@ pub fn log_with_filter(
     }
     args.push(format!("--format={}", LOG_FORMAT));
     args.push(limit_str);
-    if let Some(path) = filter.and_then(|f| f.path.as_deref()).filter(|v| !v.is_empty()) {
+    if let Some(path) = filter
+        .and_then(|f| f.path.as_deref())
+        .filter(|v| !v.is_empty())
+    {
         args.push("--".into());
         args.push(path.into());
     }
@@ -723,8 +806,11 @@ fn parse_ref_labels(raw: &str, remotes: &[String]) -> Vec<RefLabel> {
     // именем настоящего remote'а — иначе локальная ветка `feature/auth`
     // ошибочно классифицировалась бы как remote (просто потому что в имени
     // есть слеш).
-    let is_remote_name =
-        |name: &str| remotes.iter().any(|rem| name.starts_with(&format!("{}/", rem)));
+    let is_remote_name = |name: &str| {
+        remotes
+            .iter()
+            .any(|rem| name.starts_with(&format!("{}/", rem)))
+    };
     raw.split(", ")
         .filter_map(|r| {
             let r = r.trim();
@@ -917,7 +1003,11 @@ pub fn local_tag_commits(repo_path: &Path) -> Result<Vec<(String, String)>, GitE
         let name = parts.first().unwrap_or(&"").to_string();
         let obj = parts.get(1).unwrap_or(&"").to_string();
         let deref = parts.get(2).copied().unwrap_or("");
-        let commit = if deref.is_empty() { obj } else { deref.to_string() };
+        let commit = if deref.is_empty() {
+            obj
+        } else {
+            deref.to_string()
+        };
         if !name.is_empty() {
             result.push((name, commit));
         }
@@ -929,10 +1019,7 @@ pub fn local_tag_commits(repo_path: &Path) -> Result<Vec<(String, String)>, GitE
 /// возвращает статус каждого тега. Чистая функция — без сети, удобно тестировать.
 /// `remote_output` — построчно `<oid>\trefs/tags/<name>` (+ возможные `^{}`
 /// строки с разыменованным коммитом для аннотированных тегов).
-pub fn compute_tag_sync(
-    local: &[(String, String)],
-    remote_output: &str,
-) -> Vec<TagSyncStatus> {
+pub fn compute_tag_sync(local: &[(String, String)], remote_output: &str) -> Vec<TagSyncStatus> {
     // имя → commit oid на remote; для аннотированного предпочитаем `^{}` (коммит).
     let mut remote: HashMap<String, String> = HashMap::new();
     for line in remote_output.lines() {
@@ -953,7 +1040,9 @@ pub fn compute_tag_sync(
             // Разыменованная строка — это и есть коммит; перекрывает oid тег-объекта.
             remote.insert(base.to_string(), oid.to_string());
         } else {
-            remote.entry(name.to_string()).or_insert_with(|| oid.to_string());
+            remote
+                .entry(name.to_string())
+                .or_insert_with(|| oid.to_string());
         }
     }
 
@@ -1085,12 +1174,14 @@ pub fn require_current_branch_name(repo_path: &Path) -> Result<String, GitError>
 
 pub fn repo_info(repo_path: &Path) -> Result<RepoInfo, GitError> {
     let path = run_git(repo_path, &["rev-parse", "--show-toplevel"])?;
+    let common_dir = run_git(repo_path, &["rev-parse", "--git-common-dir"]).unwrap_or_default();
     let branch = run_git(repo_path, &["branch", "--show-current"])?;
     let head = run_git(repo_path, &["rev-parse", "HEAD"]).unwrap_or_default();
     Ok(RepoInfo {
         path: path.trim().to_string(),
         current_branch: branch.trim().to_string(),
         head_oid: head.trim().to_string(),
+        common_dir: common_dir.trim().to_string(),
     })
 }
 
@@ -1132,7 +1223,11 @@ pub fn diff_file(
     }
     let mut diff = parse_diff_single(&output, file);
     // staged: новая версия — индекс (`:path`); unstaged — рабочее дерево.
-    let new = if staged { BlobSrc::Rev("") } else { BlobSrc::Disk };
+    let new = if staged {
+        BlobSrc::Rev("")
+    } else {
+        BlobSrc::Disk
+    };
     fill_binary(repo_path, &mut diff, Some(BlobSrc::Rev("HEAD")), new);
     Ok(diff)
 }
@@ -1753,7 +1848,6 @@ mod log_remote_refs_tests {
 
         let _ = fs::remove_dir_all(&dir);
     }
-
 }
 
 #[cfg(test)]
@@ -1781,8 +1875,8 @@ mod status_untracked_tests {
     // SmartGit. Поэтому status() запрашивает --untracked-files=all.
     #[test]
     fn untracked_directory_lists_individual_files() {
-        let dir = std::env::temp_dir()
-            .join(format!("gitstream_status_untracked_{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("gitstream_status_untracked_{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         git(&dir, &["init", "-q"]);
@@ -1825,8 +1919,7 @@ mod status_untracked_tests {
     // с кириллицей. status() передаёт core.quotePath=false → путь как есть.
     #[test]
     fn modified_cyrillic_path_is_verbatim_utf8() {
-        let dir = std::env::temp_dir()
-            .join(format!("gitstream_status_cyr_{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("gitstream_status_cyr_{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         git(&dir, &["init", "-q"]);
@@ -1893,7 +1986,10 @@ mod diff_commit_tests {
     }
 
     fn head(dir: &Path) -> String {
-        run_git(dir, &["rev-parse", "HEAD"]).unwrap().trim().to_string()
+        run_git(dir, &["rev-parse", "HEAD"])
+            .unwrap()
+            .trim()
+            .to_string()
     }
 
     // Имя файла на кириллице не должно превращаться в мусор: git c
@@ -1999,8 +2095,16 @@ mod diff_commit_tests {
         let diffs = diff_commit(&dir, &oid)
             .expect("корневой коммит должен отдавать список файлов, а не ошибку");
         let paths: Vec<_> = diffs.iter().map(|d| d.path.as_str()).collect();
-        assert!(paths.contains(&"a.txt"), "a.txt должен быть в списке: {:?}", paths);
-        assert!(paths.contains(&"b.txt"), "b.txt должен быть в списке: {:?}", paths);
+        assert!(
+            paths.contains(&"a.txt"),
+            "a.txt должен быть в списке: {:?}",
+            paths
+        );
+        assert!(
+            paths.contains(&"b.txt"),
+            "b.txt должен быть в списке: {:?}",
+            paths
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
@@ -2032,7 +2136,12 @@ mod diff_commit_tests {
         let diffs = diff_commit(&dir, &merge_oid).expect("merge не должен падать");
         let paths: Vec<_> = diffs.iter().map(|d| d.path.as_str()).collect();
         // Diff vs первого родителя (main с a=c): только добавление b.txt.
-        assert_eq!(paths, vec!["b.txt"], "ожидаем diff vs first parent, получили {:?}", paths);
+        assert_eq!(
+            paths,
+            vec!["b.txt"],
+            "ожидаем diff vs first parent, получили {:?}",
+            paths
+        );
 
         // diff_commit_file на merge-коммите должен показывать содержимое файла
         // (diff vs первого родителя), а не пустой combined diff.
@@ -2057,7 +2166,10 @@ mod diff_commit_tests {
         git(&dir, &["init", "-q"]);
 
         let commits = log(&dir, 500).expect("пустой репозиторий не должен давать ошибку");
-        assert!(commits.is_empty(), "лог пустого репозитория должен быть пуст");
+        assert!(
+            commits.is_empty(),
+            "лог пустого репозитория должен быть пуст"
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
@@ -2086,7 +2198,8 @@ mod edge_case_tests {
     }
 
     fn empty_repo(tag: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("gitstream_edge_{}_{}", tag, std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("gitstream_edge_{}_{}", tag, std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         git(&dir, &["init", "-q"]);
@@ -2159,7 +2272,10 @@ mod edge_case_tests {
             "в detached HEAD имени текущей ветки нет"
         );
         assert_eq!(info.head_oid, first, "HEAD указывает на выбранный коммит");
-        assert!(!log(&dir, 100).unwrap().is_empty(), "лог доступен в detached HEAD");
+        assert!(
+            !log(&dir, 100).unwrap().is_empty(),
+            "лог доступен в detached HEAD"
+        );
         assert_eq!(repo_state(&dir).unwrap(), "clean");
         let err = require_current_branch_name(&dir).unwrap_err();
         assert!(err.to_string().contains("checked-out local branch"));
@@ -2181,7 +2297,11 @@ mod edge_case_tests {
 
         // По новому имени с --follow видны все три коммита (включая до rename).
         let commits = file_log(&dir, "new.txt", 100).unwrap();
-        assert_eq!(commits.len(), 3, "--follow должен пройти через переименование");
+        assert_eq!(
+            commits.len(),
+            3,
+            "--follow должен пройти через переименование"
+        );
         assert_eq!(commits[0].message, "edit new", "новейший — первым");
 
         // Несуществующий файл → пустая история, не ошибка.
@@ -2212,8 +2332,8 @@ mod edge_case_tests {
     fn push_flips_unpushed_flag_in_log() {
         let dir = with_commits("push_flip");
         // bare remote рядом
-        let bare = std::env::temp_dir()
-            .join(format!("gitstream_edge_bare_{}.git", std::process::id()));
+        let bare =
+            std::env::temp_dir().join(format!("gitstream_edge_bare_{}.git", std::process::id()));
         let _ = fs::remove_dir_all(&bare);
         let out = Command::new("git")
             .args(["init", "-q", "--bare"])
@@ -2240,7 +2360,10 @@ mod edge_case_tests {
         assert!(
             after.iter().all(|c| !c.unpushed),
             "после push unpushed обязан стать false, получено: {:?}",
-            after.iter().map(|c| (c.oid.clone(), c.unpushed)).collect::<Vec<_>>()
+            after
+                .iter()
+                .map(|c| (c.oid.clone(), c.unpushed))
+                .collect::<Vec<_>>()
         );
 
         let _ = fs::remove_dir_all(&dir);

@@ -9,6 +9,9 @@ pub struct WorktreeInfo {
     pub path: String,
     pub head: String,
     pub branch: Option<String>,
+    /// Common git directory shared by linked worktrees (useful when a
+    /// repository path points at a `.git/worktrees/*` administrative dir).
+    pub common_dir: Option<String>,
     pub detached: bool,
     pub locked: bool,
     pub prunable: bool,
@@ -40,6 +43,10 @@ fn safe_arg(value: &str, label: &str) -> Result<(), GitError> {
 }
 pub fn list(repo: &Path) -> Result<Vec<WorktreeInfo>, GitError> {
     let raw = run(repo, &["worktree", "list", "--porcelain"])?;
+    let common_dir = run(repo, &["rev-parse", "--git-common-dir"])
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty());
     let mut result = Vec::new();
     let mut current: Option<WorktreeInfo> = None;
     for line in raw.lines() {
@@ -59,6 +66,7 @@ pub fn list(repo: &Path) -> Result<Vec<WorktreeInfo>, GitError> {
                     path: value.to_owned(),
                     head: String::new(),
                     branch: None,
+                    common_dir: common_dir.clone(),
                     detached: false,
                     locked: false,
                     prunable: false,

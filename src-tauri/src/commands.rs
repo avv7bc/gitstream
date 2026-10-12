@@ -529,8 +529,9 @@ pub fn do_rebase_plan(
     repo_path: String,
     base: Option<String>,
     plan: Vec<history::TodoItem>,
+    allow_pushed: Option<bool>,
 ) -> Result<String, String> {
-    history::rebase_plan(Path::new(&repo_path), base.as_deref(), &plan).map_err(|e| e.to_string())
+    history::rebase_plan(Path::new(&repo_path), base.as_deref(), &plan, allow_pushed.unwrap_or(false)).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

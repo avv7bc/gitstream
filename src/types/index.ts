@@ -161,6 +161,7 @@ export interface RepoInfo {
   path: string;
   current_branch: string;
   head_oid: string;
+  common_dir?: string;
 }
 
 export interface RepoPathCheck {

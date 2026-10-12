@@ -149,6 +149,7 @@ pub struct RepoInfo {
     pub path: String,
     pub current_branch: String,
     pub head_oid: String,
+    pub common_dir: String,
 }
 
 #[derive(Serialize, Clone, Debug)]
