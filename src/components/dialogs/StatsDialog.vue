@@ -206,6 +206,7 @@ function cellLevel(count: number, maxCount: number): number {
 
 const periods = computed<{ value: StatsPeriod; label: string }[]>(() => [
   { value: "7d",  label: i18n.value.stats.periodWeek },
+  { value: "14d", label: i18n.value.stats.periodTwoWeeks },
   { value: "30d", label: i18n.value.stats.periodMonth },
   { value: "1y",  label: i18n.value.stats.periodYear },
   { value: "all", label: i18n.value.stats.periodAll },

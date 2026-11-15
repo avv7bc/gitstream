@@ -432,6 +432,7 @@ export const en: Translations = {
     activity: "Activity",
     commits: "commits",
     periodWeek: "Week",
+    periodTwoWeeks: "2 weeks",
     periodMonth: "Month",
     periodYear: "Year",
     periodAll: "All time",

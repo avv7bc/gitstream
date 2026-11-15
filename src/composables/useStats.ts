@@ -3,10 +3,11 @@ import { invoke } from "@tauri-apps/api/core";
 import type { RepoStats } from "@/types";
 import { useRepo } from "@/composables/useRepo";
 
-export type StatsPeriod = "7d" | "30d" | "1y" | "all";
+export type StatsPeriod = "7d" | "14d" | "30d" | "1y" | "all";
 
 const periodDays: Record<StatsPeriod, number | null> = {
   "7d": 7,
+  "14d": 14,
   "30d": 30,
   "1y": 365,
   all: null,
@@ -17,7 +18,7 @@ export function useStats() {
   const loading = ref(true);
   const stats = ref<RepoStats | null>(null);
   const error = ref<string | null>(null);
-  const period = ref<StatsPeriod>("30d");
+  const period = ref<StatsPeriod>("14d");
   const progress = ref(0);
 
   let progressTimer: ReturnType<typeof setInterval> | null = null;

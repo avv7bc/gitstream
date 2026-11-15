@@ -437,6 +437,7 @@ const _ru = {
     activity: "Активность",
     commits: "коммитов",
     periodWeek: "Неделя",
+    periodTwoWeeks: "2 недели",
     periodMonth: "Месяц",
     periodYear: "Год",
     periodAll: "Всё время",
